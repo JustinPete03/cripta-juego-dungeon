@@ -3,6 +3,7 @@ from .merge import merge_sort
 
 MAX_INSERTION_SORT_SIZE = 32 # Bench 11 oct 2026, semilla 2026: en aleatorio inserción gana hasta n=32; merge desde n=64.
 DESCENT_LIMIT = 0.05 # Mismo bench: con ~5 % de desorden inserción ganó hasta n=256.
+MAX_ALMOST_SORTED = 256
 
 
 def analizar(pares, descendente=False, contador=None):
@@ -23,7 +24,9 @@ def seleccionar(propiedades):
     descensos = propiedades["descensos"]
     if n <= MAX_INSERTION_SORT_SIZE:
         return insertion_sort
-    if descensos <= DESCENT_LIMIT * n:
+    if descensos == 0:         # ya ordenada: inserción aquí sería O(n)
+        return insertion_sort
+    if n <= MAX_ALMOST_SORTED and descensos <= DESCENT_LIMIT * n:
         return insertion_sort
     return merge_sort
 

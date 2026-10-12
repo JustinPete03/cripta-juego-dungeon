@@ -33,12 +33,13 @@ def mediana(valores):
     return ordenados[len(ordenados) // 2]
 
 def medir(fn, datos):
-    copia = list(datos)
-    contador = Contador()
-    t0 = time.perf_counter()
-    fn(copia, contador=contador)
-    t1 = time.perf_counter()
-    return (t1 - t0) * 1000, contador.comparaciones
+    t0 = time.perf_counter() #Para tiempo sin contador
+    fn(list(datos))
+    ms = (time.perf_counter() - t0) * 1000
+
+    contador = Contador() #Para contar comparaciones
+    fn(list(datos), contador=contador)
+    return ms, contador.comparaciones
 
 algoritmos = (
     ("insertion", insertion_sort),
