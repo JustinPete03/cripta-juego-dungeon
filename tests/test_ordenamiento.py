@@ -2,7 +2,7 @@ import random
 import pytest
 
 from model.ordenamiento.contador import Contador
-from model.ordenamiento.selector import analizar, seleccionar, ordenar, MAX_INSERTION_SORT_SIZE
+from model.ordenamiento.selector import analizar, seleccionar, ordenar, MAX_INSERTION_SORT_SIZE, MAX_ALMOST_SORTED
 from model.ordenamiento.insertion import insertion_sort
 from model.ordenamiento.merge import merge_sort
 from model.ordenamiento.selection import selection_sort
@@ -135,3 +135,34 @@ def test_selection_siempre_hace_n_por_n_menos_1_sobre_2_comparaciones():
     contador = Contador()
     selection_sort([1, 2, 3, 4, 5, 6], contador=contador)
     assert contador.comparaciones == 15
+
+def test_seleccionar_pocos_descensos_pero_n_grande_usa_merge():
+    n = MAX_ALMOST_SORTED * 4
+    assert seleccionar({"n": n, "descensos": 1}) is merge_sort
+
+def test_seleccionar_ordenada_grande_usa_insercion():
+    assert seleccionar({"n": 5000, "descensos": 0}) is insertion_sort
+
+def test_ordenar_mitades_intercambiadas_no_es_cuadratico():
+    n = 2048
+    entrada = list(range(n // 2, n)) + list(range(n // 2))
+    contador = Contador()
+    salida = ordenar(entrada, contador=contador)
+    assert salida == list(range(n))
+    assert contador.comparaciones < 2 * n * 11
+
+def test_ordenar_ordenada_grande_es_lineal():
+    n = 2048
+    contador = Contador()
+    ordenar(list(range(n)), contador=contador)
+    assert contador.comparaciones <= 3 * n
+
+def test_ordenar_no_modifica_la_entrada():
+    entrada = [3, 1, 2]
+    ordenar(entrada)
+    assert entrada == [3, 1, 2]
+
+def test_ordenar_cuenta_las_comparaciones_del_analisis():
+    contador = Contador()
+    ordenar([1, 2, 3, 4], contador=contador)
+    assert contador.comparaciones == 6
