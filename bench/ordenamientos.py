@@ -8,8 +8,7 @@ from model.ordenamiento.selection import selection_sort
 
 SEMILLA = 2026
 REPETICIONES = 7
-TAMANOS = (8, 16, 32, 64, 128, 256)
-
+TAMANOS = (8, 16, 32, 64, 128, 256, 512, 1024, 2048)
 
 def construir(n, modo, azar):
     if modo == "aleatorio":
@@ -25,6 +24,14 @@ def construir(n, modo, azar):
             i = azar.randrange(n)
             j = azar.randrange(n)
             datos[i], datos[j] = datos[j], datos[i]
+        return datos
+    if modo == "mitades": #Un solo decenso (caso malo para insercion)
+        return (list(range(n // 2, n)) + list(range(n // 2)))
+    if modo == "vecinos": #Intercambio entre posiciones contiguas.
+        datos = list(range(n))
+        for _ in range(max(1, n // 20)):
+            i = azar.randrange(n-1)
+            datos[i], datos[i+1] = datos[i+1], datos[i]
         return datos
     raise ValueError(f"modo desconocido: {modo}")
 
@@ -46,8 +53,7 @@ algoritmos = (
     ("merge", merge_sort),
     ("selection", selection_sort),
 )
-modos = ("aleatorio", "ordenado", "invertido", "casi")
-
+modos = ("aleatorio", "ordenado", "invertido", "casi", "mitades", "vecinos")
 
 def main():
     azar = random.Random(SEMILLA)
