@@ -1,8 +1,16 @@
 from .insertion import insertion_sort
 from .merge import merge_sort
 
-MAX_INSERTION_SORT_SIZE = 32 # Bench 11 oct 2026, semilla 2026: en aleatorio inserción gana hasta n=32; merge desde n=64.
-DESCENT_LIMIT = 0.05 # Mismo bench: con ~5 % de desorden inserción ganó hasta n=256.
+# Umbrales calibrados con bench/ordenamientos.py (12 oct 2026, semilla 2026, mediana de 7 repeticiones).
+
+# Modo "aleatorio": inserción gana hasta n=32, empata en n=64 (0.200 vs 0.204 ms) y merge gana desde n=128.
+MAX_INSERTION_SORT_SIZE = 32
+# Fracción de descensos para considerar "casi ordenada". Valor conservador, no medido directamente:
+# el bench no imprime los descensos de cada modo.
+DESCENT_LIMIT = 0.05
+# Modo "casi" (n//20 intercambios al azar): inserción gana hasta n=256 y merge desde n=512.
+# Tope necesario: en "mitades" (1 descenso pero ~n²/4 inversiones) inserción tarda 172 ms
+# contra 4.6 ms de merge en n=2048, y los descensos no distinguen ese caso de "vecinos".
 MAX_ALMOST_SORTED = 256
 
 
