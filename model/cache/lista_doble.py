@@ -31,6 +31,8 @@ class ListaDoble:
         self.tamanio -= 1
 
     def mover_al_frente(self,nodo):
+        if nodo is self.primero:
+            return
         self.quitar(nodo)
         self.agregar_al_frente(nodo)
 
