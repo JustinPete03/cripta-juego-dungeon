@@ -1,3 +1,6 @@
+from model.cache import nodo
+
+
 class ListaDoble:
     def __init__(self):
         self.primero = None
@@ -13,3 +16,17 @@ class ListaDoble:
             self.ultimo = nodo
         self.primero = nodo
         self.tamanio += 1
+
+    def quitar(self,nodo):
+        if nodo.anterior is not None:
+            nodo.anterior.siguiente = nodo.siguiente
+        else:
+            self.primero = nodo.siguiente
+        if nodo.siguiente is not None:
+            nodo.siguiente.anterior = nodo.anterior
+        else:
+            self.ultimo = nodo.anterior
+        nodo.anterior = None
+        nodo.siguiente = None
+        self.tamanio -= 1
+

@@ -25,6 +25,17 @@ def ids_hacia_atras(lista):
         actual = actual.anterior
     return ids
 
+def lista_tres_nodos():
+    lista = ListaDoble()
+    a = Nodo("a","ficha_a")
+    b = Nodo("b","ficha_b")
+    c = Nodo("c","ficha_c")
+    lista.agregar_al_frente(a)
+    lista.agregar_al_frente(b)
+    lista.agregar_al_frente(c)
+    return lista, [a,b,c]
+
+
 def test_tres_nodos():
     lista = ListaDoble()
     a = Nodo("a","ficha_a")
@@ -40,3 +51,46 @@ def test_tres_nodos():
     assert ids_hacia_atras(lista) == ["a","b","c"]
     assert lista.primero.anterior is None
     assert lista.ultimo.siguiente is None
+
+def test_quitar_primero():
+    lista, nodos = lista_tres_nodos()
+    [a,b,c] = nodos
+    lista.quitar(c)
+    assert lista.primero is b
+    assert lista.tamanio == 2
+    assert ids_hacia_adelante(lista) == ["b","a"]
+    assert ids_hacia_atras(lista) == ["a","b"]
+
+def test_quitar_ultimo():
+    lista, nodos = lista_tres_nodos()
+    [a, b, c] = nodos
+    lista.quitar(a)
+    assert lista.primero is c
+    assert lista.tamanio == 2
+    assert ids_hacia_adelante(lista) == ["c", "b"]
+    assert ids_hacia_atras(lista) == ["b", "c"]
+    assert b.siguiente is None
+    assert a.anterior is None
+    assert a.siguiente is None
+
+def test_quitar_nodo_unico():
+    lista = ListaDoble()
+    a = Nodo("a","ficha_a")
+    lista.agregar_al_frente(a)
+    lista.quitar(a)
+    assert lista.primero is None
+    assert lista.ultimo is None
+    assert lista.tamanio == 0
+
+def test_quitar_del_medio():
+    lista, nodos = lista_tres_nodos()
+    [a, b, c] = nodos
+    lista.quitar(b)
+    assert lista.primero is c
+    assert lista.tamanio == 2
+    assert ids_hacia_adelante(lista) == ["c","a"]
+    assert ids_hacia_atras(lista) == ["a","c"]
+    assert c.siguiente is a
+    assert a.anterior is c
+    assert b.anterior is None
+    assert b.siguiente is None
