@@ -6,7 +6,6 @@ class CacheFichas:
     def __init__(self, capacidad=25):
         self.capacidad = capacidad
         self.lista = ListaDoble()
-        self.indice = [] #arreglo para búsqueda binaria
 
         #contadores de metricas:
         self.aciertos = 0
@@ -15,15 +14,15 @@ class CacheFichas:
         self.veces_sobre_tope = 0
         self.maximo_alcanzado = 0
 
-    def buscar_nodo(self, id_ficha): #Para buscar la posicion en un indice contiguo
+    def buscar_nodo(self, id_ficha): #devuelve el nodo con ese id, sino devuelve None
         actual = self.lista.primero
         while actual is not None:
             if actual.idFicha == id_ficha:
                 return actual
-            actual = self.lista.siguiente
+            actual = actual.siguiente
         return None
 
-    def buscar_desalojabe(self):
+    def buscar_desalojable(self):
         actual = self.lista.ultimo
         while actual is not None:
             if actual.referencias == 0:
@@ -33,7 +32,7 @@ class CacheFichas:
 
     def consultar_ficha(self, id_ficha): #para extraer la ficha de la cache
         nodo = self.buscar_nodo(id_ficha)
-        if nodo is not None:
+        if nodo is None:
             self.fallos += 1
             return None
         self.aciertos += 1
@@ -51,7 +50,7 @@ class CacheFichas:
             return None
 
         while self.lista.tamanio >= self.capacidad:
-            candidato = self.buscar_desalojabe() #candidato a ser eliminado para guardar una nueva ficha
+            candidato = self.buscar_desalojable() #candidato a ser eliminado para guardar una nueva ficha
             if candidato is None:
                 self.veces_sobre_tope += 1
                 break
