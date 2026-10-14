@@ -1,9 +1,4 @@
-"""Historial de retroceso (§4.6): pila de intervalos (tope 5), cada uno con una pila de registros."""
-
-
 class RegistroAtributo:
-    """Sirve para vida, reloj, rastro, estado de puerta/trampa, sala, etc.
-    Guarda el valor ANTERIOR de objeto.nombre."""
     def __init__(self, objeto, nombre, valor_anterior):
         self.objeto, self.nombre, self.valor = objeto, nombre, valor_anterior
 
@@ -30,7 +25,6 @@ class Historial:
         self.intervalos = []
 
     def abrir(self):
-        """Llamar cuando el jugador CONFIRMA una acción que consume tiempo."""
         if len(self.intervalos) == self.CAP:
             for i in range(1, self.CAP):                # descarta el más antiguo
                 self.intervalos[i - 1] = self.intervalos[i]
@@ -38,7 +32,6 @@ class Historial:
         self.intervalos.append(Intervalo())
 
     def registrar(self, registro):
-        """Todas las mutaciones del modelo pasan por aquí."""
         if self.intervalos:
             self.intervalos[-1].registrar(registro)
 

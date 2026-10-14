@@ -1,6 +1,3 @@
-"""Inventario (§4.5): lista doblemente enlazada propia. Sin dict, sin list.sort()."""
-
-
 class Nodo:
     __slots__ = ("item", "ant", "sig", "enlazado")
 
@@ -74,7 +71,6 @@ class Inventario:
 
     # ---- enlaces de bajo nivel, O(1) ----
     def _enlazar_despues(self, nodo, ant):
-        """Inserta nodo después de ant; si ant es None o ya no está enlazado, al frente."""
         if ant is None or not ant.enlazado:
             nodo.ant, nodo.sig = None, self.cabeza
             if self.cabeza:
@@ -123,7 +119,6 @@ class Inventario:
         return self.tamano >= self.capacidad
 
     def recoger(self, item):
-        """False si está lleno: no ejecuta ni consume tiempo (Apéndice B)."""
         if self.lleno():
             return False
         nodo = Nodo(item)
@@ -132,7 +127,6 @@ class Inventario:
         return True
 
     def soltar_actual(self):
-        """Suelta el objeto bajo el cursor. O(1). Devuelve el item o None."""
         nodo = self.cursor
         if nodo is None:
             return None
@@ -142,7 +136,6 @@ class Inventario:
         return nodo.item
 
     def equipar_actual(self):
-        """Mueve al frente y equipa. Solo arma o armadura. O(1)."""
         nodo = self.cursor
         if nodo is None:
             return False
