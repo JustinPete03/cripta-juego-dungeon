@@ -76,3 +76,5 @@ class CacheFichas:
             return False
         nodo.referencias -= 1
         return True
+
+    def obtener_fichas(self):
