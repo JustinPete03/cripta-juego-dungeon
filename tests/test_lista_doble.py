@@ -8,6 +8,8 @@ def test_un_solo_nodo():
     assert lista.primero is a
     assert lista.ultimo is a
     assert lista.tamanio == 1
+    assert a.anterior is None
+    assert a.siguiente is None
 
 def ids_hacia_adelante(lista):
     ids = []
@@ -57,15 +59,20 @@ def test_quitar_primero():
     [a,b,c] = nodos
     lista.quitar(c)
     assert lista.primero is b
+    assert lista.ultimo is a
     assert lista.tamanio == 2
     assert ids_hacia_adelante(lista) == ["b","a"]
     assert ids_hacia_atras(lista) == ["a","b"]
+    assert b.anterior is None
+    assert c.anterior is None
+    assert c.siguiente is None
 
 def test_quitar_ultimo():
     lista, nodos = lista_tres_nodos()
     [a, b, c] = nodos
     lista.quitar(a)
     assert lista.primero is c
+    assert lista.ultimo is b
     assert lista.tamanio == 2
     assert ids_hacia_adelante(lista) == ["c", "b"]
     assert ids_hacia_atras(lista) == ["b", "c"]
@@ -81,12 +88,17 @@ def test_quitar_nodo_unico():
     assert lista.primero is None
     assert lista.ultimo is None
     assert lista.tamanio == 0
+    assert ids_hacia_adelante(lista) == []
+    assert ids_hacia_atras(lista) == []
+    assert a.anterior is None
+    assert a.siguiente is None
 
 def test_quitar_del_medio():
     lista, nodos = lista_tres_nodos()
     [a, b, c] = nodos
     lista.quitar(b)
     assert lista.primero is c
+    assert lista.ultimo is a
     assert lista.tamanio == 2
     assert ids_hacia_adelante(lista) == ["c","a"]
     assert ids_hacia_atras(lista) == ["a","c"]
