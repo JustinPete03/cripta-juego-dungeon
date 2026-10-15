@@ -113,7 +113,12 @@ class Agenda:
                 continue
             return evento
         return None
+    def secuencia(self):
+        return self._siguienteSeq
 
+    def restaurarSecuencia(self, valor):
+        # Solo lo usa el retroceso
+        self._siguienteSeq = valor
     # consultas
     def tamano(self):
         return len(self._heap)

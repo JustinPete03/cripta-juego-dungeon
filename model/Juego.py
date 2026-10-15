@@ -266,9 +266,17 @@ class Modelo:
         self.diario.abrirIntervalo()
         relojAnterior = self.reloj
         if self._grabando:
+            estadoAzar = self.azar.getstate()
+            serieAnterior = self.siguienteSerieObjeto
+            secuenciaAnterior = self.agenda.secuencia()
             def restaurarReloj():
                 self.reloj = relojAnterior
+            def restaurarContadores():
+                self.azar.setstate(estadoAzar)
+                self.siguienteSerieObjeto = serieAnterior
+                self.agenda.restaurarSecuencia(secuenciaAnterior)
             self.diario.registrar(restaurarReloj)
+            self.diario.registrar(restaurarContadores)
         self.asignar(self, "eventoDecision", None)   # la inversa restaura el evento del jugador
 
         self._programarSiguienteJugador(COSTOS[tipo])
