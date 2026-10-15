@@ -172,7 +172,7 @@ class PruebasMotor(unittest.TestCase):
         r = m.ejecutar(Accion(ACC_ABRIR, "E"))
         self.assertFalse(r.ok)
         self.assertTrue(m.ejecutar(Accion(ACC_MOVER, "O")).ok)
-        # recoger todo lo del suelo (daga, llaves) hasta tener llave A
+        # recoger del suelo (daga, llaves) hasta tener llave A
         while len(m.jugador.sala.objetos) > 0:
             self.assertTrue(m.ejecutar(Accion(ACC_RECOGER, 0)).ok)
         self.assertTrue(m.ejecutar(Accion(ACC_MOVER, "E")).ok)

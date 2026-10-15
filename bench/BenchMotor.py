@@ -30,7 +30,7 @@ def _agendaHeap(n, operaciones):
 
 
 def _agendaEscaneoLineal(n, operaciones):
-    #Alternativa descartada: lista sin orden, buscar el mínimo recorriendo todo.
+    #Alternativa descartada: lista sin orden, buscar el mínimo recorriendo.
     azar = random.Random(1)
     lista = []
     seq = 0
@@ -144,7 +144,7 @@ def _bitacoraPop(mensajes):
 
 
 def _bitacoraCrece(mensajes):
-        ##Alternativa descartada: guardar todo y mostrar los últimos 20 (memoria no constante).
+        ##Alternativa descartada:
     lista = []
     for i in range(mensajes):
         lista.append("mensaje %d" % i)

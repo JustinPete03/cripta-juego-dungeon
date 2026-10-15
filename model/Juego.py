@@ -3,7 +3,7 @@
 #Reglas de oro:
  # * Toda mutación pasa por asignar / agregar / quitar/ insertar (o por la agenda),
  #   que informan su inversa al diario. Así el retroceso no necesita copias del estado.
- # * Nada de dict como índice. Nada de hora del sistema. Todo el azar sale de self.azar.
+ # * Nada de dict como índice. Nada de hora del sistema.
  # * El modelo solo conoce las interfaces de modelo/interfaces.py.
 import random
 
