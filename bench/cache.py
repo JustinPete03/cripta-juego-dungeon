@@ -71,7 +71,8 @@ def bench_persistencia(capacidad, peticiones):
     for id_ficha in peticiones:
         cache_vacia.obtener_fichas([id_ficha], cargador_vacia)
 
-    guardar_cache(ARCHIVO_BENCH_TEMP, VERSION_BENCH, cache_vacia)
+    if not guardar_cache(ARCHIVO_BENCH_TEMP, VERSION_BENCH, cache_vacia):
+        print("Aviso: no se pudo guardar la cache de prueba")
 
     #Restaurando desde el disco
     cache_restaurada = CacheFichas(capacidad = capacidad)

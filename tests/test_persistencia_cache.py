@@ -1,3 +1,5 @@
+import os
+
 from model.cache.cache_fichas import CacheFichas
 from model.cache.persistencia_cache import guardar_cache, cargar_cache
 
@@ -66,3 +68,19 @@ def test_guardar_y_cargar_preserva_orden_lru(tmp_path):
 
     assert cache_restaurada.lista.primero.id_ficha == "a"
     assert cache_restaurada.lista.ultimo.id_ficha == "b"
+
+def test_guardar_ficha_no_serializable_no_deja_temporales(tmp_path):
+    archivo = tmp_path / "cache.json"
+    cache = CacheFichas(capacidad=3)
+    cache.guardar_ficha("f1", {"nombre": "Orco"})
+    assert guardar_cache(str(archivo), "1.0.0", cache) is True
+
+    cache.guardar_ficha("f2", {1, 2})  #un set no es serializable a JSON
+    assert guardar_cache(str(archivo), "1.0.0", cache) is False
+
+    assert os.listdir(tmp_path) == ["cache.json"]
+
+    cache_nueva = CacheFichas(capacidad=3)
+    assert cargar_cache(str(archivo), "1.0.0", cache_nueva) is True
+    assert cache_nueva.consultar_ficha("f1") == {"nombre": "Orco"}
+    assert cache_nueva.consultar_ficha("f2") is None

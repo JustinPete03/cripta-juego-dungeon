@@ -15,11 +15,11 @@ def guardar_cache(ruta_archivo, version, cache):
     ruta_temporal = None
     try:
         with tempfile.NamedTemporaryFile("w", dir=directorio, delete=False, encoding="utf-8") as temp:
-            json.dump(datos, temp, indent=2)
             ruta_temporal = temp.name
+            json.dump(datos, temp, indent=2)
         os.replace(ruta_temporal, ruta_archivo)
         return True
-    except Exception:
+    except (TypeError, ValueError, OSError):
         if ruta_temporal and os.path.exists(ruta_temporal):
             os.remove(ruta_temporal)
         return False

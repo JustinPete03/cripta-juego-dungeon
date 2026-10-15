@@ -1,4 +1,4 @@
-import sys
+import argparse
 
 def ejecutar_benchmarks():
     from bench.ordenamientos import main as bench_ordenamientos
@@ -10,7 +10,11 @@ def ejecutar_benchmarks():
     bench_cache()
 
 def main():
-    if "--bench" in sys.argv:
+    parser = argparse.ArgumentParser(description="Cripta Dungeon")
+    parser.add_argument("--bench", action="store_true", help="ejecuta los benchmarks en lugar del juego")
+    args = parser.parse_args()
+
+    if args.bench:
         ejecutar_benchmarks()
         return
     print("Iniciando cripta dungeon...")

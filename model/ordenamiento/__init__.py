@@ -1,5 +1,5 @@
-#Permite que el programa ejecute cualquiera de los dos algoritmos sin ser seleccionados
-#manualmente por alguna persona.
+#Expone ordenar(), que elige automaticamente entre insercion y merge segun el tamano
+#y el desorden de la entrada. selection_sort existe solo como referencia en los benchmarks.
 
 from .selector import ordenar
 
