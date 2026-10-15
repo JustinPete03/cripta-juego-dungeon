@@ -224,7 +224,9 @@ class Inventario(InventarioBase):
         ficha = self._ficha(nodo.objeto)
         if ficha["clase"] == "pocion" and "cura" in ficha:
             modelo.curar(modelo.jugador, ficha["cura"])
-        modelo.efectos.alUsarObjeto(modelo, ficha)
+        gancho = getattr(modelo.efectos, "alUsarObjeto", None)
+        if gancho is not None:
+            gancho(modelo, ficha)
         self._quitarRegistrando(modelo, nodo)
         modelo.mensaje("Usas: %s." % ficha["nombre"])
 
@@ -241,7 +243,7 @@ class Inventario(InventarioBase):
 
     def vistaOrdenada(self, criterio):
         if criterio not in ("peso", "valor", "nombre"):
-            raise ValueError("Criterio desconocido: %r (usa peso, valor o nombre)." % (criterio,))
+            return self.objetos()
         pares = []
         for objeto in self.objetos():
             ficha = self._ficha(objeto)
