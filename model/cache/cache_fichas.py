@@ -17,7 +17,7 @@ class CacheFichas:
     def buscar_nodo(self, id_ficha): #devuelve el nodo con ese id, sino devuelve None
         actual = self.lista.primero
         while actual is not None:
-            if actual.idFicha == id_ficha:
+            if actual.id_ficha == id_ficha:
                 return actual
             actual = actual.siguiente
         return None
@@ -77,4 +77,29 @@ class CacheFichas:
         nodo.referencias -= 1
         return True
 
-    def obtener_fichas(self):
+    def obtener_fichas(self, ids, cargador, tamano_lote=10):
+        unicos = []
+        resultados = []
+        faltantes = []
+
+        for id_ficha in ids:
+            if id_ficha not in unicos:
+                unicos.append(id_ficha)
+
+        for id_ficha in unicos:
+            ficha = self.consultar_ficha(id_ficha)
+            if ficha is not None:
+                resultados.append((id_ficha, ficha))
+            else:
+                faltantes.append(id_ficha)
+
+        for inicio in range(0, len(faltantes), tamano_lote):
+            lote = faltantes[inicio : inicio + tamano_lote]
+            cargadas = cargador(lote)
+            for id_ficha, ficha in cargadas:
+                self.guardar_ficha(id_ficha, ficha)
+                resultados.append((id_ficha, ficha))
+
+        return resultados
+
+

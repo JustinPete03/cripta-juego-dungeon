@@ -4,7 +4,7 @@ def ids_cache(cache):
     ids = []
     actual = cache.lista.primero
     while actual is not None:
-        ids.append(actual.idFicha)
+        ids.append(actual.id_ficha)
         actual = actual.siguiente
     return ids
 
@@ -97,3 +97,21 @@ def test_capacidad_cero_no_guarda():
     cache = CacheFichas(0)
     assert cache.guardar_ficha("a", "ficha_a") is None
     assert cache.lista.tamanio == 0
+
+def test_obtener_fichas_carga_faltantes(): #en este test se comprueba que pasa cuando la caché está vacía y se piden fichas que esta no tiene
+    llamadas = []
+
+    def cargadorFalso(lote): #fabrica fichas de ejemplo
+        llamadas.append(lote)
+        pares = []
+        for id_ficha in lote:
+            pares.append((id_ficha, "ficha_" + id_ficha))
+        return pares
+
+    cache = CacheFichas()
+    resultado = cache.obtener_fichas(["a","b","c"], cargadorFalso)
+
+    assert llamadas == [["a", "b", "c"]]
+    assert cache.fallos == 3
+    assert resultado == [("a", "ficha_a"), ("b", "ficha_b"), ("c", "ficha_c")]
+    assert cache.consultar_ficha("a") == "ficha_a"

@@ -15,7 +15,7 @@ def ids_hacia_adelante(lista):
     ids = []
     actual = lista.primero
     while actual is not None:
-        ids.append(actual.idFicha)
+        ids.append(actual.id_ficha)
         actual = actual.siguiente
     return ids
 
@@ -23,7 +23,7 @@ def ids_hacia_atras(lista):
     ids = []
     actual = lista.ultimo
     while actual is not None:
-        ids.append(actual.idFicha)
+        ids.append(actual.id_ficha)
         actual = actual.anterior
     return ids
 
