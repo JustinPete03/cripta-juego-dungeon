@@ -13,7 +13,7 @@ from model.Tiempo import intervaloAccion, tiempoTrasCambioVelocidad
 from controller.ControladorJuego import Controlador
 from tests.FuentePrueba import FuentePrueba
 from tests.DiarioPruebas import DiarioPrueba
-from model.InventarioProvisional import InventarioProvisional
+from model.Inventario import Inventario
 
 
 def nuevoModelo(fuente=None, semilla=1, diario=None):
