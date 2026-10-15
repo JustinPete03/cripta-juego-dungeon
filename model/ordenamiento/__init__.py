@@ -2,3 +2,5 @@
 #manualmente por alguna persona.
 
 from .selector import ordenar
+
+__all__ = [ordenar]

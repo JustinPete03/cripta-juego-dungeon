@@ -1,6 +1,3 @@
-from model.cache import nodo
-
-
 class ListaDoble:
     def __init__(self):
         self.primero = None

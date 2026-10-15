@@ -1,9 +1,8 @@
 import sys
 
-from bench.ordenamientos import main as bench_ordenamientos
-from bench.cache import main as bench_cache
-
 def ejecutar_benchmarks():
+    from bench.ordenamientos import main as bench_ordenamientos
+    from bench.cache import main as bench_cache
     print("------Bench de Ordenamientos------")
     bench_ordenamientos()
     print("\n" + "=" * 50 + "\n")

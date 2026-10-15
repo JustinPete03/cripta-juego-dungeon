@@ -38,7 +38,7 @@ def simular_carga(capacidad, peticiones):
         llamadas_externas += len(lote)
         return[(id_f, f"datos_{id_f}") for id_f in lote]
 
-    t0 =time.perf_counter()
+    t0 = time.perf_counter()
 
     for id_ficha in peticiones:
         cache.obtener_fichas([id_ficha], cargador_simulado)
@@ -71,7 +71,7 @@ def bench_persistencia(capacidad, peticiones):
     for id_ficha in peticiones:
         cache_vacia.obtener_fichas([id_ficha], cargador_vacia)
 
-    guardar_cache(ARCHIVO_BENCH_TEMP,VERSION_BENCH, cache_vacia)
+    guardar_cache(ARCHIVO_BENCH_TEMP, VERSION_BENCH, cache_vacia)
 
     #Restaurando desde el disco
     cache_restaurada = CacheFichas(capacidad = capacidad)
@@ -83,11 +83,12 @@ def bench_persistencia(capacidad, peticiones):
         llamadas_restaurada += len(lote)
         return[(id_f, f"datos_{id_f}") for id_f in lote]
 
-    for id_ficha in peticiones:
-        cache_restaurada.obtener_fichas([id_ficha], cargador_restaurada)
-
-    if os.path.exists(ARCHIVO_BENCH_TEMP): #eliminar el archivo temporal
-        os.remove(ARCHIVO_BENCH_TEMP)
+    try:
+        for id_ficha in peticiones:
+            cache_restaurada.obtener_fichas([id_ficha], cargador_restaurada)
+    finally:
+        if os.path.exists(ARCHIVO_BENCH_TEMP): #eliminar el archivo temporal
+            os.remove(ARCHIVO_BENCH_TEMP)
 
     solicitudes_ahorradas = llamadas_vacia - llamadas_restaurada
     porcentaje_ahorro = (solicitudes_ahorradas / llamadas_vacia * 100) if llamadas_vacia > 0 else 0.0

@@ -25,7 +25,7 @@ def construir(n, modo, azar):
             j = azar.randrange(n)
             datos[i], datos[j] = datos[j], datos[i]
         return datos
-    if modo == "mitades": #Un solo decenso (caso malo para insercion)
+    if modo == "mitades": #Un solo descenso (caso malo para insercion)
         return (list(range(n // 2, n)) + list(range(n // 2)))
     if modo == "vecinos": #Intercambio entre posiciones contiguas.
         datos = list(range(n))

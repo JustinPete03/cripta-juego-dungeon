@@ -1,0 +1,1 @@
+#Permite que pytest reconozca la raiz del proyecto para resolver imports.

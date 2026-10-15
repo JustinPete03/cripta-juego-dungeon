@@ -6,7 +6,7 @@ from .merge import merge_sort
 # Modo "aleatorio": inserción gana hasta n=32, empata en n=64 (0.200 vs 0.204 ms) y merge gana desde n=128.
 MAX_INSERTION_SORT_SIZE = 32
 
-#Comparacion costosa donde el cruce baja a n-16
+#Comparacion costosa donde el cruce baja a n=16
 MAX_INSERTION_SORT_SIZE_COSTOSA = 16
 
 #Con pocos descensos, inserción cuesta descensos * n y merge con n log n
