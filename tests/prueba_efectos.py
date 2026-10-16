@@ -1,73 +1,188 @@
-from model.efectos import Veneno, Regeneracion, Antorcha, CambioVelocidad
-from tests.agenda_falsa import AgendaFalsa
+from model.Constantes import EV_JUGADOR
+from model.Entidades import Enemigo
+from model.efectos import EfectosJuego
+from tests.modelo_falso import ModeloFalso
 
 
-class Actor:
-    def __init__(self, vida=30, vida_max=30, velocidad=100):
-        self.vida = vida
-        self.vida_max = vida_max
-        self.velocidad = velocidad
-        self.evento_accion = None
+def nuevo(fichas=None):
+    ef = EfectosJuego()
+    return ModeloFalso(ef, fichas), ef
 
 
 def test_veneno_completo():
-    # Pulsos en 80, 160, 240, 320 y 400 (dura 400): 5 pulsos de 2 de daño
-    a, ag = Actor(), AgendaFalsa()
-    Veneno(a, 2).activar(ag)
-    ag.avanzar_hasta(1000)
-    assert a.vida == 30 - 2 * 5
+    m, ef = nuevo()
+    ef.aplicarVeneno(m, m.jugador, 2)
+    m.correr_hasta(1000)
+    assert m.jugador.vida == 30 - 2 * 5          # pulsos en 80,160,240,320,400
+    assert ef.activos == []
 
 
-def test_veneno_cancelado():
-    # Antidoto después del pulso de 160: los pulsos futuros no hacen daño
-    a, ag = Actor(), AgendaFalsa()
-    v = Veneno(a, 2)
-    v.activar(ag)
-    ag.avanzar_hasta(170)
-    v.cancelar(ag)
-    ag.avanzar_hasta(1000)
-    assert a.vida == 30 - 2 * 2
-    assert not v.activo
+def test_antidoto_cancela_pulsos_futuros():
+    m, ef = nuevo()
+    ef.aplicarVeneno(m, m.jugador, 2)
+    m.correr_hasta(170)                           # pulsos en 80 y 160
+    assert ef.curarVeneno(m, m.jugador) is True
+    m.correr_hasta(1000)
+    assert m.jugador.vida == 30 - 2 * 2
+    assert ef.curarVeneno(m, m.jugador) is False  # ya no hay veneno
+
+
+def test_veneno_mata_al_actor():
+    m, ef = nuevo()
+    m.jugador.vida = 3
+    ef.aplicarVeneno(m, m.jugador, 2)
+    m.correr_hasta(1000)
+    assert m.jugador.vida == 0 and not m.jugador.vivo
+    assert ef.activos == []
+    assert m.agenda.pendientesValidos() == []     # no quedan pulsos pendientes
 
 
 def test_regeneracion_con_tope():
-    # Pulsos en 200, 400, 600...: 10 + 4 + 4 = 18
-    a, ag = Actor(vida=10), AgendaFalsa()
-    Regeneracion(a, 4).activar(ag)
-    ag.avanzar_hasta(400)
-    assert a.vida == 18
-    ag.avanzar_hasta(2000)
-    assert a.vida == a.vida_max      # nunca lo supera
+    m, ef = nuevo()
+    rata = Enemigo("e-1", "ent_rata", "Rata", "guardián", 10, 30, 5, 1, 100)
+    ef.aplicarRegeneracion(m, rata, 4)
+    m.correr_hasta(401)                           # pulsos en 200 y 400
+    assert rata.vida == 18                        # 10 + 4 + 4
+    m.correr_hasta(2000)
+    assert rata.vida == rata.vidaMax              # nunca lo supera
+
+
+def test_regeneracion_se_activa_con_el_enemigo():
+    m, ef = nuevo({"ent_rata": {"regeneracion": 4}})
+    rata = Enemigo("e-1", "ent_rata", "Rata", "guardián", 10, 30, 5, 1, 100)
+    ef.alActivarEnemigo(m, rata)
+    m.correr_hasta(200)
+    assert rata.vida == 14
+
+
+def test_muerte_cancela_regeneracion():
+    m, ef = nuevo()
+    rata = Enemigo("e-1", "ent_rata", "Rata", "guardián", 10, 30, 5, 1, 100)
+    ef.aplicarRegeneracion(m, rata, 4)
+    m.aplicarDanio(rata, 10)                      # muere
+    m.correr_hasta(1000)
+    assert rata.vida == 0 and ef.activos == []
 
 
 def test_antorcha():
-    a, ag = Actor(), AgendaFalsa()
-    t = Antorcha(a, 2000)
-    t.activar(ag)
-    ag.avanzar_hasta(1999)
-    assert t.activo
-    ag.avanzar_hasta(2000)
-    assert not t.activo
+    m, ef = nuevo()
+    ef.encenderAntorcha(m, m.jugador, 2000)
+    m.correr_hasta(1999)
+    assert ef.antorchaEncendida(m.jugador)
+    m.correr_hasta(2000)
+    assert not ef.antorchaEncendida(m.jugador)
 
 
-def test_cambio_velocidad():
-    a, ag = Actor(), AgendaFalsa()
-    a.evento_accion = ag.programar(1000, lambda agenda: None)
-    ef = CambioVelocidad(a, 200, 300)
-    ef.activar(ag)
-    # Restante 1000 a velocidad 100 -> 1000*100//200 = 500
-    assert a.velocidad == 200
-    assert a.evento_accion.tiempo == 500
-    ag.avanzar_hasta(300)             # termina el efecto
-    # En t=300 quedan 200; (200*200)//100 = 400 -> tiempo 700
-    assert a.velocidad == 100
-    assert a.evento_accion.tiempo == 700
+def test_velocidad_y_su_fin():
+    m, ef = nuevo()
+    m.jugador.evento = m.programarEvento(1000, EV_JUGADOR, m.jugador)
+    ef.aplicarVelocidad(m, m.jugador, 200, 300)
+    assert m.jugador.velocidad == 200
+    assert m.jugador.evento.tiempo == 500         # 1000*100//200
+    m.correr_hasta(300)
+    assert m.jugador.velocidad == 100
+    assert m.jugador.evento.tiempo == 700         # (500-300)*200//100 = 400
+
+
+def test_velocidad_cancelada_a_mitad():
+    m, ef = nuevo()
+    m.jugador.evento = m.programarEvento(1000, EV_JUGADOR, m.jugador)
+    ef.aplicarVelocidad(m, m.jugador, 200, 300)
+    m.correr_hasta(100)
+    ef.cancelar(m, ef.activosDe(m.jugador)[0])
+    assert m.jugador.velocidad == 100
+    assert m.jugador.evento.tiempo == 900         # (500-100)*200//100 = 800
+
+
+def test_retroceso_veneno():
+    m, ef = nuevo()
+    marca = m.marca()
+    ef.aplicarVeneno(m, m.jugador, 2)
+    m.correr_hasta(170)
+    assert m.jugador.vida == 26
+    m.retroceder_hasta(marca)
+    assert m.jugador.vida == 30
+    assert ef.activos == []
+    assert m.agenda.pendientesValidos() == []
+
+
+def test_retroceso_velocidad():
+    m, ef = nuevo()
+    original = m.programarEvento(1000, EV_JUGADOR, m.jugador)
+    m.jugador.evento = original
+    marca = m.marca()
+    ef.aplicarVelocidad(m, m.jugador, 200, 300)
+    m.correr_hasta(100)
+    m.retroceder_hasta(marca)
+    assert m.jugador.velocidad == 100
+    assert m.jugador.evento is original
+    assert original.tiempo == 1000 and not original.cancelado
+    assert ef.activos == []
+
+
+def test_reaplicar_veneno_reinicia():
+    m, ef = nuevo()
+    ef.aplicarVeneno(m, m.jugador, 2)
+    m.correr_hasta(100)                           # 1 pulso
+    ef.aplicarVeneno(m, m.jugador, 3)             # reinicia: 5 pulsos de 3 desde t=100
+    m.correr_hasta(1000)
+    assert m.jugador.vida == 30 - 2 - 3 * 5
+    assert len(ef.activos) == 0
+
+
+def test_descripcion_para_la_vista():
+    m, ef = nuevo()
+    assert ef.descripcionjugador(m) == []
+    ef.aplicarVeneno(m, m.jugador, 2)
+    ef.encenderAntorcha(m, m.jugador, 2000)
+    m.correr_hasta(100)
+    textos = ef.descripcionjugador(m)
+    assert len(textos) == 2
+    assert "Veneno" in textos[0] and "quedan 300" in textos[0]
+    assert "Antorcha" in textos[1] and "quedan 1900" in textos[1]
+
+
+def test_usar_antidoto():
+    m, ef = nuevo()
+    ef.aplicarVeneno(m, m.jugador, 2)
+    m.correr_hasta(100)                           # 1 pulso
+    ef.alUsarObjeto(m, {"clase": "antidoto", "nombre": "Antídoto"})
+    m.correr_hasta(1000)
+    assert m.jugador.vida == 28 and ef.activos == []
+
+
+def test_usar_antidoto_sin_veneno_no_falla():
+    m, ef = nuevo()
+    ef.alUsarObjeto(m, {"clase": "antidoto", "nombre": "Antídoto"})
+    assert ef.activos == []
+
+
+def test_usar_antorcha():
+    m, ef = nuevo()
+    ef.alUsarObjeto(m, {"clase": "antorcha", "duracion": 2000})
+    assert ef.antorchaEncendida(m.jugador)
+    m.correr_hasta(2000)
+    assert not ef.antorchaEncendida(m.jugador)
+
+
+def test_usar_pocion_de_velocidad():
+    m, ef = nuevo()
+    m.jugador.evento = m.programarEvento(1000, EV_JUGADOR, m.jugador)
+    ef.alUsarObjeto(m, {"clase": "pocion", "modificador_velocidad": 2, "duracion": 300})
+    assert m.jugador.velocidad == 200
+    m.correr_hasta(300)
+    assert m.jugador.velocidad == 100
+
+
+def test_pocion_de_curacion_no_crea_efectos():
+    m, ef = nuevo()
+    ef.alUsarObjeto(m, {"clase": "pocion", "cura": 10})   # la cura la hace el inventario
+    assert ef.activos == []
 
 
 if __name__ == "__main__":
-    test_veneno_completo()
-    test_veneno_cancelado()
-    test_regeneracion_con_tope()
-    test_antorcha()
-    test_cambio_velocidad()
-    print("Todos los efectos OK")
+    for nombre, f in list(globals().items()):
+        if nombre.startswith("test_"):
+            f()
+            print("OK", nombre)
+    print("Efectos OK")

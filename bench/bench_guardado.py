@@ -70,5 +70,9 @@ def ejecutar(tamanos=(20, 200, 2000, 20000)):
         medir_carga_total(n)
 
 
-if __name__ == "__main__":
+def main():
     ejecutar()
+
+
+if __name__ == "__main__":
+    main()
