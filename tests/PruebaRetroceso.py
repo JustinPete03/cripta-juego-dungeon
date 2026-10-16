@@ -261,7 +261,7 @@ class PruebasRetroceso(unittest.TestCase):
         self.assertFalse(m.ejecutar(Accion(ACC_RETROCESO)).ok)
         self.assertEqual(cantidadPergaminos(m), 1)          # el sexto no se consumió
 
-    def testDosPergaminosSeguidosRetroceden_DosAcciones(self):
+    def testDosPergaminosSeguidosRetrocedenDosAcciones(self):
         m = nuevo()
         inicial = fotoCompleta(m)
         m.ejecutar(Accion(ACC_ESPERAR))

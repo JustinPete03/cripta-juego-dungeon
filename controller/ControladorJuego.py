@@ -73,7 +73,7 @@ class Controlador:
         ##Ejecuta en el modelo y anota en la bitácora de partida lo que cambia el estado.
         resultado = self.modelo.ejecutar(accion)
         if resultado.ok and resultado.registrable and self.registro is not None:
-            self.registro.anotar(accion.a_texto())
+            self.registro.anotar(accion.aTexto())
         if self.modelo.estado != EN_CURSO:
             self._cerrarPartida()
         return resultado
@@ -108,7 +108,7 @@ class Controlador:
     def bucleInteractivo(self):
         self.vista.mostrar(self.modelo)
         while self.modelo.estado == EN_CURSO:
-            texto = self.vista.leer_comando()
+            texto = self.vista.leerComando()
             if texto is None:
                 break
             if self.procesar(texto):
@@ -116,7 +116,7 @@ class Controlador:
             self.vista.mostrar(self.modelo)
         if self.modelo.estado != EN_CURSO:
             self.vista.mostrar(self.modelo)
-            self.vista.mostrar_final(self.modelo)
+            self.vista.mostrarFinal(self.modelo)
 
     def reproducir(self, lineas):
 
@@ -142,27 +142,27 @@ class Controlador:
             return
         self.termino = True
         if self.puntajes is not None:
-            self.puntajes.registrar(self.modelo.resultado_partida())
+            self.puntajes.registrar(self.modelo.resultadoPartida())
 
     def _decir(self, texto):
         if self.vista is not None:
-            self.vista.mostrar_texto(texto)
+            self.vista.mostrarTexto(texto)
 
     def _mostrarInventario(self):
         lineas = []
         for objeto in self.modelo.inventario.objetos():
-            lineas.append("  - " + self.modelo.nombre_de(objeto.tipo_id))
+            lineas.append("  - " + self.modelo.nombreDe(objeto.tipoId))
         self._decir("Inventario:\n" + ("\n".join(lineas) if len(lineas) > 0 else "  (vacío)"))
 
     def _ordenar(self, criterio):
         inventario = self.modelo.inventario
-        if not hasattr(inventario, "vista_ordenada"):
+        if not hasattr(inventario, "vistaOrdenada"):
             self._decir("La vista ordenada la aporta el inventario de Jorge.")
             return
-        lista = inventario.vista_ordenada(criterio)
+        lista = inventario.vistaOrdenada(criterio)
         lineas = []
         for objeto in lista:
-            lineas.append("  - " + self.modelo.nombre_de(objeto.tipo_id))
+            lineas.append("  - " + self.modelo.nombreDe(objeto.tipoId))
         self._decir("Inventario por %s:\n%s" % (criterio, "\n".join(lineas)))
 
     def _guardarCargar(self, comando, ruta):

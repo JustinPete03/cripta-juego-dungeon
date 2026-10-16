@@ -1,5 +1,6 @@
 from model.Constantes import ACC_RECOGER, ACC_USAR, ACC_EQUIPAR, ACC_SOLTAR
 from model.Interfaces import InventarioBase, Resultado
+from model.ordenamiento.selector import ordenar as ordenarSeleccion   # Keilor (4.9)
 
 CLASE_PERGAMINO = "pergamino_retroceso"
 
@@ -14,21 +15,10 @@ class Nodo:
         self.enlazado = False
 
 
-def ordenarInsercion(lista, clave):
-    for i in range(1, len(lista)):
-        x = lista[i]
-        kx = clave(x)
-        j = i - 1
-        while j >= 0 and clave(lista[j]) > kx:
-            lista[j + 1] = lista[j]
-            j -= 1
-        lista[j + 1] = x
-
-
 class Inventario(InventarioBase):
     def __init__(self, proveedor, ordenar=None):
         self.proveedor = proveedor
-        self._ordenar = ordenar if ordenar is not None else ordenarInsercion
+        self._ordenar = ordenar if ordenar is not None else ordenarSeleccion
         self.capacidad = 0
         self.cabeza = None
         self.cola = None
@@ -242,17 +232,12 @@ class Inventario(InventarioBase):
         self._desenlazar(nodo)
 
     def vistaOrdenada(self, criterio):
+        """Copia temporal ordenada con el selector de Keilor; el orden real no cambia."""
         if criterio not in ("peso", "valor", "nombre"):
-            return self.objetos()
-        pares = []
-        for objeto in self.objetos():
-            ficha = self._ficha(objeto)
-            clave = ficha["nombre"].lower() if criterio == "nombre" else ficha.get(criterio, 0)
-            pares.append((clave, objeto))
-        self._ordenar(pares, lambda par: par[0])
-        resultado = []
-        for _, objeto in pares:
-            resultado.append(objeto)
-        return resultado
+            return self.objetos()                      # criterio desconocido: orden real
 
-    vista_ordenada = vistaOrdenada
+        def clave(objeto):
+            ficha = self._ficha(objeto)
+            return ficha["nombre"].lower() if criterio == "nombre" else ficha.get(criterio, 0)
+        # los nombres son la comparación costosa: Keilor baja el umbral de inserción (4.9)
+        return self._ordenar(self.objetos(), clave=clave, costosa=(criterio == "nombre"))
