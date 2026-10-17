@@ -6,7 +6,7 @@ class guardadoJson:
             json.dump(salas, archivo)
 
     def cargarSala(self, ruta, salaId):
-        # Hay que leer y convertir TODO el archivo para obtener una sala.
+        # Hay que leer y convertir
         with open(ruta, encoding="utf-8") as archivo:
             salas = json.load(archivo)
         for sala in salas:
