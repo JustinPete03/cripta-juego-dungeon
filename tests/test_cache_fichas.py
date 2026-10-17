@@ -183,3 +183,60 @@ def testSinAlmacenElComportamientoNoCambia():
     cache.obtenerFichas(["a"], cargadorFalso)
     assert llamadas == [["a"]]
     assert cache.aciertosDisco == 0
+
+def cargadorQueRegistra(llamadas):
+    #devuelve un cargador falso que anota en 'llamadas' cada lote que recibe
+    def cargadorFalso(lote):
+        llamadas.append(list(lote))
+        return [(idFicha, "ficha_" + idFicha) for idFicha in lote]
+    return cargadorFalso
+
+def testObtenerFichasRepetidaNoLlamaAlCargador():
+    llamadas = []
+    cargador = cargadorQueRegistra(llamadas)
+    cache = CacheFichas()
+    cache.obtenerFichas(["a", "b"], cargador)
+    resultado = cache.obtenerFichas(["a", "b"], cargador)
+    assert llamadas == [["a", "b"]]
+    assert resultado == [("a", "ficha_a"), ("b", "ficha_b")]
+    assert cache.aciertos == 2
+
+def testObtenerFichasMezclaSoloPideLasFaltantes():
+    llamadas = []
+    cache = CacheFichas()
+    cache.guardarFicha("a", "ficha_a")
+    resultado = cache.obtenerFichas(["a", "b", "c"], cargadorQueRegistra(llamadas))
+    assert llamadas == [["b", "c"]]
+    assert resultado == [("a", "ficha_a"), ("b", "ficha_b"), ("c", "ficha_c")]
+
+def testObtenerFichasIdsRepetidosSePidenUnaVez():
+    llamadas = []
+    cache = CacheFichas()
+    resultado = cache.obtenerFichas(["a", "a", "b"], cargadorQueRegistra(llamadas))
+    assert llamadas == [["a", "b"]]
+    assert resultado == [("a", "ficha_a"), ("b", "ficha_b")]
+
+def testObtenerFichas25FaltantesSeDividenEnLotes():
+    llamadas = []
+    cache = CacheFichas()
+    ids = ["f" + str(i) for i in range(25)]
+    resultado = cache.obtenerFichas(ids, cargadorQueRegistra(llamadas))
+    assert [len(lote) for lote in llamadas] == [10, 10, 5]
+    assert cache.llamadasRed == 3
+    assert len(resultado) == 25
+
+def testObtenerFichasListaVacia():
+    llamadas = []
+    cache = CacheFichas()
+    resultado = cache.obtenerFichas([], cargadorQueRegistra(llamadas))
+    assert resultado == []
+    assert llamadas == []
+
+def testObtenerFichasIdQueElCargadorNoDevuelve():
+    def cargadorIncompleto(lote):
+        return [(idFicha, "ficha_" + idFicha) for idFicha in lote if idFicha != "x"]
+
+    cache = CacheFichas()
+    resultado = cache.obtenerFichas(["a", "x"], cargadorIncompleto)
+    assert resultado == [("a", "ficha_a")]
+    assert cache.consultarFicha("x") is None
