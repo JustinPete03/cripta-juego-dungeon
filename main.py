@@ -1,6 +1,7 @@
 import argparse
 import os
 
+<<<<<<< Updated upstream
 BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1"
 
 
@@ -9,6 +10,13 @@ def ejecutarBenchmarks():
     from bench.Cache import main as benchCache
     from bench.benchGuardado import main as benchGuardado
     from bench.BenchEfectos import main as benchEfectos
+=======
+def ejecutar_benchmarks():
+    from bench.ordenamientos import main as bench_ordenamientos
+    from bench.cache import main as bench_cache
+    from bench.benchGuardado import main as bench_guardado      # NUEVO
+    from bench.BenchEfectos import main as bench_efectos        # NUEVO
+>>>>>>> Stashed changes
     print("------Bench de Ordenamientos------")
     benchOrdenamientos()
     print("\n" + "=" * 50 + "\n")
