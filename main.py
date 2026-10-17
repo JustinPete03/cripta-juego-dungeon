@@ -4,25 +4,25 @@ import os
 BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1"
 
 
-def ejecutar_benchmarks():
-    from bench.ordenamientos import main as bench_ordenamientos
-    from bench.cache import main as bench_cache
-    from bench.benchGuardado import main as bench_guardado
-    from bench.BenchEfectos import main as bench_efectos
+def ejecutarBenchmarks():
+    from bench.Ordenamientos import main as benchOrdenamientos
+    from bench.Cache import main as benchCache
+    from bench.benchGuardado import main as benchGuardado
+    from bench.BenchEfectos import main as benchEfectos
     print("------Bench de Ordenamientos------")
-    bench_ordenamientos()
+    benchOrdenamientos()
     print("\n" + "=" * 50 + "\n")
     print("------Bench de Cache------")
-    bench_cache()
+    benchCache()
     print("\n" + "=" * 50 + "\n")
-    print("------Bench de Guardado (binario vs JSON)------")
-    bench_guardado()
+    print("------Bench de Guardado (Binario vs JSON)------")
+    benchGuardado()
     print("\n" + "=" * 50 + "\n")
     print("------Bench de Efectos (cancelar)------")
-    bench_efectos()
+    benchEfectos()
 
 
-def crear_cliente(args):
+def crearCliente(args):
     if args.offline:
         from adapters.clienteOffline import ClienteOffline
         return ClienteOffline(args.offline)
@@ -30,7 +30,7 @@ def crear_cliente(args):
     return ClienteHTTP(BASE_URL)
 
 
-def elegir_cripta(cliente):
+def elegirCripta(cliente):
     criptas = cliente.obtener_lista_criptas().get("criptas", [])
     if len(criptas) == 0:
         raise RuntimeError("El servicio no devolvió criptas.")
@@ -45,14 +45,14 @@ def elegir_cripta(cliente):
             return criptas[int(texto) - 1]["id"]
 
 
-def construir_modelo(cliente, id_cripta, semilla, cache_size):
+def construirModelo(cliente, idCripta, semilla, cacheSize):
     from adapters.ProveedorRed import ProveedorRed
     from model.Juego import Modelo
     from model.Inventario import Inventario
     from model.Diario import Diario
     from model.efectos import EfectosJuego
 
-    proveedor = ProveedorRed(cliente, id_cripta, cache_size)
+    proveedor = ProveedorRed(cliente, idCripta, cacheSize)
     efectos = EfectosJuego()
     modelo = Modelo(proveedor, semilla, Inventario(proveedor), Diario(), efectos)
     efectos.registrarEn(modelo)
@@ -65,20 +65,20 @@ def jugar(args, cliente):
     from controller.ControladorJuego import Controlador
     from view.Consola import VistaConsola
 
-    id_cripta = args.cripta if args.cripta else elegir_cripta(cliente)
+    idCripta = args.cripta if args.cripta else elegirCripta(cliente)
     semilla = args.semilla if args.semilla is not None else int.from_bytes(os.urandom(4), "big")
     nombre = args.nombre if args.nombre else (input("Nombre del jugador: ").strip() or "Jugador")
 
-    proveedor, modelo = construir_modelo(cliente, id_cripta, semilla, args.cache_size)
-    version_cripta = proveedor.datos["version"]
+    proveedor, modelo = construirModelo(cliente, idCripta, semilla, args.cache_size)
+    versionCripta = proveedor.datos["version"]
 
     registro = GestorBitacoraReplay(args.log)
-    registro.iniciar_nueva_bitacora(id_cripta, version_cripta, proveedor.cache.versionCatalogo, semilla)
+    registro.iniciarNuevaBitacora(idCripta, versionCripta, proveedor.cache.versionCatalogo, semilla)
 
     controlador = Controlador(modelo, VistaConsola(), registro, GestorTablaPuntajes())
     controlador.nombre = nombre
-    controlador.idCripta = id_cripta
-    controlador.versionCripta = version_cripta
+    controlador.idCripta = idCripta
+    controlador.versionCripta = versionCripta
 
     modelo.iniciarPartida()
     print("Semilla: %d  |  bitácora: %s" % (semilla, args.log))
@@ -91,8 +91,8 @@ def reproducir(args, cliente):
     from controller.ControladorJuego import Controlador
 
     registro = GestorBitacoraReplay(args.replay)
-    meta, acciones = registro.cargar_y_validar_replay(cliente)
-    proveedor, modelo = construir_modelo(cliente, meta["id_cripta"], meta["semilla"], args.cache_size)
+    meta, acciones = registro.cargarYValidaReplay(cliente)
+    proveedor, modelo = construirModelo(cliente, meta["id_cripta"], meta["semilla"], args.cacheSize)
     modelo.iniciarPartida()
     controlador = Controlador(modelo)          # sin vista: --replay no la usa
     ok, motivo = controlador.reproducir(acciones)
@@ -116,11 +116,11 @@ def main():
     args = parser.parse_args()
 
     if args.bench:
-        ejecutar_benchmarks()
+        ejecutarBenchmarks()
         return
 
     try:
-        cliente = crear_cliente(args)
+        cliente = crearCliente(args)
         if args.replay:
             reproducir(args, cliente)
         else:

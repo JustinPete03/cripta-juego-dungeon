@@ -1,23 +1,23 @@
 import random
 import time
 
-from model.ordenamiento.contador import Contador
-from model.ordenamiento.insertion import insertion_sort
-from model.ordenamiento.merge import merge_sort
-from model.ordenamiento.selection import selection_sort
+from model.ordenamiento.Contador import Contador
+from model.ordenamiento.Insertion import insertionSort
+from model.ordenamiento.Merge import mergeSort
+from model.ordenamiento.Selection import selectionSort
 
 SEMILLA = 2026
 REPETICIONES = 7
 TAMANOS = (8, 16, 32, 64, 128, 256, 512, 1024, 2048)
 
 def construir(n, modo, azar):
-    if modo == "aleatorio":
+    if modo == "Aleatorio":
         return [azar.randint(0, n) for _ in range(n)]
-    if modo == "ordenado":
+    if modo == "Ordenado":
         return list(range(n))
-    if modo == "invertido":
+    if modo == "Invertido":
         return list(range(n, 0, -1))
-    if modo == "casi":
+    if modo == "Casi":
         datos = list(range(n))
         intercambios = max(1, n // 20)
         for _ in range(intercambios):
@@ -25,18 +25,18 @@ def construir(n, modo, azar):
             j = azar.randrange(n)
             datos[i], datos[j] = datos[j], datos[i]
         return datos
-    if modo == "mitades": #Un solo descenso (caso malo para insercion)
+    if modo == "Mitades": #Un solo descenso (caso malo para insercion)
         return (list(range(n // 2, n)) + list(range(n // 2)))
-    if modo == "vecinos": #Intercambio entre posiciones contiguas.
+    if modo == "Vecinos": #Intercambio entre posiciones contiguas.
         datos = list(range(n))
         for _ in range(max(1, n // 20)):
             i = azar.randrange(n-1)
             datos[i], datos[i+1] = datos[i+1], datos[i]
         return datos
-    raise ValueError(f"modo desconocido: {modo}")
+    raise ValueError(f"Modo desconocido: {modo}")
 
 def mediana(valores):
-    ordenados = insertion_sort(valores)
+    ordenados = insertionSort(valores)
     return ordenados[len(ordenados) // 2]
 
 def medir(fn, datos):
@@ -49,16 +49,16 @@ def medir(fn, datos):
     return ms, contador.comparaciones
 
 algoritmos = (
-    ("insertion", insertion_sort),
-    ("merge", merge_sort),
-    ("selection", selection_sort),
+    ("insertion", insertionSort),
+    ("merge", mergeSort),
+    ("selection", selectionSort),
 )
-modos = ("aleatorio", "ordenado", "invertido", "casi", "mitades", "vecinos")
+modos = ("Aleatorio", "Ordenado", "Invertido", "Casi", "Mitades", "Vecinos")
 
 def main():
     azar = random.Random(SEMILLA)
-    print(f"semilla={SEMILLA}  repeticiones={REPETICIONES}")
-    print(f"{'algo':<12}{'modo':<12}{'n':>6}{'ms':>12}{'comps':>10}")
+    print(f"Semilla={SEMILLA}  Repeticiones={REPETICIONES}")
+    print(f"{'Algo':<12}{'Modo':<12}{'n':>6}{'Ms':>12}{'Comps':>10}")
     for nombre, fn in algoritmos:
         for modo in modos:
             for n in TAMANOS:

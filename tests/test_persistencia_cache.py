@@ -1,86 +1,84 @@
 import os
 
-from model.cache.cache_fichas import CacheFichas
-from model.cache.persistencia_cache import guardar_cache, cargar_cache
+from model.cache.CacheFichas import CacheFichas
+from model.cache.PersistenciaCache import guardarCache, cargarCache
 
-def test_guardar_y_cargar_cache_exitoso(tmp_path):
-    archivo_temporal = tmp_path / "cache_prueba.json"
-    cache_original = CacheFichas(capacidad=5)
-    cache_original.guardar_ficha("f1", {"nombre": "Orco"})
-    cache_original.guardar_ficha("f2", {"nombre": "Esqueleto"})
+def testGuardarYCargarCacheExitoso(tmp_path):
+    archivoTemporal = tmp_path / "cache_prueba.json"
+    cacheOriginal = CacheFichas(capacidad=5)
+    cacheOriginal.guardarFicha("f1", {"nombre": "Orco"})
+    cacheOriginal.guardarFicha("f2", {"nombre": "Esqueleto"})
 
-    guardar_cache(str(archivo_temporal), "1.0.0", cache_original)
+    guardarCache(str(archivoTemporal), "1.0.0", cacheOriginal)
 
-    cache_nueva = CacheFichas(capacidad=5)
-    exito = cargar_cache(str(archivo_temporal), "1.0.0", cache_nueva)
+    cacheNueva = CacheFichas(capacidad=5)
+    exito = cargarCache(str(archivoTemporal), "1.0.0", cacheNueva)
 
     assert exito is True
-    assert cache_nueva.consultar_ficha("f1") == {"nombre": "Orco"}
-    assert cache_nueva.consultar_ficha("f2") == {"nombre": "Esqueleto"}
+    assert cacheNueva.consultarFicha("f1") == {"nombre": "Orco"}
+    assert cacheNueva.consultarFicha("f2") == {"nombre": "Esqueleto"}
 
-
-def test_cargar_archivo_inexistente(tmp_path):
-    archivo_falso = tmp_path / "no_existe.json"
+def testCargarArchivoInexistente(tmp_path):
+    archivoFalso = tmp_path / "no_existe.json"
     cache = CacheFichas()
 
-    exito = cargar_cache(str(archivo_falso), "1.0.0", cache)
+    exito = cargarCache(str(archivoFalso), "1.0.0", cache)
 
     assert exito is False
     assert cache.lista.tamanio == 0
 
-
-def test_cargar_version_invalida(tmp_path):
-    archivo_temporal = tmp_path / "cache_vieja.json"
+def testCargarVersionInvalida(tmp_path):
+    archivoTemporal = tmp_path / "cache_vieja.json"
     cache = CacheFichas()
-    cache.guardar_ficha("f1", {"nombre": "Mago"})
+    cache.guardarFicha("f1", {"nombre": "Mago"})
 
-    guardar_cache(str(archivo_temporal), "1.0.0", cache)
+    guardarCache(str(archivoTemporal), "1.0.0", cache)
 
-    cache_destino = CacheFichas()
-    exito = cargar_cache(str(archivo_temporal), "2.0.0", cache_destino)
+    cacheDestino = CacheFichas()
+    exito = cargarCache(str(archivoTemporal), "2.0.0", cacheDestino)
 
     assert exito is False
-    assert cache_destino.consultar_ficha("f1") is None
+    assert cacheDestino.consultarFicha("f1") is None
 
-def test_cargar_archivo_corrupto(tmp_path):
-    archivo_corrupto = tmp_path / "corrupto.json"
-    with open(archivo_corrupto, "w", encoding="utf-8") as f:
+def testCargarArchivoCorrupto(tmp_path):
+    archivoCorrupto = tmp_path / "corrupto.json"
+    with open(archivoCorrupto, "w", encoding="utf-8") as f:
         f.write("{ json incompleto...")
 
     cache = CacheFichas()
-    exito = cargar_cache(str(archivo_corrupto), "1.0.0", cache)
+    exito = cargarCache(str(archivoCorrupto), "1.0.0", cache)
 
     assert exito is False
     assert cache.lista.tamanio == 0
 
-def test_guardar_y_cargar_preserva_orden_lru(tmp_path):
+def testGuardarYCargarPreservaOrdenLRU(tmp_path):
     archivo = tmp_path / "orden_lru.json"
     cache = CacheFichas(capacidad=3)
-    cache.guardar_ficha("a", 1)
-    cache.guardar_ficha("b", 2)
-    cache.guardar_ficha("c", 3)
-    cache.consultar_ficha("a")
+    cache.guardarFicha("a", 1)
+    cache.guardarFicha("b", 2)
+    cache.guardarFicha("c", 3)
+    cache.consultarFicha("a")
 
-    guardar_cache(str(archivo), "1.0.0", cache)
+    guardarCache(str(archivo), "1.0.0", cache)
 
-    cache_restaurada = CacheFichas(capacidad=3)
-    cargar_cache(str(archivo), "1.0.0", cache_restaurada)
+    cacheRestaurada = CacheFichas(capacidad=3)
+    cargarCache(str(archivo), "1.0.0", cacheRestaurada)
 
-    assert cache_restaurada.lista.primero.id_ficha == "a"
-    assert cache_restaurada.lista.ultimo.id_ficha == "b"
+    assert cacheRestaurada.lista.primero.idFicha == "a"
+    assert cacheRestaurada.lista.ultimo.idFicha == "b"
 
-def test_guardar_ficha_no_serializable_no_deja_temporales(tmp_path):
+def testGuardarFichaNoSerializableNoDejaTemporales(tmp_path):
     archivo = tmp_path / "cache.json"
     cache = CacheFichas(capacidad=3)
-    cache.guardar_ficha("f1", {"nombre": "Orco"})
-    assert guardar_cache(str(archivo), "1.0.0", cache) is True
+    cache.guardarFicha("f1", {"nombre": "Orco"})
+    assert guardarCache(str(archivo), "1.0.0", cache) is True
 
-    cache.guardar_ficha("f2", {1, 2})  #un set no es serializable a JSON
-    assert guardar_cache(str(archivo), "1.0.0", cache) is False
+    cache.guardarFicha("f2", {1, 2})  #un set no es serializable a JSON
+    assert guardarCache(str(archivo), "1.0.0", cache) is False
 
     assert os.listdir(tmp_path) == ["cache.json"]
 
-    cache_nueva = CacheFichas(capacidad=3)
-    assert cargar_cache(str(archivo), "1.0.0", cache_nueva) is True
-    assert cache_nueva.consultar_ficha("f1") == {"nombre": "Orco"}
-    assert cache_nueva.consultar_ficha("f2") is None
+    cacheNueva = CacheFichas(capacidad=3)
+    assert cargarCache( str(archivo), "1.0.0", cacheNueva) is True
+    assert cacheNueva.consultarFicha("f1") == {"nombre": "Orco"}
+    assert cacheNueva.consultarFicha("f2") is None

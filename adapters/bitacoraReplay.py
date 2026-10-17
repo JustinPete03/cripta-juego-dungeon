@@ -6,7 +6,7 @@ class GestorBitacoraReplay:
     def __init__(self, ruta_log: str = "partida.log"):
         self.ruta_log = ruta_log
 
-    def iniciar_nueva_bitacora(
+    def iniciarNuevaBitacora(
         self,
         id_cripta: str,
         version_cripta: str,
@@ -22,7 +22,7 @@ class GestorBitacoraReplay:
         with open(self.ruta_log, "a", encoding="utf-8") as archivo:
             archivo.write(f"ACCION|{comando_accion}\n")
 
-    def cargar_y_validar_replay(self, cliente: ClienteCripta) -> tuple:
+    def cargarYValidaReplay(self, cliente: ClienteCripta) -> tuple:
         #Lee un archivo .log para --replay y verifica que las versiones coincidan (§4.11).
         if not os.path.exists(self.ruta_log):
             raise RuntimeError(f"[Replay] No existe el archivo de bitácora: {self.ruta_log}")

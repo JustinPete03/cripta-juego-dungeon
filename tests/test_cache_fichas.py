@@ -1,117 +1,117 @@
-from model.cache.cache_fichas import CacheFichas
+from model.cache.CacheFichas import CacheFichas
 
-def ids_cache(cache):
+def idsCache(cache):
     ids = []
     actual = cache.lista.primero
     while actual is not None:
-        ids.append(actual.id_ficha)
+        ids.append(actual.idFicha)
         actual = actual.siguiente
     return ids
 
-def test_estado_inicial():
+def testEstadoInicial():
     cache = CacheFichas()
     assert cache.capacidad == 25
     assert cache.lista.tamanio == 0
     assert cache.aciertos == 0
     assert cache.fallos == 0
     assert cache.desalojos == 0
-    assert cache.veces_sobre_tope == 0
-    assert cache.maximo_alcanzado == 0
+    assert cache.vecesSobreTope == 0
+    assert cache.maximoAlcanzado == 0
 
-def test_acierto_y_fallo():
+def testAciertoYFallo():
     cache = CacheFichas()
-    cache.guardar_ficha("a", "ficha_a")
-    assert cache.consultar_ficha("a") == "ficha_a"
-    assert cache.consultar_ficha("z") is None
+    cache.guardarFicha("a", "ficha_a")
+    assert cache.consultarFicha("a") == "ficha_a"
+    assert cache.consultarFicha("z") is None
     assert cache.aciertos == 1
     assert cache.fallos == 1
 
-def test_guardar_existente_no_duplica():
+def testGuardarExistenteNoDuplica():
     cache = CacheFichas()
-    cache.guardar_ficha("a", "v1")
-    cache.guardar_ficha("a", "v2")
+    cache.guardarFicha("a", "v1")
+    cache.guardarFicha("a", "v2")
     assert cache.lista.tamanio == 1
-    assert cache.consultar_ficha("a") == "v2"
+    assert cache.consultarFicha("a") == "v2"
 
-def test_consultar_mueve_al_frente():
+def testConsultarMueveAlFrente():
     cache = CacheFichas(3)
-    cache.guardar_ficha("a", "ficha_a")
-    cache.guardar_ficha("b", "ficha_b")
-    cache.guardar_ficha("c", "ficha_c")
-    assert ids_cache(cache) == ["c", "b", "a"]
-    cache.consultar_ficha("a")
-    assert ids_cache(cache) == ["a", "c", "b"]
+    cache.guardarFicha("a", "ficha_a")
+    cache.guardarFicha("b", "ficha_b")
+    cache.guardarFicha("c", "ficha_c")
+    assert idsCache(cache) == ["c", "b", "a"]
+    cache.consultarFicha("a")
+    assert idsCache(cache) == ["a", "c", "b"]
 
-def test_desaloja_el_menos_reciente():
+def testDesalojaElMenosReciente():
     cache = CacheFichas(2)
-    cache.guardar_ficha("a", "ficha_a")
-    cache.guardar_ficha("b", "ficha_b")
-    cache.consultar_ficha("a")
-    cache.guardar_ficha("c", "ficha_c")
-    assert ids_cache(cache) == ["c", "a"]
-    assert cache.consultar_ficha("b") is None
-    assert cache.consultar_ficha("a") == "ficha_a"
+    cache.guardarFicha("a", "ficha_a")
+    cache.guardarFicha("b", "ficha_b")
+    cache.consultarFicha("a")
+    cache.guardarFicha("c", "ficha_c")
+    assert idsCache(cache) == ["c", "a"]
+    assert cache.consultarFicha("b") is None
+    assert cache.consultarFicha("a") == "ficha_a"
     assert cache.desalojos == 1
 
-def test_no_desaloja_ficha_en_uso():
+def testNoDesalojaFichaEnUso():
     cache = CacheFichas(2)
-    cache.guardar_ficha("a", "ficha_a")
-    cache.guardar_ficha("b", "ficha_b")
-    cache.retener_ficha("a")
-    cache.guardar_ficha("c", "ficha_c")
-    assert ids_cache(cache) == ["c", "a"]
-    assert cache.consultar_ficha("a") == "ficha_a"
-    assert cache.consultar_ficha("b") is None
+    cache.guardarFicha("a", "ficha_a")
+    cache.guardarFicha("b", "ficha_b")
+    cache.retenerFicha("a")
+    cache.guardarFicha("c", "ficha_c")
+    assert idsCache(cache) == ["c", "a"]
+    assert cache.consultarFicha("a") == "ficha_a"
+    assert cache.consultarFicha("b") is None
     assert cache.desalojos == 1
 
-def test_todas_en_uso_supera_el_tope():
+def testTodasEnUsoSuperaElTope():
     cache = CacheFichas(2)
-    cache.guardar_ficha("a", "ficha_a")
-    cache.guardar_ficha("b", "ficha_b")
-    cache.retener_ficha("a")
-    cache.retener_ficha("b")
-    cache.guardar_ficha("c", "ficha_c")  #nada se puede desalojar
+    cache.guardarFicha("a", "ficha_a")
+    cache.guardarFicha("b", "ficha_b")
+    cache.retenerFicha("a")
+    cache.retenerFicha("b")
+    cache.guardarFicha("c", "ficha_c")  #nada se puede desalojar
     assert cache.lista.tamanio == 3
-    assert cache.veces_sobre_tope == 1
-    assert cache.maximo_alcanzado == 3
+    assert cache.vecesSobreTope == 1
+    assert cache.maximoAlcanzado == 3
     assert cache.desalojos == 0
 
-def test_vuelve_al_tope_al_soltar():
+def testVuelveAlTopeAlSoltar():
     cache = CacheFichas(2)
-    cache.guardar_ficha("a", "ficha_a")
-    cache.guardar_ficha("b", "ficha_b")
-    cache.retener_ficha("a")
-    cache.retener_ficha("b")
-    cache.guardar_ficha("c", "ficha_c")
-    cache.soltar_ficha("a")
-    cache.guardar_ficha("d", "ficha_d")
+    cache.guardarFicha("a", "ficha_a")
+    cache.guardarFicha("b", "ficha_b")
+    cache.retenerFicha("a")
+    cache.retenerFicha("b")
+    cache.guardarFicha("c", "ficha_c")
+    cache.soltarFicha("a")
+    cache.guardarFicha("d", "ficha_d")
     assert cache.lista.tamanio == 2
-    assert ids_cache(cache) == ["d", "b"]
-    assert cache.consultar_ficha("a") is None
-    assert cache.consultar_ficha("c") is None
-    assert cache.consultar_ficha("b") == "ficha_b"
-    assert cache.consultar_ficha("d") == "ficha_d"
+    assert idsCache(cache) == ["d", "b"]
+    assert cache.consultarFicha("a") is None
+    assert cache.consultarFicha("c") is None
+    assert cache.consultarFicha("b") == "ficha_b"
+    assert cache.consultarFicha("d") == "ficha_d"
     assert cache.desalojos == 2
 
-def test_capacidad_cero_no_guarda():
+def testCapacidadCeroNoGuarda():
     cache = CacheFichas(0)
-    assert cache.guardar_ficha("a", "ficha_a") is None
+    assert cache.guardarFicha("a", "ficha_a") is None
     assert cache.lista.tamanio == 0
 
-def test_obtener_fichas_carga_faltantes(): #en este test se comprueba que pasa cuando la caché está vacía y se piden fichas que esta no tiene
+def testObtenerFichasCargaFaltantes(): #en este test se comprueba que pasa cuando la caché está vacía y se piden fichas que esta no tiene
     llamadas = []
 
     def cargadorFalso(lote): #fabrica fichas de ejemplo
         llamadas.append(lote)
         pares = []
-        for id_ficha in lote:
-            pares.append((id_ficha, "ficha_" + id_ficha))
+        for idFicha in lote:
+            pares.append((idFicha, "ficha_" + idFicha))
         return pares
 
     cache = CacheFichas()
-    resultado = cache.obtener_fichas(["a","b","c"], cargadorFalso)
+    resultado = cache.obtenerFichas(["a","b","c"], cargadorFalso)
 
     assert llamadas == [["a", "b", "c"]]
     assert cache.fallos == 3
     assert resultado == [("a", "ficha_a"), ("b", "ficha_b"), ("c", "ficha_c")]
-    assert cache.consultar_ficha("a") == "ficha_a"
+    assert cache.consultarFicha("a") == "ficha_a"

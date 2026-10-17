@@ -9,7 +9,7 @@ import time
 from model.Constantes import EV_ENEMIGO
 from model.Entidades import Enemigo
 from model.efectos import EfectosJuego, VENENO
-from model.ordenamiento.insertion import insertion_sort
+from model.ordenamiento.Insertion import insertionSort
 from tests.modelo_falso import ModeloFalso
 
 
@@ -28,7 +28,7 @@ def preparar(n):
 
 
 def mediana(valores):
-    ordenados = insertion_sort(valores)
+    ordenados = insertionSort(valores)
     return ordenados[len(ordenados) // 2]
 
 

@@ -1,6 +1,6 @@
 from model.Constantes import ACC_RECOGER, ACC_USAR, ACC_EQUIPAR, ACC_SOLTAR
 from model.Interfaces import InventarioBase, Resultado
-from model.ordenamiento.selector import ordenar as ordenarSeleccion   # Keilor (4.9)
+from model.ordenamiento.Selector import ordenar as ordenarSeleccion   # Keilor (4.9)
 
 CLASE_PERGAMINO = "pergamino_retroceso"
 

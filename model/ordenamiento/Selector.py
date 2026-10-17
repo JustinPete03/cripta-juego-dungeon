@@ -1,7 +1,7 @@
-from .insertion import insertion_sort
-from .merge import merge_sort
+from .Insertion import insertionSort
+from .Merge import mergeSort
 
-# Umbrales calibrados con bench/ordenamientos.py (12 oct 2026, semilla 2026, mediana de 7 repeticiones).
+# Umbrales calibrados con bench/Ordenamientos.py (12 oct 2026, semilla 2026, mediana de 7 repeticiones).
 
 # Modo "aleatorio": inserción gana hasta n=32, empata en n=64 (0.200 vs 0.204 ms) y merge gana desde n=128.
 MAX_INSERTION_SORT_SIZE = 32
@@ -36,12 +36,12 @@ def seleccionar(propiedades, costosa=False):
     descensos = propiedades["descensos"]
     tope = MAX_INSERTION_SORT_SIZE_COSTOSA if costosa else MAX_INSERTION_SORT_SIZE
     if n <= tope:
-        return insertion_sort
+        return insertionSort
     if descensos == 0:         # ya ordenada: inserción aquí sería O(n)
-        return insertion_sort
+        return insertionSort
     if n <= MAX_ALMOST_SORTED and descensos <= min(MAX_DESCENSOS, n // 4):
-        return insertion_sort
-    return merge_sort
+        return insertionSort
+    return mergeSort
 
 
 def ordenar(entrada, clave=None, descendente=False, contador=None, costosa=False):
