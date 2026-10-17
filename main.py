@@ -8,7 +8,7 @@ def ejecutarBenchmarks():
     from bench.Ordenamientos import main as benchOrdenamientos
     from bench.Cache import main as benchCache
     from bench.benchGuardado import main as benchGuardado
-    from bench.benchEfectos import main as benchEfectos
+    from bench.BenchEfectos import main as benchEfectos
     print("------Bench de Ordenamientos------")
     benchOrdenamientos()
     print("\n" + "=" * 50 + "\n")
@@ -50,7 +50,7 @@ def construirModelo(cliente, idCripta, semilla, cacheSize):
     from model.Juego import Modelo
     from model.Inventario import Inventario
     from model.Diario import Diario
-    from model.efectos import efectosJuego
+    from model.efectos import EfectosJuego
 
     proveedor = ProveedorRed(cliente, idCripta, cacheSize)
     efectos = EfectosJuego()
