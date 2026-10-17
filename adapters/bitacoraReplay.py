@@ -1,5 +1,5 @@
 import os
-from adapters.cliente_cripta import ClienteCripta
+from adapters.clienteCripta import ClienteCripta
 
 
 class GestorBitacoraReplay:

@@ -22,7 +22,7 @@ class VistaConsola:
         lineas.append("Vida %d/%d  Ataque %d(+%d)  Defensa %d(+%d)  Velocidad %d"
                       % (jugador.vida, jugador.vidaMax, jugador.ataque, jugador.bonoAtaque,
                          jugador.defensa, jugador.bonoDefensa, jugador.velocidad))
-        efectos = modelo.efectos.descripcionJugador(modelo)
+        efectos = modelo.efectos.descripcionjugador(modelo)
         if len(efectos) > 0:
             lineas.append("Efectos: " + ", ".join(efectos))
 

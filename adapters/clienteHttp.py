@@ -1,6 +1,6 @@
 import time
 import uuid
-from adapters.cliente_cripta import ClienteCripta
+from adapters.clienteCripta import ClienteCripta
 import requests
 
 
@@ -14,6 +14,7 @@ class ClienteHTTP(ClienteCripta):
         self.headers = {"X-Cripta-Client-Id": self.client_id}
         # Toda solicitud HTTP cuenta para el presupuesto (incluyendo reintentos 429)
         self.solicitudes_realizadas = 0
+        self._version_catalogo = None
     
     # Implementación de la interfaz ClienteCripta con manejo de errores y reintentos
     def _hacer_peticion_segura(self, ruta: str) -> dict:
@@ -61,7 +62,9 @@ class ClienteHTTP(ClienteCripta):
         return self._hacer_peticion_segura(f"/criptas/{id_cripta}/version")
 
     def obtener_version_catalogo(self) -> dict:
-        return self._hacer_peticion_segura("/catalogo/version")
+        if self._version_catalogo is None:
+            self._version_catalogo = self._hacer_peticion_segura("/catalogo/version")
+        return self._version_catalogo
 
     def obtener_esqueleto(self, id_cripta: str, pagina: int = 1) -> dict:
         return self._hacer_peticion_segura(f"/criptas/{id_cripta}/salas?pagina={pagina}")

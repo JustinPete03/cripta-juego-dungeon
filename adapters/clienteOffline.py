@@ -1,6 +1,6 @@
 import json
 import os
-from adapters.cliente_cripta import ClienteCripta
+from adapters.clienteCripta import ClienteCripta
 
 # Modo offline, leyendo datos desde archivos locales.
 class ClienteOffline(ClienteCripta):
