@@ -5,3 +5,4 @@ class Nodo:
         self.referencias = 0
         self.anterior = None
         self.siguiente = None
+        self.enDisco = False

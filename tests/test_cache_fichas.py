@@ -240,3 +240,13 @@ def testObtenerFichasIdQueElCargadorNoDevuelve():
     resultado = cache.obtenerFichas(["a", "x"], cargadorIncompleto)
     assert resultado == [("a", "ficha_a")]
     assert cache.consultarFicha("x") is None
+
+def testFichaRecuperadaDeDiscoNoSeVuelveAGuardar():
+    almacen = AlmacenFalso()
+    cache = CacheFichas(capacidad=1, almacen=almacen)
+    cache.guardarFicha("a", "ficha_a")
+    cache.guardarFicha("b", "ficha_b")      #desaloja "a": se guarda una vez
+    cache.obtenerFichas(["a"], lambda lote: [])   #"a" vuelve de disco, desaloja "b"
+    cache.guardarFicha("c", "ficha_c")      #desaloja "a": ya estaba en disco
+    ids = [idFicha for idFicha, ficha in almacen.guardadas]
+    assert ids.count("a") == 1

@@ -1,9 +1,11 @@
 import random
 import time
 import os
+import tempfile
 
 from model.cache.CacheFichas import CacheFichas
 from adapters.GuardadoCache import guardarCache, cargarCache
+from adapters.AlmacenFichasDisco import AlmacenFichasDisco
 
 #creamos constantes fijas para evidencias/resultados del analisis
 SEMILLA = 2026
@@ -29,14 +31,24 @@ def generarSolicitudesSesgadas(nPeticiones, totalFichas, azar): #divide las fich
 
     return solicitudes
 
-def simularCarga(capacidad, peticiones):
-    cache = CacheFichas(capacidad = capacidad)
+class CacheFifo(CacheFichas):
+    #Política descartada: desaloja la ficha que lleva más tiempo en memoria, aunque se haya usado hace poco.
+    def consultarFicha(self, idFicha):
+        nodo = self.buscarNodo(idFicha)
+        if nodo is None:
+            self.fallos += 1
+            return None
+        self.aciertos += 1
+        return nodo.ficha
+
+def simularCarga(capacidad, peticiones, claseCache=CacheFichas):
+    cache = claseCache(capacidad=capacidad)
     llamadasExternas = 0
 
     def cargadorSimulado(lote):
         nonlocal llamadasExternas
         llamadasExternas += len(lote)
-        return[(id_f, f"datos_{id_f}") for id_f in lote]
+        return[(idF, f"datos_{idF}") for idF in lote]
 
     t0 = time.perf_counter()
 
@@ -101,24 +113,88 @@ def benchPersistencia(capacidad, peticiones):
         "porcentajeAhorro" : porcentajeAhorro,
     }
 
+def cargadorDisco(lote):
+    return [(idF, f"datos_{idF}") for idF in lote]
+
+def correrPeticiones(cache, peticiones):
+    t0 = time.perf_counter()
+    for idFicha in peticiones:
+        cache.obtenerFichas([idFicha], cargadorDisco)
+    return (time.perf_counter() - t0) * 1000
+
+def benchDisco(capacidad, peticiones):
+    cacheSola = CacheFichas(capacidad=capacidad)
+    msSola = correrPeticiones(cacheSola, peticiones)
+
+    with tempfile.TemporaryDirectory() as carpeta:
+        cacheConDisco = CacheFichas(capacidad=capacidad, almacen=AlmacenFichasDisco(carpeta))
+        msConDisco = correrPeticiones(cacheConDisco, peticiones)
+
+    ahorro = cacheSola.llamadasRed - cacheConDisco.llamadasRed
+    porcentaje = (ahorro / cacheSola.llamadasRed * 100) if cacheSola.llamadasRed > 0 else 0.0
+    return {
+        "redSola": cacheSola.llamadasRed,
+        "redConDisco": cacheConDisco.llamadasRed,
+        "aciertosDisco": cacheConDisco.aciertosDisco,
+        "porcentajeAhorro": porcentaje,
+        "msSola": msSola,
+        "msConDisco": msConDisco,
+    }
+
+TAMANOS_BUSQUEDA = (25, 100, 400, 1600)
+REPETICIONES_BUSQUEDA = 2000
+
+def benchBusqueda(n):
+    azar = random.Random(SEMILLA)   #generador propio: no altera los otros resultados
+    cache = CacheFichas(capacidad=n)
+    for i in range(n):
+        cache.guardarFicha(f"ficha_{i}", f"datos_{i}")
+
+    presentes = [f"ficha_{azar.randrange(n)}" for _ in range(REPETICIONES_BUSQUEDA)]
+    ausentes = [f"ausente_{i}" for i in range(REPETICIONES_BUSQUEDA)]
+    peorCaso = "ficha_0"    #la primera que se guardó queda al final de la lista
+
+    resultados = {}
+    for nombre, ids in (("presente", presentes), ("ausente", ausentes), ("peor", [peorCaso] * REPETICIONES_BUSQUEDA)):
+        t0 = time.perf_counter()
+        for idFicha in ids:
+            cache.buscarNodo(idFicha)
+        resultados[nombre] = (time.perf_counter() - t0) / REPETICIONES_BUSQUEDA * 1_000_000
+    return resultados
+
 def main():
     azar = random.Random(SEMILLA)
     capacidades = (5, 10, 25, 50)
+    politicas = (("LRU", CacheFichas), ("FIFO", CacheFifo))
 
     print(f"semilla={SEMILLA}  peticiones={NUMERO_PETICIONES}")
-    print(f"{'patron':<12}{'cap':>6}{'aciertos':>10}{'fallos':>10}{'hit_rate':>12}{'desalojos':>12}{'ms':>10}")
+    print(f"{'patron':<12}{'politica':<10}{'cap':>6}{'aciertos':>10}{'fallos':>10}{'hit_rate':>12}{'desalojos':>12}{'ms':>10}")
 
     pruebas = [("uniforme", generarSolicitudesUniformes(NUMERO_PETICIONES, TOTAL_FICHAS_CATALOGO, azar)), ("sesgado", generarSolicitudesSesgadas(NUMERO_PETICIONES, TOTAL_FICHAS_CATALOGO, azar))]
 
     for nombre, solicitudes in pruebas:
         for cap in capacidades:
-            res = simularCarga(cap, solicitudes)
-            print(f"{nombre:<12}{cap:>6}{res['aciertos']:>10}{res['fallos']:>10}{res['hitRate']:>11.1f}%{res['desalojos']:>12}{res['tiempoMs']:>10.2f}")
+            for nombrePolitica, claseCache in politicas:
+                res = simularCarga(cap, solicitudes, claseCache)
+                print(f"{nombre:<12}{nombrePolitica:<10}{cap:>6}{res['aciertos']:>10}{res['fallos']:>10}{res['hitRate']:>11.1f}%{res['desalojos']:>12}{res['tiempoMs']:>10.2f}")
+
+    print("\n--- Recuperacion desde disco (patron sesgado, mismas peticiones) ---")
+    print(f"{'cap':>6}{'redSola':>10}{'redConDisco':>13}{'aciertosDisco':>15}{'ahorro':>10}{'msSola':>10}{'msConDisco':>12}")
+    solicitudesSesgadas = pruebas[1][1]
+    for cap in capacidades:
+        d = benchDisco(cap, solicitudesSesgadas)
+        print(f"{cap:>6}{d['redSola']:>10}{d['redConDisco']:>13}{d['aciertosDisco']:>15}{d['porcentajeAhorro']:>9.1f}%{d['msSola']:>10.2f}{d['msConDisco']:>12.2f}")
+
+    print("\n--- Búsqueda en la cache (µs por búsqueda) ---")
+    print(f"{'n':>6}{'presente':>12}{'ausente':>12}{'peorCaso':>12}")
+    for n in TAMANOS_BUSQUEDA:
+        r = benchBusqueda(n)
+        print(f"{n:>6}{r['presente']:>12.2f}{r['ausente']:>12.2f}{r['peor']:>12.2f}")
 
     print("\n--- Persistencia (Arranque) ---")
     for n in (25, 50, 100):
-        solicitudes_arranque = generarSolicitudesSesgadas(n, TOTAL_FICHAS_CATALOGO, azar)
-        datos = benchPersistencia(25, solicitudes_arranque)
+        solicitudesArranque = generarSolicitudesSesgadas(n, TOTAL_FICHAS_CATALOGO, azar)
+        datos = benchPersistencia(25, solicitudesArranque)
         print(f"peticiones={n:<4} vacia={datos['llamadasVacia']:<3} restaurada={datos['llamadasRestaurada']:<3} ahorro={datos['porcentajeAhorro']:.1f}%")
 
 

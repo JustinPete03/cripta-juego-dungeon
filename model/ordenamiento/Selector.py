@@ -6,6 +6,10 @@ from .Merge import mergeSort
 # Modo "aleatorio": inserción gana hasta n=32, empata en n=64 (0.200 vs 0.204 ms) y merge gana desde n=128.
 MAX_INSERTION_SORT_SIZE = 32
 
+# Comparación costosa (nombres comparados carácter por carácter): inserción gana hasta n=8
+# y merge desde n=12 (bench 17 oct 2026, semilla 2026, mediana de 15 repeticiones).
+MAX_INSERTION_SORT_SIZE_COSTOSA = 8
+
 # Proporción de descensos hasta la cual inserción sigue ganando (modo "casi": ~5 % de desorden).
 LIMITE_DESCENSOS = 0.05
 
@@ -28,10 +32,11 @@ def analizar(pares, descendente=False, contador=None):
     return {"n": n, "descensos": descensos}
 
 
-def seleccionar(propiedades):
+def seleccionar(propiedades,costosa=False):
     n = propiedades["n"]
     descensos = propiedades["descensos"]
-    if n <= MAX_INSERTION_SORT_SIZE:
+    tope = MAX_INSERTION_SORT_SIZE_COSTOSA if costosa else MAX_INSERTION_SORT_SIZE
+    if n <= tope:
         return insertionSort
     if descensos == 0:         # ya ordenada: inserción aquí sería O(n)
         return insertionSort
@@ -40,11 +45,11 @@ def seleccionar(propiedades):
     return mergeSort
 
 
-def ordenar(entrada, clave=None, descendente=False, contador=None):
+def ordenar(entrada, clave=None, descendente=False, contador=None, costosa=False):
     if clave is None:
         clave = lambda x: x
     pares = [(clave(x),x) for x in entrada]
     propiedades = analizar(pares, descendente, contador)
-    algoritmo = seleccionar(propiedades)
+    algoritmo = seleccionar(propiedades, costosa)
     resultado = algoritmo(pares, lambda par: par[0], descendente, contador)
     return [par[1] for par in resultado]

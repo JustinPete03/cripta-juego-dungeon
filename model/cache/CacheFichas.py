@@ -46,6 +46,7 @@ class CacheFichas:
         nodo = self.buscarNodo(idFicha)
         if nodo is not None:
             nodo.ficha = ficha
+            nodo.enDisco = False
             self.lista.moverAlFrente(nodo)
             return nodo
 
@@ -57,7 +58,7 @@ class CacheFichas:
             if candidato is None:
                 self.vecesSobreTope += 1
                 break
-            if self.almacen is not None:
+            if self.almacen is not None and not candidato.enDisco:
                 self.almacen.guardar(candidato.idFicha, candidato.ficha)
             self.lista.quitar(candidato)
             self.desalojos += 1
@@ -97,7 +98,9 @@ class CacheFichas:
                 ficha = self.almacen.leer(idFicha)
                 if ficha is not None:
                     self.aciertosDisco += 1
-                    self.guardarFicha(idFicha, ficha)
+                    nodo = self.guardarFicha(idFicha, ficha)
+                    if nodo is not None:
+                        nodo.enDisco = True
             if ficha is not None:
                 resultados.append((idFicha, ficha))
             else:

@@ -166,3 +166,14 @@ def testOrdenarCuentaLasComparacionesDelAnalisis():
     contador = Contador()
     ordenar([1, 2, 3, 4], contador=contador)
     assert contador.comparaciones == 6
+
+def testOrdenarAceptaParametroCostosa():
+    datos = ["pocion", "espada", "anillo"]
+    assert ordenar(datos, costosa=True) == ["anillo", "espada", "pocion"]
+    assert ordenar(datos, costosa=False) == ["anillo", "espada", "pocion"]
+
+def testSeleccionarComparacionCostosaBajaElTope():
+    propiedades = {"n": 12, "descensos": 12}
+    assert seleccionar(propiedades, costosa=False) is insertionSort
+    assert seleccionar(propiedades, costosa=True) is mergeSort
+    assert seleccionar({"n": 8, "descensos": 8}, costosa=True) is insertionSort

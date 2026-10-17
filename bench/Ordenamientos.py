@@ -9,6 +9,9 @@ from model.ordenamiento.Selection import selectionSort
 SEMILLA = 2026
 REPETICIONES = 7
 TAMANOS = (8, 16, 32, 64, 128, 256, 512, 1024, 2048)
+REPETICIONES_COSTOSA = 15
+TAMANOS_COSTOSA = (4, 8, 12, 16, 24, 32, 48, 64, 128)
+LETRAS = "abcdefghijklmnopqrstuvwxyz"
 
 def construir(n, modo, azar):
     if modo == "Aleatorio":
@@ -55,6 +58,60 @@ algoritmos = (
 )
 modos = ("Aleatorio", "Ordenado", "Invertido", "Casi", "Mitades", "Vecinos")
 
+class ClaveCostosa:
+    #Simula una comparación costosa: compara los nombres carácter por carácter.
+    def __init__(self, texto):
+        self.texto = texto
+
+    def comparar(self, otro):
+        a = self.texto
+        b = otro.texto
+        for i in range(min(len(a), len(b))):
+            if a[i] != b[i]:
+                return -1 if a[i] < b[i] else 1
+        return (len(a) > len(b)) - (len(a) < len(b))
+
+    def __lt__(self, otro):
+        return self.comparar(otro) < 0
+
+    def __gt__(self, otro):
+        return self.comparar(otro) > 0
+
+def construirNombres(n, azar):
+    nombres = []
+    for _ in range(n):
+        sufijo = "".join(azar.choice(LETRAS) for _ in range(azar.randint(3, 8)))
+        nombres.append("espada de " + sufijo)
+    return nombres
+
+def medirCostosa(fn, nombres):
+    t0 = time.perf_counter()
+    fn(list(nombres), clave=ClaveCostosa)
+    ms = (time.perf_counter() - t0) * 1000
+
+    contador = Contador()
+    fn(list(nombres), clave=ClaveCostosa, contador=contador)
+    return ms, contador.comparaciones
+
+def benchCostosa():
+    azar = random.Random(SEMILLA)   #generador propio: no altera los otros resultados
+    print("\n--- Comparación costosa (nombres comparados carácter por carácter) ---")
+    print(f"{'n':>6}{'Ins ms':>10}{'Mer ms':>10}{'Ins comps':>11}{'Mer comps':>11}  Gana")
+    for n in TAMANOS_COSTOSA:
+        tiemposIns, tiemposMer, compsIns, compsMer = [], [], [], []
+        for _ in range(REPETICIONES_COSTOSA):
+            nombres = construirNombres(n, azar)
+            ms, comps = medirCostosa(insertionSort, nombres)
+            tiemposIns.append(ms)
+            compsIns.append(comps)
+            ms, comps = medirCostosa(mergeSort, nombres)
+            tiemposMer.append(ms)
+            compsMer.append(comps)
+        ins = mediana(tiemposIns)
+        mer = mediana(tiemposMer)
+        gana = "insertion" if ins <= mer else "merge"
+        print(f"{n:>6}{ins:>10.3f}{mer:>10.3f}{mediana(compsIns):>11}{mediana(compsMer):>11}  {gana}")
+
 def main():
     azar = random.Random(SEMILLA)
     print(f"Semilla={SEMILLA}  Repeticiones={REPETICIONES}")
@@ -73,6 +130,6 @@ def main():
                     f"{nombre:<12}{modo:<12}{n:>6}"
                     f"{mediana(tiempos):>12.3f}{mediana(comparaciones):>10}"
                 )
-
+    benchCostosa()
 if __name__ == "__main__":
     main()
