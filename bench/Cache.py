@@ -3,7 +3,7 @@ import time
 import os
 
 from model.cache.CacheFichas import CacheFichas
-from model.cache.PersistenciaCache import guardarCache, cargarCache
+from adapters.GuardadoCache import guardarCache, cargarCache
 
 #creamos constantes fijas para evidencias/resultados del analisis
 SEMILLA = 2026

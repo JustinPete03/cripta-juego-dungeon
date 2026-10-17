@@ -1,7 +1,7 @@
 import os
 
 from model.cache.CacheFichas import CacheFichas
-from model.cache.PersistenciaCache import guardarCache, cargarCache
+from adapters.GuardadoCache import guardarCache, cargarCache
 
 def testGuardarYCargarCacheExitoso(tmp_path):
     archivoTemporal = tmp_path / "cache_prueba.json"
