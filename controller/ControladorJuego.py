@@ -4,7 +4,7 @@ Sirve igual para el modo interactivo y para --replay (sin vista): reproducir() n
 Servicios opcionales (los aportan los demás): registro (bitácora de partida de Diego),
 puntajes (tabla de puntajes de Diego), guardado (guardado binario de Jurnier).
 """
-from model.Constantes import (EN_CURSO, ACC_MOVER, ACC_ABRIR, ACC_ATACAR, ACC_ESPERAR,
+from model.Constantes import (EN_CURSO, VICTORIA, ACC_MOVER, ACC_ABRIR, ACC_ATACAR, ACC_ESPERAR,
                                ACC_RECOGER, ACC_USAR, ACC_EQUIPAR, ACC_SOLTAR, ACC_RETROCESO,
                                ACC_SIGUIENTE, ACC_ANTERIOR)
 from model.Acciones import Accion, accionesDesdeTexto
@@ -32,6 +32,9 @@ class Controlador:
         self.puntajes = puntajes
         self.guardado = guardado
         self.termino = False
+        self.nombre = "Jugador"
+        self.idCripta = ""
+        self.versionCripta = ""
 
     def interpretar(self, texto):
 
@@ -73,7 +76,7 @@ class Controlador:
         ##Ejecuta en el modelo y anota en la bitácora de partida lo que cambia el estado.
         resultado = self.modelo.ejecutar(accion)
         if resultado.ok and resultado.registrable and self.registro is not None:
-            self.registro.anotar(accion.aTexto())
+            self.registro.registrar_accion(accion.aTexto())
         if self.modelo.estado != EN_CURSO:
             self._cerrarPartida()
         return resultado
@@ -142,7 +145,10 @@ class Controlador:
             return
         self.termino = True
         if self.puntajes is not None:
-            self.puntajes.registrar(self.modelo.resultadoPartida())
+            r = self.modelo.resultadoPartida()
+            self.puntajes.registrar_partida(self.nombre, self.idCripta, self.versionCripta,
+                                            r.acciones, r.derrotados, r.tiempoFinal,
+                                            r.estado == VICTORIA)
 
     def _decir(self, texto):
         if self.vista is not None:

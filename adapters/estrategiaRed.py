@@ -1,4 +1,4 @@
-from adapters.cliente_cripta import ClienteCripta
+from adapters.clienteCripta import ClienteCripta
 from model.cache_estructuras import CacheCatalogo, RegistroSalas
 
 

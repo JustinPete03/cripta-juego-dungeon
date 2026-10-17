@@ -1,8 +1,8 @@
 import os
 import time
 
-from adapters.guardado_binario import GuardadoBinario
-from adapters.guardado_json import GuardadoJSON
+from adapters.guardadoBinario import GuardadoBinario
+from adapters.guardadoJson import GuardadoJSON
 
 def generar(n):
     # Datos sintéticos; ids ordenados por construcción

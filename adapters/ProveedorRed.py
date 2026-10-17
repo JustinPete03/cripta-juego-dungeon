@@ -1,5 +1,5 @@
-from adapters.estrategia_red import GestorRedPrecarga
-from adapters.persistencia_cache import AlmacenamientoPersistenteCache
+from adapters.estrategiaRed import GestorRedPrecarga
+from adapters.persistenciaCache import AlmacenamientoPersistenteCache
 from model.Interfaces import ProveedorDatos
 from model.cache_estructuras import CacheCatalogo, FichaCatalogo
 
