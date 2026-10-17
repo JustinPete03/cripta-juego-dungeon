@@ -3,9 +3,10 @@ from model.cache.Nodo import Nodo
 
 class CacheFichas:
 
-    def __init__(self, capacidad=25):
+    def __init__(self, capacidad=25, almacen=None):
         self.capacidad = capacidad
         self.lista = ListaDoble()
+        self.almacen = almacen
 
         #contadores de metricas:
         self.aciertos = 0
@@ -13,6 +14,8 @@ class CacheFichas:
         self.desalojos = 0
         self.vecesSobreTope = 0
         self.maximoAlcanzado = 0
+        self.aciertosDisco = 0
+        self.llamadasRed = 0
 
     def buscarNodo(self, idFicha): #devuelve el nodo con ese id, sino devuelve None
         actual = self.lista.primero
@@ -54,6 +57,8 @@ class CacheFichas:
             if candidato is None:
                 self.vecesSobreTope += 1
                 break
+            if self.almacen is not None:
+                self.almacen.guardar(candidato.idFicha, candidato.ficha)
             self.lista.quitar(candidato)
             self.desalojos += 1
 
@@ -88,6 +93,11 @@ class CacheFichas:
 
         for idFicha in unicos:
             ficha = self.consultarFicha(idFicha)
+            if ficha is None and self.almacen is not None:
+                ficha = self.almacen.leer(idFicha)
+                if ficha is not None:
+                    self.aciertosDisco += 1
+                    self.guardarFicha(idFicha, ficha)
             if ficha is not None:
                 resultados.append((idFicha, ficha))
             else:
@@ -96,6 +106,7 @@ class CacheFichas:
         for inicio in range(0, len(faltantes), tamanoLote):
             lote = faltantes[inicio : inicio + tamanoLote]
             cargadas = cargador(lote)
+            self.llamadasRed += 1
             for idFicha, ficha in cargadas:
                 self.guardarFicha(idFicha, ficha)
                 resultados.append((idFicha, ficha))

@@ -1,4 +1,5 @@
 from model.cache.CacheFichas import CacheFichas
+from model.cache.AlmacenFichas import AlmacenFichas
 
 def idsCache(cache):
     ids = []
@@ -115,3 +116,70 @@ def testObtenerFichasCargaFaltantes(): #en este test se comprueba que pasa cuand
     assert cache.fallos == 3
     assert resultado == [("a", "ficha_a"), ("b", "ficha_b"), ("c", "ficha_c")]
     assert cache.consultarFicha("a") == "ficha_a"
+
+class AlmacenFalso(AlmacenFichas):
+    def __init__(self):
+        self.guardadas = []
+
+    def guardar(self, idFicha, ficha):
+        self.guardadas.append((idFicha, ficha))
+        return True
+
+    def leer(self, idFicha):
+        for id, ficha in self.guardadas:
+            if id == idFicha:
+                return ficha
+        return None
+
+def testDesalojadaLlegaAlAlmacen():
+    almacen = AlmacenFalso()
+    cache = CacheFichas(capacidad=2, almacen=almacen)
+    cache.guardarFicha("a", "ficha_a")
+    cache.guardarFicha("b", "ficha_b")
+    cache.guardarFicha("c", "ficha_c")
+    assert almacen.leer("a") == "ficha_a"
+
+def testRecuperaDeDiscoSinLlamarAlCargador():
+    almacen = AlmacenFalso()
+    cache = CacheFichas(capacidad=2, almacen=almacen)
+    cache.guardarFicha("a", "ficha_a")
+    cache.guardarFicha("b", "ficha_b")
+    cache.guardarFicha("c", "ficha_c")
+    llamadas = []
+
+    def cargadorFalso(lote):
+        llamadas.append(lote)
+        return []
+
+    resultado = cache.obtenerFichas(["a"], cargadorFalso)
+    assert resultado == [("a", "ficha_a")]
+    assert llamadas == []
+    assert cache.aciertosDisco == 1
+    assert cache.llamadasRed == 0
+
+def testFichaNoEstaEnDiscoVaAlCargador():
+    cache = CacheFichas(capacidad=2, almacen=AlmacenFalso())
+    llamadas = []
+
+    def cargadorFalso(lote):
+        llamadas.append(lote)
+        return [(idFicha, "ficha_" + idFicha) for idFicha in lote]
+
+    cache.obtenerFichas(["x"], cargadorFalso)
+    assert llamadas == [["x"]]
+    assert cache.aciertosDisco == 0
+    assert cache.llamadasRed == 1
+
+def testSinAlmacenElComportamientoNoCambia():
+    cache = CacheFichas(capacidad=1)
+    cache.guardarFicha("a", "ficha_a")
+    cache.guardarFicha("b", "ficha_b")
+    llamadas = []
+
+    def cargadorFalso(lote):
+        llamadas.append(lote)
+        return [(idFicha, "ficha_" + idFicha) for idFicha in lote]
+
+    cache.obtenerFichas(["a"], cargadorFalso)
+    assert llamadas == [["a"]]
+    assert cache.aciertosDisco == 0
