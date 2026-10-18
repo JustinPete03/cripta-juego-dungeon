@@ -1,0 +1,38 @@
+[
+  {
+    "nombre_jugador": "Takjl7",
+    "id_cripta": "cripta-01",
+    "version_cripta": "fd58f7743b9e",
+    "acciones_ejecutadas": 5,
+    "enemigos_derrotados": 0,
+    "tiempo_final": 223,
+    "victoria": false
+  },
+  {
+    "nombre_jugador": "IceSpider",
+    "id_cripta": "cripta-01",
+    "version_cripta": "fd58f7743b9e",
+    "acciones_ejecutadas": 5,
+    "enemigos_derrotados": 0,
+    "tiempo_final": 223,
+    "victoria": false
+  },
+  {
+    "nombre_jugador": "JorgeL",
+    "id_cripta": "cripta-01",
+    "version_cripta": "fd58f7743b9e",
+    "acciones_ejecutadas": 6,
+    "enemigos_derrotados": 0,
+    "tiempo_final": 289,
+    "victoria": false
+  },
+  {
+    "nombre_jugador": "JorgeL",
+    "id_cripta": "cripta-01",
+    "version_cripta": "fd58f7743b9e",
+    "acciones_ejecutadas": 6,
+    "enemigos_derrotados": 0,
+    "tiempo_final": 421,
+    "victoria": false
+  }
+]
