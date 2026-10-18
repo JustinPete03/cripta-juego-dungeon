@@ -1,0 +1,18 @@
+# Artefactos de Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Archivos que genera el programa al jugar
+partida.log
+tmp_*.log
+tmp_*.sav
+puntajes_locales.json
+.cache_cripta/
+*.sav
+
+# Entorno del editor
+.idea/
+.vscode/
