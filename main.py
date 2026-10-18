@@ -8,18 +8,42 @@ def ejecutarBenchmarks():
     from bench.Ordenamientos import main as benchOrdenamientos
     from bench.Cache import main as benchCache
     from bench.benchGuardado import main as benchGuardado
-    from bench.BenchEfectos import main as benchEfectos
-    print("------Bench de Ordenamientos------")
+    try:
+        from bench.benchEfectos import main as benchEfectos
+    except ImportError:
+        from bench.BenchEfectos import main as benchEfectos
+
+    print("------Bench de Ordenamientos (§4.9)------")
     benchOrdenamientos()
     print("\n" + "=" * 50 + "\n")
-    print("------Bench de Cache------")
+    print("------Bench de Cache (§4.3 / §4.4)------")
     benchCache()
     print("\n" + "=" * 50 + "\n")
-    print("------Bench de Guardado (Binario vs JSON)------")
+    print("------Bench de Guardado (Binario vs JSON) (§4.10)------")
     benchGuardado()
     print("\n" + "=" * 50 + "\n")
-    print("------Bench de Efectos (cancelar)------")
+    print("------Bench de Efectos (cancelar) (§4.1)------")
     benchEfectos()
+    print("\n" + "=" * 50 + "\n")
+    print("------Bench de Motor (Agenda, Rastro, Bitácora) (§4.1, §4.7, §4.8)------")
+    try:
+        from bench.BenchMotor import correr as correrMotor
+        def imprimir(subsistema, descripcion, segundos):
+            print("%-9s %-48s %9.2f ms" % (subsistema, descripcion, segundos * 1000))
+        correrMotor(imprimir)
+    except Exception as e:
+        print(f"Nota BenchMotor: {e}")
+    print("\n" + "=" * 50 + "\n")
+    print("------Bench de Retroceso e Inventario (§4.5, §4.6)------")
+    try:
+        import sys, threading
+        sys.setrecursionlimit(200000)
+        from bench.BenchRetroceso import _todo as correrRetroceso
+        hilo = threading.Thread(target=correrRetroceso)
+        hilo.start()
+        hilo.join()
+    except Exception as e:
+        print(f"Nota BenchRetroceso: {e}")
 
 
 def crearCliente(args):
@@ -31,7 +55,7 @@ def crearCliente(args):
 
 
 def elegirCripta(cliente):
-    criptas = cliente.obtener_lista_criptas().get("criptas", [])
+    criptas = cliente.obtenerListaCriptas().get("criptas", [])
     if len(criptas) == 0:
         raise RuntimeError("El servicio no devolvió criptas.")
     print("Criptas disponibles:")
@@ -91,10 +115,12 @@ def reproducir(args, cliente):
     from controller.ControladorJuego import Controlador
 
     registro = GestorBitacoraReplay(args.replay)
-    mmeta, acciones = registro.cargarYValidaReplay(cliente)
-    proveedor, modelo = construirModelo(cliente, meta["id_cripta"], meta["semilla"], args.cache_size)
+    meta, acciones = registro.cargarYValidarReplay(cliente)
+    idCripta = meta.get("idCripta", meta.get("id_cripta"))
+    semilla = meta.get("semilla")
+    proveedor, modelo = construirModelo(cliente, idCripta, semilla, args.cache_size)
     modelo.iniciarPartida()
-    controlador = Controlador(modelo)          # sin vista: --replay no la usa
+    controlador = Controlador(modelo)          # sin vista: --replay no la usa (§6)
     ok, motivo = controlador.reproducir(acciones)
     resultado = modelo.resultadoPartida()
     print("Replay %s. Estado=%d reloj=%d acciones=%d derrotados=%d"
@@ -103,12 +129,19 @@ def reproducir(args, cliente):
     print(proveedor.reporte())
 
 
+def mostrarTablaPuntajes():
+    from adapters.tablaPuntajes import GestorTablaPuntajes
+    gestor = GestorTablaPuntajes()
+    print(gestor.formatearTabla())
+
+
 def main():
     parser = argparse.ArgumentParser(description="Cripta Dungeon")
-    parser.add_argument("--bench", action="store_true", help="ejecuta los benchmarks")
-    parser.add_argument("--offline", metavar="DIR", help="lee las respuestas desde una carpeta")
-    parser.add_argument("--replay", metavar="LOG", help="reproduce una partida desde su bitácora")
-    parser.add_argument("--cache-size", type=int, default=25, help="fichas en memoria (def. 25)")
+    parser.add_argument("--bench", action="store_true", help="ejecuta los benchmarks (§5.3)")
+    parser.add_argument("--offline", metavar="DIR", help="lee las respuestas desde una carpeta (§Modo sin conexión)")
+    parser.add_argument("--replay", metavar="LOG", help="reproduce una partida desde su bitácora (§4.11)")
+    parser.add_argument("--puntajes", action="store_true", help="muestra la tabla de puntajes locales (§2.12)")
+    parser.add_argument("--cache-size", type=int, default=25, help="fichas en memoria (def. 25) (§4.4)")
     parser.add_argument("--cripta", help="id de la cripta (si no, se elige de una lista)")
     parser.add_argument("--semilla", type=int, help="semilla del azar (si no, aleatoria)")
     parser.add_argument("--nombre", help="nombre del jugador")
@@ -117,6 +150,10 @@ def main():
 
     if args.bench:
         ejecutarBenchmarks()
+        return
+
+    if args.puntajes:
+        mostrarTablaPuntajes()
         return
 
     try:

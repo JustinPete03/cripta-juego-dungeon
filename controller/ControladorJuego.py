@@ -13,7 +13,7 @@ from model.Interfaces import Resultado
 AYUDA = (
     "Comandos: n/s/e/o (mover) | abrir <n|s|e|o> | atacar [k] | esperar | recoger [k] | soltar |\n"
     "          equipar | usar | retroceso | sig | ant | inv | ordenar <peso|valor|nombre> |\n"
-    "          guardar <archivo> | cargar <archivo> | ayuda | salir"
+    "          puntajes | guardar <archivo> | cargar <archivo> | ayuda | salir"
 )
 
 
@@ -76,7 +76,7 @@ class Controlador:
         ##Ejecuta en el modelo y anota en la bitácora de partida lo que cambia el estado.
         resultado = self.modelo.ejecutar(accion)
         if resultado.ok and resultado.registrable and self.registro is not None:
-            self.registro.registrar_accion(accion.aTexto())
+            self.registro.registrarAccion(accion.aTexto())
         if self.modelo.estado != EN_CURSO:
             self._cerrarPartida()
         return resultado
@@ -97,6 +97,9 @@ class Controlador:
             return False
         if comando == "ordenar":
             self._ordenar(palabra[1] if len(palabra) > 1 else "")
+            return False
+        if comando in ("puntajes", "tabla"):
+            self._mostrarPuntajes()
             return False
         if comando in ("guardar", "cargar"):
             self._guardarCargar(comando, palabra[1] if len(palabra) > 1 else "")
@@ -146,9 +149,19 @@ class Controlador:
         self.termino = True
         if self.puntajes is not None:
             r = self.modelo.resultadoPartida()
-            self.puntajes.registrar_partida(self.nombre, self.idCripta, self.versionCripta,
-                                            r.acciones, r.derrotados, r.tiempoFinal,
-                                            r.estado == VICTORIA)
+            self.puntajes.registrarPartida(self.nombre, self.idCripta, self.versionCripta,
+                                           r.acciones, r.derrotados, r.tiempoFinal,
+                                           r.estado == VICTORIA)
+
+    def _mostrarPuntajes(self):
+        if self.puntajes is None:
+            self._decir("Tabla de puntajes no disponible.")
+            return
+        if hasattr(self.puntajes, "formatearTabla"):
+            self._decir(self.puntajes.formatearTabla())
+        else:
+            tabla = self.puntajes.obtenerTablaOrdenada()
+            self._decir("Partidas registradas: %d" % len(tabla))
 
     def _decir(self, texto):
         if self.vista is not None:

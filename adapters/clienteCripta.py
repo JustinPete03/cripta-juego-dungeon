@@ -1,36 +1,46 @@
 from abc import ABC, abstractmethod
-#Clase abstracta que define la interfaz para interactuar con el servidor de criptas.
 
+# Clase abstracta que define la interfaz para interactuar con el servidor de criptas.
 class ClienteCripta(ABC):
 
     @abstractmethod
-    def obtener_lista_criptas(self) -> dict:
+    def obtenerListaCriptas(self) -> dict:
         pass
 
     @abstractmethod
-    def obtener_datos_generales(self, id_cripta: str) -> dict:
+    def obtenerDatosGenerales(self, idCripta: str) -> dict:
         pass
 
     @abstractmethod
-    def obtener_version_cripta(self, id_cripta: str) -> dict:
+    def obtenerVersionCripta(self, idCripta: str) -> dict:
         pass
 
     @abstractmethod
-    def obtener_version_catalogo(self) -> dict:
+    def obtenerVersionCatalogo(self) -> dict:
         pass
 
     @abstractmethod
-    def obtener_esqueleto(self, id_cripta: str, pagina: int = 1) -> dict:
+    def obtenerEsqueleto(self, idCripta: str, pagina: int = 1) -> dict:
         pass
 
     @abstractmethod
-    def obtener_contenido_lote(self, id_cripta: str, salas: list) -> dict:
+    def obtenerContenidoLote(self, idCripta: str, salas: list) -> dict:
         pass
 
     @abstractmethod
-    def obtener_catalogo_lote(self, ids_catalogo: list) -> dict:
+    def obtenerCatalogoLote(self, idsCatalogo: list) -> dict:
         pass
 
     @abstractmethod
-    def obtener_solicitudes_realizadas(self) -> int:
+    def obtenerSolicitudesRealizadas(self) -> int:
         pass
+
+    # Alias en snake_case para compatibilidad retroactiva si algún módulo externo aún los invoca
+    obtener_lista_criptas = obtenerListaCriptas
+    obtener_datos_generales = obtenerDatosGenerales
+    obtener_version_cripta = obtenerVersionCripta
+    obtener_version_catalogo = obtenerVersionCatalogo
+    obtener_esqueleto = obtenerEsqueleto
+    obtener_contenido_lote = obtenerContenidoLote
+    obtener_catalogo_lote = obtenerCatalogoLote
+    obtener_solicitudes_realizadas = obtenerSolicitudesRealizadas
