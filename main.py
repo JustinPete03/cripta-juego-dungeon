@@ -91,8 +91,8 @@ def reproducir(args, cliente):
     from controller.ControladorJuego import Controlador
 
     registro = GestorBitacoraReplay(args.replay)
-    meta, acciones = registro.cargarYValidaReplay(cliente)
-    proveedor, modelo = construirModelo(cliente, meta["id_cripta"], meta["semilla"], args.cacheSize)
+    mmeta, acciones = registro.cargarYValidaReplay(cliente)
+    proveedor, modelo = construirModelo(cliente, meta["id_cripta"], meta["semilla"], args.cache_size)
     modelo.iniciarPartida()
     controlador = Controlador(modelo)          # sin vista: --replay no la usa
     ok, motivo = controlador.reproducir(acciones)

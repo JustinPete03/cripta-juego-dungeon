@@ -10,7 +10,7 @@ class GestorRedPrecarga:
         self.presupuesto_maximo = 0
         self.id_cripta_actual = ""
 
-    def inicializar_cripta(self, id_cripta: str) -> tuple:
+    def inicializarCripta(self, id_cripta: str) -> tuple:
        # Descarga datos generales, todo el esqueleto y precarga la sala inicial.
         self.id_cripta_actual = id_cripta
         datos_gen = self.cliente.obtener_datos_generales(id_cripta)
@@ -29,7 +29,7 @@ class GestorRedPrecarga:
 
         return datos_gen, esqueleto_salas
 
-    def asegurar_contenido_sala(
+    def asegurarContenidoSala(
         self, id_sala: int, esqueleto_salas: list
     ) -> dict:
         # Garantiza que la sala destino esté en memoria antes de entrar 
@@ -39,7 +39,7 @@ class GestorRedPrecarga:
             contenido = self.salas_descargadas.obtener(id_sala)
         return contenido
 
-    def precargar_vecindad(self, id_sala_origen: int, esqueleto_salas: list):
+    def precargarVecindad(self, id_sala_origen: int, esqueleto_salas: list):
         # Usa una Cola FIFO para recolectar hasta 10 salas cercanas no descargadas 
         por_descargar = []
         cola_pendientes = [id_sala_origen]
@@ -63,7 +63,7 @@ class GestorRedPrecarga:
         # Si hay salas pendientes de descargar, hacer la solicitud al servidor
         if len(por_descargar) > 0: self._descargar_lote_salas_y_catalogo(por_descargar)
 
-    def _obtener_salas_contiguas(
+    def _obtenerSalasContiguas(
         self, id_sala: int, esqueleto_salas: list) -> list:
         # Busca en el esqueleto de la cripta las salas contiguas a la sala dada, según sus salidas.
         contiguas = []
@@ -75,7 +75,7 @@ class GestorRedPrecarga:
                 break
         return contiguas
 
-    def _descargar_lote_salas_y_catalogo(self, lote_salas: list):
+    def _descargarLoteSalasYCatalogo(self, lote_salas: list):
         # Solicita al cliente el contenido de las salas y luego descarga los elementos del catálogo que no estén en caché.
         respuesta = self.cliente.obtener_contenido_lote(self.id_cripta_actual, lote_salas)
         ids_catalogo_faltantes = []
@@ -83,38 +83,34 @@ class GestorRedPrecarga:
         for info_sala in respuesta.get("contenido", []):
             self.salas_descargadas.guardar(info_sala["sala"], info_sala)
 
-            # Recolectar IDs de enemigos, objetos y trampas que no estén en caché
+           # Recolectar IDs sin registrar fallos de caché en la métrica del jugador
             for enem in info_sala.get("enemigos", []):
-                tipo = enem["tipo"]
-                if (
-                    not self.cache_catalogo.contiene(tipo)
-                    and tipo not in ids_catalogo_faltantes
+              tipo = enem["tipo"]
+              if (
+                  not self.cacheCatalogo.contiene(tipo, registrar_metrica=False)
+                  and tipo not in ids_catalogo_faltantes
                 ):
-                    ids_catalogo_faltantes.append(tipo)
+                  ids_catalogo_faltantes.append(tipo)
 
             for obj_id in info_sala.get("objetos", []):
-                if (
-                    not self.cache_catalogo.contiene(obj_id)
-                    and obj_id not in ids_catalogo_faltantes
-                ):
-                    ids_catalogo_faltantes.append(obj_id)
+              if (
+                  not self.cacheCatalogo.contiene(obj_id, registrar_metrica=False)
+                  and obj_id not in ids_catalogo_faltantes
+              ):
+                  ids_catalogo_faltantes.append(obj_id)
 
             for trampa in info_sala.get("trampas", []):
-                tipo = trampa["tipo"]
-                if (
-                    not self.cache_catalogo.contiene(tipo)
-                    and tipo not in ids_catalogo_faltantes
-                ):
-                    ids_catalogo_faltantes.append(tipo)
+              tipo = trampa["tipo"]
+              if (
+                  not self.cacheCatalogo.contiene(tipo, registrar_metrica=False)
+                  and tipo not in ids_catalogo_faltantes
+              ):
+                  ids_catalogo_faltantes.append(tipo)
 
-        # Pedir al catálogo en lotes de máximo 10 IDs
-        for i in range(0, len(ids_catalogo_faltantes), 10):
-            sub_lote = ids_catalogo_faltantes[i : i + 10]
-            resp_cat = self.cliente.obtener_catalogo_lote(sub_lote)
-            for ficha in resp_cat.get("entidades", []): self.cache_catalogo.insertar(ficha["id"], ficha)
-
+      # Orden determinista garantiza que el orden de petición y entrada al LRU sea idéntico
+        ids_catalogo_faltantes.sort()
 #Se crea un reporte de rendimiento de la red y la caché, mostrando solicitudes realizadas, presupuesto, aciertos y fallos de caché.
-    def generar_reporte_rendimiento_red(self) -> str:
+    def generarReporteRendimientoRed(self) -> str:
         """Regla 5.1: Reporta solicitudes realizadas, presupuesto, aciertos y fallos de caché."""
         realizadas = self.cliente.obtener_solicitudes_realizadas()
         aciertos = self.cache_catalogo.aciertos
