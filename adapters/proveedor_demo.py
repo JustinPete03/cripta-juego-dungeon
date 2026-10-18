@@ -2,7 +2,8 @@
 #
 # Amplía las fichas de la fuente de prueba con las clases del catálogo (sección 2.7) que la interfaz
 # necesita poder ejercitar: pergamino de retroceso, armadura, antorcha, antídoto y la trampa
-# envenenada (el campo "veneno" es el daño por pulso que contagia efectosTrampa).
+# envenenada. "veneno" es una extensión nuestra (daño por pulso que contagia efectosTrampa): el
+# servicio real no lo publica, por eso la demo lo declara a mano y así la vista puede mostrarlo.
 
 from tests.FuentePrueba import FuentePrueba, FICHAS
 

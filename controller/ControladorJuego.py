@@ -25,12 +25,13 @@ def _direccion(texto):
 
 
 class Controlador:
-    def __init__(self, modelo, vista=None, registro=None, puntajes=None, guardado=None):
+    def __init__(self, modelo, vista=None, registro=None, puntajes=None, guardado=None, reporte=None):
         self.modelo = modelo
         self.vista = vista
         self.registro = registro
         self.puntajes = puntajes
         self.guardado = guardado
+        self.reporte = reporte        # función del adaptador de red: solicitudes vs presupuesto (5.1)
         self.termino = False
         self.nombre = "Jugador"
         self.idCripta = ""
@@ -152,6 +153,8 @@ class Controlador:
             self.puntajes.registrarPartida(self.nombre, self.idCripta, self.versionCripta,
                                            r.acciones, r.derrotados, r.tiempoFinal,
                                            r.estado == VICTORIA)
+        if self.reporte is not None:
+            self._decir(self.reporte())      # la GUI también tiene que mostrar el reporte (5.1)
 
     def _mostrarPuntajes(self):
         if self.puntajes is None:

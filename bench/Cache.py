@@ -1,18 +1,19 @@
+# Bench de la caché que usa el juego: model/cache_estructuras.CacheCatalogo (tabla hash con
+# encadenamiento, LRU y protección de fichas en uso) y su variante con disco del adaptador.
+# model/cache/CacheFichas.py no se mide aquí: es la alternativa que quedó fuera del camino vivo.
 import random
-import time
-import os
 import tempfile
+import time
 
-from model.cache.CacheFichas import CacheFichas
-from adapters.GuardadoCache import guardarCache, cargarCache
-from adapters.AlmacenFichasDisco import AlmacenFichasDisco
+from adapters.ProveedorRed import CacheConDisco
+from adapters.persistenciaCache import AlmacenamientoPersistenteCache
+from model.cache_estructuras import CacheCatalogo
 
 #creamos constantes fijas para evidencias/resultados del analisis
 SEMILLA = 2026
 TOTAL_FICHAS_CATALOGO = 60
-NUMERO_PETICIONES= 1000    #cantidad de peticiones propuesta para la simulacion
-ARCHIVO_BENCH_TEMP = "cache_bench_temp.json"
-VERSION_BENCH = "1.0.0"
+NUMERO_PETICIONES = 1000    #cantidad de peticiones propuesta para la simulacion
+VERSION_BENCH = "bench"
 
 def generarSolicitudesUniformes(nPeticiones, totalFichas, azar): #este metodo hace que cualquier ficha tenga igual probabilidad de aparecer
     return[f"ficha_{azar.randint(1, totalFichas)}" for _ in range(nPeticiones)]
@@ -31,114 +32,79 @@ def generarSolicitudesSesgadas(nPeticiones, totalFichas, azar): #divide las fich
 
     return solicitudes
 
-class CacheFifo(CacheFichas):
-    #Política descartada: desaloja la ficha que lleva más tiempo en memoria, aunque se haya usado hace poco.
-    def consultarFicha(self, idFicha):
-        nodo = self.buscarNodo(idFicha)
-        if nodo is None:
-            self.fallos += 1
-            return None
-        self.aciertos += 1
-        return nodo.ficha
+class CacheFifo(CacheCatalogo):
+    """Política descartada (sección 4.4): desaloja la ficha más antigua aunque se use seguido.
 
-def simularCarga(capacidad, peticiones, claseCache=CacheFichas):
-    cache = claseCache(capacidad=capacidad)
-    llamadasExternas = 0
+    Reusa la máquina de desalojo de la base y solo deja de refrescar la marca de último acceso,
+    así la comparación de políticas corre sobre el mismo código y no sobre dos implementaciones."""
 
-    def cargadorSimulado(lote):
-        nonlocal llamadasExternas
-        llamadasExternas += len(lote)
-        return[(idF, f"datos_{idF}") for idF in lote]
+    def _entrada(self, idEntidad):
+        for entrada in self.cubetas[self._hash(idEntidad)]:
+            if entrada.id_entidad == idEntidad:
+                return entrada
+        return None
 
-    t0 = time.perf_counter()
+    def _sinRefrescar(self, metodo, idEntidad, *extra):
+        entrada = self._entrada(idEntidad)
+        marca = None if entrada is None else entrada.ultimo_acceso
+        resultado = metodo(self, idEntidad, *extra)
+        if marca is not None:
+            entrada.ultimo_acceso = marca
+        return resultado
 
-    for idFicha in peticiones:
-        cache.obtenerFichas([idFicha], cargadorSimulado)
+    def contiene(self, idEntidad, registrar_metrica=True):
+        return self._sinRefrescar(CacheCatalogo.contiene, idEntidad, registrar_metrica)
 
-    tiempoMs = (time.perf_counter() - t0) * 1000
-
-    totalConsultas = cache.aciertos + cache.fallos
-    hitRate = (cache.aciertos / totalConsultas * 100) if totalConsultas > 0 else 0.0
-
-    return{
-        "capacidad": capacidad,
-        "aciertos" : cache.aciertos,
-        "fallos" : cache.fallos,
-        "desalojos" : cache.desalojos,
-        "hitRate" : hitRate,
-        "llamadasExternas" : llamadasExternas,
-        "tiempoMs" : tiempoMs,
-    }
-
-def benchPersistencia(capacidad, peticiones):
-    #Inicio sin archivo previo
-    cacheVacia = CacheFichas(capacidad = capacidad)
-    llamadasVacia = 0
-
-    def cargadorVacia(lote):
-        nonlocal llamadasVacia
-        llamadasVacia += len(lote)
-        return[(idF, f"datos_{idF}") for idF in lote]
-
-    for idFicha in peticiones:
-        cacheVacia.obtenerFichas([idFicha], cargadorVacia)
-
-    if not guardarCache(ARCHIVO_BENCH_TEMP, VERSION_BENCH, cacheVacia):
-        print("Aviso: no se pudo guardar la cache de prueba")
-
-    #Restaurando desde el disco
-    cacheRestaurada = CacheFichas(capacidad = capacidad)
-    cargarCache(ARCHIVO_BENCH_TEMP, VERSION_BENCH, cacheRestaurada)
-    llamadasRestaurada = 0
-
-    def cargadorRestaurada(lote):
-        nonlocal llamadasRestaurada
-        llamadasRestaurada += len(lote)
-        return[(idF, f"datos_{idF}") for idF in lote]
-
-    try:
-        for idFicha in peticiones:
-            cacheRestaurada.obtenerFichas([idFicha], cargadorRestaurada)
-    finally:
-        if os.path.exists(ARCHIVO_BENCH_TEMP): #eliminar el archivo temporal
-            os.remove(ARCHIVO_BENCH_TEMP)
-
-    solicitudesAhorradas = llamadasVacia - llamadasRestaurada
-    porcentajeAhorro = (solicitudesAhorradas / llamadasVacia * 100) if llamadasVacia > 0 else 0.0
-
-    return{
-        "llamadasVacia" : llamadasVacia,
-        "llamadasRestaurada" : llamadasRestaurada,
-        "ahorro" : solicitudesAhorradas,
-        "porcentajeAhorro" : porcentajeAhorro,
-    }
-
-def cargadorDisco(lote):
-    return [(idF, f"datos_{idF}") for idF in lote]
+    def obtener(self, idEntidad):
+        return self._sinRefrescar(CacheCatalogo.obtener, idEntidad)
 
 def correrPeticiones(cache, peticiones):
+    """Lee y, en lo que falta, inserta como haría el adaptador tras una respuesta del servicio."""
+    llamadasRed = 0
     t0 = time.perf_counter()
     for idFicha in peticiones:
-        cache.obtenerFichas([idFicha], cargadorDisco)
-    return (time.perf_counter() - t0) * 1000
+        if cache.obtener(idFicha) is None:
+            llamadasRed += 1
+            cache.insertar(idFicha, {"id": idFicha, "nombre": idFicha})
+    return llamadasRed, (time.perf_counter() - t0) * 1000
+
+def simularCarga(capacidad, peticiones, claseCache=CacheCatalogo):
+    cache = claseCache(capacidad)
+    llamadasExternas, tiempoMs = correrPeticiones(cache, peticiones)
+    totalConsultas = cache.aciertos + cache.fallos
+    hitRate = (cache.aciertos / totalConsultas * 100) if totalConsultas > 0 else 0.0
+    return {
+        "capacidad": capacidad,
+        "aciertos": cache.aciertos,
+        "fallos": cache.fallos,
+        "desalojos": cache.desalojos,
+        "hitRate": hitRate,
+        "llamadasExternas": llamadasExternas,
+        "tiempoMs": tiempoMs,
+    }
 
 def benchDisco(capacidad, peticiones):
-    cacheSola = CacheFichas(capacidad=capacidad)
-    msSola = correrPeticiones(cacheSola, peticiones)
-
+    """Costo de la caché con disco (sección 4.4) sobre el mismo almacén que usa el adaptador."""
     with tempfile.TemporaryDirectory() as carpeta:
-        cacheConDisco = CacheFichas(capacidad=capacidad, almacen=AlmacenFichasDisco(carpeta))
-        msConDisco = correrPeticiones(cacheConDisco, peticiones)
+        almacen = AlmacenamientoPersistenteCache(carpeta)
 
-    ahorro = cacheSola.llamadasRed - cacheConDisco.llamadasRed
-    porcentaje = (ahorro / cacheSola.llamadasRed * 100) if cacheSola.llamadasRed > 0 else 0.0
+        redSola, msSola = correrPeticiones(CacheCatalogo(capacidad), peticiones)
+        primera, msPrimera = correrPeticiones(CacheConDisco(capacidad, almacen, VERSION_BENCH), peticiones)
+        # Segunda sesión: la RAM arranca vacía pero el directorio de caché ya está poblado.
+        restaurada, msRestaurada = correrPeticiones(
+            CacheConDisco(capacidad, almacen, VERSION_BENCH), peticiones)
+
+    ahorro = redSola - restaurada
+    porcentaje = (ahorro / redSola * 100) if redSola > 0 else 0.0
     return {
-        "redSola": cacheSola.llamadasRed,
-        "redConDisco": cacheConDisco.llamadasRed,
-        "aciertosDisco": cacheConDisco.aciertosDisco,
+        "redSola": redSola,
+        "redConDisco": primera,
+        "redRestaurada": restaurada,
+        "ahorro": ahorro,
         "porcentajeAhorro": porcentaje,
         "msSola": msSola,
-        "msConDisco": msConDisco,
+        "msConDisco": msPrimera,
+        "msRestaurada": msRestaurada,
     }
 
 TAMANOS_BUSQUEDA = (25, 100, 400, 1600)
@@ -146,26 +112,27 @@ REPETICIONES_BUSQUEDA = 2000
 
 def benchBusqueda(n):
     azar = random.Random(SEMILLA)   #generador propio: no altera los otros resultados
-    cache = CacheFichas(capacidad=n)
+    cache = CacheCatalogo(n)
     for i in range(n):
-        cache.guardarFicha(f"ficha_{i}", f"datos_{i}")
+        cache.insertar(f"ficha_{i}", {"id": f"ficha_{i}", "nombre": f"ficha_{i}"})
 
     presentes = [f"ficha_{azar.randrange(n)}" for _ in range(REPETICIONES_BUSQUEDA)]
     ausentes = [f"ausente_{i}" for i in range(REPETICIONES_BUSQUEDA)]
-    peorCaso = "ficha_0"    #la primera que se guardó queda al final de la lista
 
-    resultados = {}
-    for nombre, ids in (("presente", presentes), ("ausente", ausentes), ("peor", [peorCaso] * REPETICIONES_BUSQUEDA)):
+    micro = {}
+    for nombre, ids in (("presente", presentes), ("ausente", ausentes)):
         t0 = time.perf_counter()
         for idFicha in ids:
-            cache.buscarNodo(idFicha)
-        resultados[nombre] = (time.perf_counter() - t0) / REPETICIONES_BUSQUEDA * 1_000_000
-    return resultados
+            cache.obtener(idFicha)
+        micro[nombre] = (time.perf_counter() - t0) / REPETICIONES_BUSQUEDA * 1_000_000
+    micro["cubetas"] = cache.num_cubetas
+    micro["cadena"] = cache.cantidad_actual / cache.num_cubetas
+    return micro
 
 def main():
     azar = random.Random(SEMILLA)
     capacidades = (5, 10, 25, 50)
-    politicas = (("LRU", CacheFichas), ("FIFO", CacheFifo))
+    politicas = (("LRU", CacheCatalogo), ("FIFO", CacheFifo))
 
     print(f"semilla={SEMILLA}  peticiones={NUMERO_PETICIONES}")
     print(f"{'patron':<12}{'politica':<10}{'cap':>6}{'aciertos':>10}{'fallos':>10}{'hit_rate':>12}{'desalojos':>12}{'ms':>10}")
@@ -178,24 +145,19 @@ def main():
                 res = simularCarga(cap, solicitudes, claseCache)
                 print(f"{nombre:<12}{nombrePolitica:<10}{cap:>6}{res['aciertos']:>10}{res['fallos']:>10}{res['hitRate']:>11.1f}%{res['desalojos']:>12}{res['tiempoMs']:>10.2f}")
 
-    print("\n--- Recuperacion desde disco (patron sesgado, mismas peticiones) ---")
-    print(f"{'cap':>6}{'redSola':>10}{'redConDisco':>13}{'aciertosDisco':>15}{'ahorro':>10}{'msSola':>10}{'msConDisco':>12}")
+    print("\n--- Cache con disco: peticiones al servicio (patron sesgado, mismas peticiones) ---")
+    print(f"{'cap':>6}{'sinDisco':>10}{'primera':>10}{'restaurada':>13}{'ahorro':>9}{'msPrimera':>11}{'msRestaurada':>14}")
     solicitudesSesgadas = pruebas[1][1]
     for cap in capacidades:
         d = benchDisco(cap, solicitudesSesgadas)
-        print(f"{cap:>6}{d['redSola']:>10}{d['redConDisco']:>13}{d['aciertosDisco']:>15}{d['porcentajeAhorro']:>9.1f}%{d['msSola']:>10.2f}{d['msConDisco']:>12.2f}")
+        print(f"{cap:>6}{d['redSola']:>10}{d['redConDisco']:>10}{d['redRestaurada']:>13}"
+              f"{d['porcentajeAhorro']:>8.1f}%{d['msConDisco']:>11.2f}{d['msRestaurada']:>14.2f}")
 
-    print("\n--- Búsqueda en la cache (µs por búsqueda) ---")
-    print(f"{'n':>6}{'presente':>12}{'ausente':>12}{'peorCaso':>12}")
+    print("\n--- Búsqueda en la cache viva (µs por búsqueda) ---")
+    print(f"{'n':>6}{'presente':>12}{'ausente':>12}{'cubetas':>10}{'cadena':>9}")
     for n in TAMANOS_BUSQUEDA:
         r = benchBusqueda(n)
-        print(f"{n:>6}{r['presente']:>12.2f}{r['ausente']:>12.2f}{r['peor']:>12.2f}")
-
-    print("\n--- Persistencia (Arranque) ---")
-    for n in (25, 50, 100):
-        solicitudesArranque = generarSolicitudesSesgadas(n, TOTAL_FICHAS_CATALOGO, azar)
-        datos = benchPersistencia(25, solicitudesArranque)
-        print(f"peticiones={n:<4} vacia={datos['llamadasVacia']:<3} restaurada={datos['llamadasRestaurada']:<3} ahorro={datos['porcentajeAhorro']:.1f}%")
+        print(f"{n:>6}{r['presente']:>12.2f}{r['ausente']:>12.2f}{r['cubetas']:>10}{r['cadena']:>9.2f}")
 
 
 if __name__ == "__main__":

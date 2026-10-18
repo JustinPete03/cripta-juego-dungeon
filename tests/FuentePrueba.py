@@ -103,5 +103,8 @@ class FuentePrueba:
     def anticipar(self, salaId):
         pass
 
-    def fijarPredicadoEnUso(self, predicado):
-        self.predicado = predicado
+    def asegurarFichas(self, tipoIds):
+        pass    # todo el catálogo de prueba ya está en memoria
+
+    def fijarFichasEnUso(self, productor):
+        self.productor = productor

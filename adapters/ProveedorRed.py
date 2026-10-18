@@ -1,6 +1,7 @@
 from adapters.estrategiaRed import GestorRedPrecarga
 from adapters.persistenciaCache import AlmacenamientoPersistenteCache
-from model.Interfaces import ProveedorDatos
+from model.Interfaces import ProveedorDatos, SinDatos
+from model.Tabla import Conjunto
 from model.cache_estructuras import CacheCatalogo, FichaCatalogo
 
 
@@ -50,7 +51,7 @@ class ProveedorRed(ProveedorDatos):
         self.cache = CacheConDisco(capacidadCache, AlmacenamientoPersistenteCache(directorioCache), version)
         self.gestor = GestorRedPrecarga(cliente, self.cache)
         self.datos, self.salas = self.gestor.inicializarCripta(idCripta)
-        self.enUso = None
+        self.productorEnUso = None
 
     def datosGenerales(self):
         return self.datos
@@ -62,7 +63,7 @@ class ProveedorRed(ProveedorDatos):
         self._protegerEnUso()
         c = self.gestor.asegurarContenidoSala(salaId, self.salas)
         if c is None:
-            raise KeyError(f"No se pudo obtener el contenido para la sala {salaId}.")
+            raise SinDatos(f"No se pudo obtener el contenido para la sala {salaId}.")
         return {
             "sala": c["sala"],
             "enemigos": list(c.get("enemigos", [])),
@@ -71,31 +72,36 @@ class ProveedorRed(ProveedorDatos):
         }
 
     def ficha(self, tipoId):
+        self._protegerEnUso()   # un hit de disco reinserta y podría desalojar una ficha en uso
         ficha = self.cache.obtener(tipoId)
         if ficha is None:  # Ni en RAM ni en disco: única razón de pedir por red (sección 4.4)
-            self._protegerEnUso()
-            respuesta = self.gestor.cliente.obtenerCatalogoLote([tipoId])
-            for f in respuesta.get("entidades", []):
-                self.cache.insertar(f["id"], f)
+            self.gestor.asegurarCatalogo([tipoId])
             ficha = self.cache.obtener(tipoId)
             if ficha is None:
                 raise KeyError("Ficha de catálogo inexistente: %s" % tipoId)
         return ficha.crudo
 
+    def asegurarFichas(self, tipoIds):
+        self._protegerEnUso()
+        self.gestor.asegurarCatalogo(tipoIds)
+
     def anticipar(self, salaId):
         self._protegerEnUso()
         self.gestor.precargarVecindad(salaId, self.salas)
 
-    def fijarPredicadoEnUso(self, predicado):
-        self.enUso = predicado
+    def fijarFichasEnUso(self, productor):
+        self.productorEnUso = productor
 
     def _protegerEnUso(self):
-        """Traduce el predicado del modelo (sección 4.4) a las referencias que respeta la caché."""
-        if self.enUso is None:
+        """Marca la caché en una pasada con el conjunto de ids en uso (sección 4.4)."""
+        if self.productorEnUso is None:
             return
+        enUso = Conjunto()
+        for tipoId in self.productorEnUso():
+            enUso.agregar(tipoId)
         for cubeta in self.cache.cubetas:
             for entrada in cubeta:
-                entrada.referencias_activas = 1 if self.enUso(entrada.id_entidad) else 0
+                entrada.referencias_activas = 1 if enUso.contiene(entrada.id_entidad) else 0
 
     def reporte(self):
         return self.gestor.generarReporteRendimientoRed()

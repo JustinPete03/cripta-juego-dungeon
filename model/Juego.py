@@ -20,7 +20,7 @@ from model.Bitacora import BitacoraCircular
 from model.Salas import IndiceOrdenado
 from model.Entidades import (Sala, Salida, Puerta, Jugador, Enemigo, ObjetoInstancia, Trampa,
                               ordenarEnemigosPorInstancia)
-from model.Interfaces import Resultado, DiarioNulo, EfectosBase
+from model.Interfaces import Resultado, DiarioNulo, EfectosBase, SinDatos
 from model.Rastro import elegirDestinoRastreador
 from model import estado
 
@@ -157,7 +157,14 @@ class Modelo:
         inicial = self.salas.buscar(self.salaInicialId)
         if inicial is None:
             raise ValueError("La sala inicial %s no existe en el esqueleto." % (self.salaInicialId,))
-        self.proveedor.fijarPredicadoEnUso(self.fichaEnUso)
+        if self.salas.buscar(self.salaSalidaId) is None:
+            raise ValueError("La sala de salida %s no existe en el esqueleto." % (self.salaSalidaId,))
+        # §2.12 pide entrar con la puerta de acceso abierta, no haberla abierto en persona: una
+        # cripta que la entrega ya abierta (sección 9) sigue siendo ganable.
+        for acceso in self.salas.buscar(self.salaSalidaId).salidas:
+            if not acceso.puerta.cerrada:
+                self.puertaSalidaAbierta = True
+        self.proveedor.fijarFichasEnUso(self.fichasEnUso)
 
         # El contenido de la sala inicial se carga antes de aceptar la primera acción (sección 2.4)
         self._asegurarContenido(inicial)
@@ -215,6 +222,15 @@ class Modelo:
         if sala.contenidoIncorporado:
             return
         contenido = self.proveedor.contenidoSala(sala.id)
+        # Las fichas que la sala va a necesitar se piden juntas: así el catálogo se resuelve en
+        # lotes de 10 y no con una solicitud por ficha, que es lo que estira el presupuesto (2.3).
+        ids = list(contenido["objetos"])
+        for datos in contenido["enemigos"]:
+            ids.append(datos["tipo"])
+        for datos in contenido["trampas"]:
+            ids.append(datos["tipo"])
+        self.proveedor.asegurarFichas(ids)
+        nuevosEnemigos = []
         for datos in contenido["enemigos"]:
             ficha = self.proveedor.ficha(datos["tipo"])
             vida = datos.get("vida", ficha["vida_max"])
@@ -222,13 +238,23 @@ class Modelo:
                               ficha["comportamiento"], vida, ficha["vida_max"],
                               ficha["ataque"], ficha["defensa"], ficha["velocidad"])
             enemigo.sala = sala
+            nuevosEnemigos.append(enemigo)
+        serieInicial = self.siguienteSerieObjeto
+        nuevosObjetos = []
+        for i, tipoObjeto in enumerate(contenido["objetos"]):
+            nuevosObjetos.append(ObjetoInstancia(tipoObjeto, serieInicial + i))
+        nuevasTrampas = []
+        for datos in contenido["trampas"]:
+            nuevasTrampas.append(Trampa(datos["instancia"], datos["tipo"]))
+
+        # Todo lo que puede fallar ya ocurrió: desde aquí la sala se completa de una sola vez,
+        # para que un SinDatos a medias no deje enemigos duplicados en el modelo.
+        for enemigo in nuevosEnemigos:
             sala.enemigos.append(enemigo)
             self.enemigosVivos.append(enemigo)
-        for tipoObjeto in contenido["objetos"]:
-            sala.objetos.append(ObjetoInstancia(tipoObjeto, self.siguienteSerieObjeto))
-            self.siguienteSerieObjeto += 1
-        for datos in contenido["trampas"]:
-            sala.trampas.append(Trampa(datos["instancia"], datos["tipo"]))
+        sala.objetos.extend(nuevosObjetos)
+        self.siguienteSerieObjeto = serieInicial + len(nuevosObjetos)
+        sala.trampas.extend(nuevasTrampas)
         sala.contenidoIncorporado = True
 
     # Bucle del reloj virtual
@@ -327,7 +353,11 @@ class Modelo:
                 return Resultado(False, "No hay salida hacia %s." % accion.argumento)
             if salida.puerta.cerrada:
                 return Resultado(False, "La puerta hacia %s está cerrada." % accion.argumento)
-            self._asegurarContenido(salida.destino)   # nunca se entra sin contenido
+            try:
+                self._asegurarContenido(salida.destino)   # nunca se entra sin contenido
+            except SinDatos as falta:
+                # Rechazar aquí no gasta tiempo: el presupuesto de la cripta manda (sección 2.3).
+                return Resultado(False, "No se puede entrar a %s: %s." % (salida.destino.nombre, falta))
             return Resultado(True)
         if tipo == ACC_ABRIR:
             salida = sala.salida(accion.argumento)
@@ -535,24 +565,23 @@ class Modelo:
         self.asignar(puerta, "eventoCierre", None)
 
     # Consultas
-    def fichaEnUso(self, tipoId):
-        """Predicado para la caché (sección 4.4): ficha referenciada por una instancia activa.
-        Se evalúa solo al desalojar, no en cada búsqueda."""
+    def fichasEnUso(self):
+        """Lista de ids de fichas referenciadas por una instancia activa (sección 4.4).
+
+        Es una lista y no un predicado para que la caché la vuelva conjunto y recorra sus
+        entradas una sola vez, en vez de evaluar esto sobre cada ficha guardada."""
+        ids = []
         for enemigo in self.enemigosVivos:
-            if enemigo.tipoId == tipoId:
-                return True
+            ids.append(enemigo.tipoId)
         for objeto in self.inventario.objetos():
-            if objeto.tipoId == tipoId:
-                return True
+            ids.append(objeto.tipoId)
         if self.jugador is not None and self.jugador.sala is not None:
             sala = self.jugador.sala
             for objeto in sala.objetos:
-                if objeto.tipoId == tipoId:
-                    return True
+                ids.append(objeto.tipoId)
             for trampa in sala.trampas:
-                if trampa.tipoId == tipoId:
-                    return True
-        return False
+                ids.append(trampa.tipoId)
+        return ids
 
     def resultadoPartida(self):
         return ResultadoPartida(self.estado, self.jugador.acciones, self.jugador.derrotados, self.reloj)

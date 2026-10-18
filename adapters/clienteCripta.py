@@ -35,6 +35,11 @@ class ClienteCripta(ABC):
     def obtenerSolicitudesRealizadas(self) -> int:
         pass
 
+    # Una respuesta leída del almacenamiento local no consume presupuesto (sección 3.4), así que
+    # el modo offline redefine esto a False para que la estrategia de red no se autocensure.
+    def cuentaComoRed(self) -> bool:
+        return True
+
     # Alias en snake_case para compatibilidad retroactiva si algún módulo externo aún los invoca
     obtener_lista_criptas = obtenerListaCriptas
     obtener_datos_generales = obtenerDatosGenerales

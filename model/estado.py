@@ -11,7 +11,8 @@
 from model.Constantes import (EV_JUGADOR, EV_ENEMIGO, EV_CIERRE_PUERTA, EV_REARME_TRAMPA)
 from model.Agenda import Evento
 from model.Bitacora import BitacoraCircular
-from model.Entidades import ObjetoInstancia
+from model.Entidades import ObjetoInstancia, ordenarEnemigosPorInstancia
+from model.Tabla import Conjunto, Tabla
 from model.efectos import efectoActivo
 
 VERSION_FORMATO = 1
@@ -19,38 +20,38 @@ VERSION_FORMATO = 1
 
 # ------------------------------------------------------------------ referencias
 def _índice(modelo):
-    """Mapa id(objeto) -> etiqueta, para serializar los dueños de los eventos."""
-    etiquetas = {}
+    """Tabla id(objeto) -> etiqueta, para serializar los dueños de los eventos."""
+    etiquetas = Tabla()
     if modelo.jugador is not None:
-        etiquetas[id(modelo.jugador)] = "j"
+        etiquetas.guardar(id(modelo.jugador), "j")
     for i in range(len(modelo.enemigosVivos)):
-        etiquetas[id(modelo.enemigosVivos[i])] = "e:%s" % modelo.enemigosVivos[i].instancia
+        etiquetas.guardar(id(modelo.enemigosVivos[i]), "e:%s" % modelo.enemigosVivos[i].instancia)
     activos = getattr(modelo.efectos, "activos", [])
     for i in range(len(activos)):
-        etiquetas[id(activos[i])] = "f:%d" % i
+        etiquetas.guardar(id(activos[i]), "f:%d" % i)
     for i, puerta in enumerate(_listaPuertas(modelo)):
-        etiquetas[id(puerta)] = "p:%d" % i
+        etiquetas.guardar(id(puerta), "p:%d" % i)
     for i in range(modelo.salas.cantidad()):
         sala = modelo.salas.enPosicion(i)
         for trampa in sala.trampas:
-            etiquetas[id(trampa)] = "t:%s" % trampa.instancia
+            etiquetas.guardar(id(trampa), "t:%s" % trampa.instancia)
     return etiquetas
 
 
 def _listaPuertas(modelo):
     """Puertas en un orden fijo: el índice del esqueleto y el de las salidas ya son canónicos."""
     puertas = []
-    vistas = set()
+    vistas = Conjunto()
     for i in range(modelo.salas.cantidad()):
         for salida in modelo.salas.enPosicion(i).salidas:
-            if id(salida.puerta) not in vistas:
-                vistas.add(id(salida.puerta))
+            if not vistas.contiene(id(salida.puerta)):
+                vistas.agregar(id(salida.puerta))
                 puertas.append(salida.puerta)
     return puertas
 
 
 def _etiqueta(etiquetas, objeto):
-    etiqueta = etiquetas.get(id(objeto))
+    etiqueta = etiquetas.obtener(id(objeto))
     if etiqueta is None:
         raise ValueError("El guardado no conoce cómo referenciar un objeto del modelo.")
     return etiqueta
@@ -150,15 +151,14 @@ def _capturarEnemigos(modelo):
 
 def _capturarSalas(modelo):
     salas = []
-    vistas = set()
+    vistas = Conjunto()
     for i in range(modelo.salas.cantidad()):
         sala = modelo.salas.enPosicion(i)
         puertas = []
         for salida in sala.salidas:
-            if id(salida.puerta) in vistas:
-                continue
-            vistas.add(id(salida.puerta))
-            puertas.append([salida.direccion, salida.puerta.cerrada])
+            if not vistas.contiene(id(salida.puerta)):
+                vistas.agregar(id(salida.puerta))
+                puertas.append([salida.direccion, salida.puerta.cerrada])
         trampas = []
         for trampa in sala.trampas:
             trampas.append([trampa.instancia, trampa.armada])
@@ -223,15 +223,15 @@ def _restaurarSalas(modelo, registros):
 
 def _restaurarEnemigos(modelo, registros):
     # Los enemigos deambuladores cambian de sala, así que la lista por sala se rehace entera.
-    porInstancia = {}
+    porInstancia = Tabla()
     for i in range(modelo.salas.cantidad()):
         sala = modelo.salas.enPosicion(i)
         for enemigo in sala.enemigos:
-            porInstancia[enemigo.instancia] = enemigo
+            porInstancia.guardar(enemigo.instancia, enemigo)
         del sala.enemigos[:]
     del modelo.enemigosVivos[:]
     for registro in registros:
-        enemigo = porInstancia.get(registro["instancia"])
+        enemigo = porInstancia.obtener(registro["instancia"])
         if enemigo is None:
             raise ValueError("La partida guardada menciona el enemigo inexistente %s."
                              % registro["instancia"])
@@ -243,6 +243,12 @@ def _restaurarEnemigos(modelo, registros):
         enemigo.evento = None
         enemigo.sala.enemigos.append(enemigo)
         modelo.enemigosVivos.append(enemigo)
+    # Orden canónico por id de instancia: el orden de llegada dependería del historial de
+    # movimientos y cargar no debe cambiar la numeración que la vista muestra de los enemigos.
+    for i in range(modelo.salas.cantidad()):
+        sala = modelo.salas.enPosicion(i)
+        if len(sala.enemigos) > 1:
+            sala.enemigos[:] = ordenarEnemigosPorInstancia(sala.enemigos)
 
 
 def _restaurarJugador(modelo, datos):

@@ -4,6 +4,8 @@ import os
 import sys
 import threading
 
+from model.Interfaces import SinDatos
+
 BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1"
 
 
@@ -109,7 +111,8 @@ def jugar(args, cliente):
     registro.iniciarNuevaBitacora(idCripta, versionCripta, proveedor.cache.versionCatalogo, semilla)
 
     controlador = Controlador(modelo, VistaConsola(), registro, GestorTablaPuntajes(),
-                              armarGuardado(idCripta, versionCripta, proveedor.cache.versionCatalogo))
+                              armarGuardado(idCripta, versionCripta, proveedor.cache.versionCatalogo),
+                              proveedor.reporte)
     controlador.nombre = nombre
     controlador.idCripta = idCripta
     controlador.versionCripta = versionCripta
@@ -117,7 +120,9 @@ def jugar(args, cliente):
     modelo.iniciarPartida()
     print("Semilla: %d  |  bitácora: %s" % (semilla, args.log))
     controlador.bucleInteractivo()
-    print(proveedor.reporte())
+    if not controlador.termino:
+        # El reporte ya lo muestra el controlador al terminar la partida; esto cubre salir antes.
+        print(proveedor.reporte())
 
 
 def reproducir(args, cliente):
@@ -168,6 +173,7 @@ def lanzarInterfaz(args):
 
     def fabrica(indice, semilla):
         nombre, parametros = criptas[indice]
+        reporte = None
         if cliente is None:
             from adapters.proveedor_demo import ProveedorDemo
             proveedor = ProveedorDemo(**parametros)
@@ -180,11 +186,12 @@ def lanzarInterfaz(args):
             datos = proveedor.datos
             idCripta = parametros["id"]
             versionCatalogo = proveedor.cache.versionCatalogo
+            reporte = proveedor.reporte       # la demo no hace solicitudes: no tiene nada que reportar
         modelo = armarModelo(proveedor, semilla)
         registro.iniciarNuevaBitacora(idCripta, datos["version"], versionCatalogo, semilla)
         modelo.iniciarPartida()
         controlador = Controlador(modelo, vista, registro, puntajes,
-                                  armarGuardado(idCripta, datos["version"], versionCatalogo))
+                                  armarGuardado(idCripta, datos["version"], versionCatalogo), reporte)
         controlador.nombre = args.nombre if args.nombre else "Explorador"
         controlador.idCripta = idCripta
         controlador.versionCripta = datos["version"]
@@ -238,7 +245,8 @@ def main():
             jugar(args, crearCliente(args))
             return
         lanzarInterfaz(args)
-    except RuntimeError as error:
+    except (RuntimeError, SinDatos) as error:
+        # PresupuestoAgotado al arrancar (no alcanza ni para el esqueleto) también sale por aquí.
         print("ERROR: %s" % error)
         raise SystemExit(1)
 

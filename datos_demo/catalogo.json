@@ -91,7 +91,6 @@
    "nombre": "Dardos en la pared",
    "clase": "trampa",
    "daño": 4,
-   "veneno": 3,
    "rearme": 300
   }
  ]

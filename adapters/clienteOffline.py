@@ -1,6 +1,7 @@
 import json
 import os
 from adapters.clienteCripta import ClienteCripta
+from model.Tabla import Tabla
 
 
 # Modo offline, leyendo datos desde archivos locales (sección Modo sin conexión)
@@ -9,7 +10,7 @@ class ClienteOffline(ClienteCripta):
     def __init__(self, directorioDatos: str):
         self.directorioDatos = directorioDatos
         self.solicitudesRealizadas = 0  # Lecturas desde almacenamiento local o modo --offline no cuentan (sección 5.1)
-        self._cacheArchivos = {}
+        self._cacheArchivos = Tabla()   # índice propio: dict está prohibido como caché (sección 7)
 
     @property
     def directorio(self):
@@ -20,14 +21,15 @@ class ClienteOffline(ClienteCripta):
         return self.solicitudesRealizadas
 
     def _leerJson(self, nombreArchivo: str) -> dict:
-        if nombreArchivo in self._cacheArchivos:
-            return self._cacheArchivos[nombreArchivo]
+        guardado = self._cacheArchivos.obtener(nombreArchivo)
+        if guardado is not None:
+            return guardado
 
         ruta = os.path.join(self.directorioDatos, nombreArchivo)
         try:
             with open(ruta, "r", encoding="utf-8") as archivo:
                 datos = json.load(archivo)
-                self._cacheArchivos[nombreArchivo] = datos
+                self._cacheArchivos.guardar(nombreArchivo, datos)
                 return datos
         except FileNotFoundError:
             raise RuntimeError(f"[Modo Offline] No se encontró el archivo requerido: {ruta}")
@@ -91,6 +93,9 @@ class ClienteOffline(ClienteCripta):
 
     def obtenerSolicitudesRealizadas(self) -> int:
         return 0
+
+    def cuentaComoRed(self) -> bool:
+        return False        # leer un archivo local no gasta presupuesto (sección 3.4)
 
     # Alias en snake_case
     obtener_lista_criptas = obtenerListaCriptas

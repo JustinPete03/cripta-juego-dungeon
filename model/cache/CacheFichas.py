@@ -1,3 +1,6 @@
+# Alternativa descartada: busca recorriendo la lista doble (O(n)), así que no cumple la tabla
+# hash de la sección 4.4. El camino vivo es model/cache_estructuras.CacheCatalogo; esta clase se
+# conserva con sus pruebas como evidencia de la comparación, no la usa ningún adaptador.
 from model.cache.ListaDoble import ListaDoble
 from model.cache.Nodo import Nodo
 
