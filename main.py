@@ -8,10 +8,7 @@ def ejecutarBenchmarks():
     from bench.Ordenamientos import main as benchOrdenamientos
     from bench.Cache import main as benchCache
     from bench.benchGuardado import main as benchGuardado
-    try:
-        from bench.benchEfectos import main as benchEfectos
-    except ImportError:
-        from bench.BenchEfectos import main as benchEfectos
+    from bench.benchEfectos import main as benchEfectos
 
     print("------Bench de Ordenamientos (§4.9)------")
     benchOrdenamientos()
