@@ -11,7 +11,7 @@ ANTORCHA = 2
 VELOCIDAD = 3
 
 
-class EfectoActivo:
+class efectoActivo:
     """Un efecto en curso sobre un actor. Su evento pendiente se guarda aquí mismo,
     de modo que cancelarlo no exige buscarlo en la agenda."""
 
@@ -25,7 +25,7 @@ class EfectoActivo:
         self.activo = True
 
 
-class EfectosJuego(EfectosBase):
+class efectosJuego(EfectosBase):
     def __init__(self):
         self.activos = []                   # efectos en curso (pocos a la vez)
 
@@ -40,7 +40,7 @@ class EfectosJuego(EfectosBase):
         if not actor.vivo:
             return
         self._reemplazar(modelo, VENENO, actor)
-        efecto = EfectoActivo(VENENO, actor, dano, modelo.reloj + DURACION_VENENO)
+        efecto = efectoActivo(VENENO, actor, dano, modelo.reloj + DURACION_VENENO)
         efecto.evento = modelo.programarEvento(modelo.reloj + INTERVALO_VENENO, EV_VENENO, efecto)
         modelo.agregarA(self.activos, efecto)
         modelo.mensaje("%s queda envenenado." % self._nombre(actor))
@@ -57,7 +57,7 @@ class EfectosJuego(EfectosBase):
         if not actor.vivo:
             return
         self._reemplazar(modelo, REGENERACION, actor)
-        efecto = EfectoActivo(REGENERACION, actor, cantidad)
+        efecto = efectoActivo(REGENERACION, actor, cantidad)
         efecto.evento = modelo.programarEvento(modelo.reloj + INTERVALO_REGENERACION,
                                                EV_REGENERACION, efecto)
         modelo.agregarA(self.activos, efecto)
@@ -66,7 +66,7 @@ class EfectosJuego(EfectosBase):
         if not actor.vivo:
             return
         self._reemplazar(modelo, ANTORCHA, actor)
-        efecto = EfectoActivo(ANTORCHA, actor)
+        efecto = efectoActivo(ANTORCHA, actor)
         efecto.evento = modelo.programarEvento(modelo.reloj + duracion, EV_FIN_ANTORCHA, efecto)
         modelo.agregarA(self.activos, efecto)
         modelo.mensaje("La antorcha se enciende.")
@@ -75,7 +75,7 @@ class EfectosJuego(EfectosBase):
         if not actor.vivo:
             return
         self._reemplazar(modelo, VELOCIDAD, actor)     # restaura la velocidad previa
-        efecto = EfectoActivo(VELOCIDAD, actor, velocidadAnterior=actor.velocidad)
+        efecto = efectoActivo(VELOCIDAD, actor, velocidadAnterior=actor.velocidad)
         modelo.cambiarVelocidad(actor, velocidadNueva)  # reescala la acción ya programada
         efecto.evento = modelo.programarEvento(modelo.reloj + duracion, EV_FIN_VELOCIDAD, efecto)
         modelo.agregarA(self.activos, efecto)

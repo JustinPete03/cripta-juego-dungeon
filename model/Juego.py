@@ -22,6 +22,7 @@ from model.Entidades import (Sala, Salida, Puerta, Jugador, Enemigo, ObjetoInsta
                               ordenarEnemigosPorInstancia)
 from model.Interfaces import Resultado, DiarioNulo, EfectosBase
 from model.Rastro import elegirDestinoRastreador
+from model import estado
 
 
 class ResultadoPartida:
@@ -36,12 +37,21 @@ class Modelo:
     def __init__(self, proveedor, semilla, inventario, diario=None, efectos=None):
         self.proveedor = proveedor
         self.semilla = semilla
-        self.azar = random.Random(semilla)        # única fuente de azar
         self.inventario = inventario
         self.diario = diario if diario is not None else DiarioNulo()
         self.efectos = efectos if efectos is not None else EfectosBase()
-        self.bitacora = BitacoraCircular(CAPACIDAD_BITACORA)
 
+        # Tabla de manejadores indexada por tipo de evento (
+        self._manejadores = [None] * CANTIDAD_TIPOS_EVENTO
+        self._manejadores[EV_ENEMIGO] = self._manejarEnemigo
+        self._manejadores[EV_CIERRE_PUERTA] = self._manejarCierrePuerta
+        self._manejadores[EV_REARME_TRAMPA] = self._manejarRearmeTrampa
+        self._prepararEstado()
+
+    def _prepararEstado(self):
+        """Deja el modelo como recién creado. Lo usan iniciarPartida y el cargado de partidas."""
+        self.azar = random.Random(self.semilla)        # única fuente de azar
+        self.bitacora = BitacoraCircular(CAPACIDAD_BITACORA)
         self.reloj = 0
         self.agenda = Agenda(self._registrar)
         self.salas = IndiceOrdenado()
@@ -54,13 +64,11 @@ class Modelo:
         self.salaSalidaId = None
         self.llaveSalida = None
         self.siguienteSerieObjeto = 0
-
         self._grabando = False
-        # Tabla de manejadores indexada por tipo de evento (
-        self._manejadores = [None] * CANTIDAD_TIPOS_EVENTO
-        self._manejadores[EV_ENEMIGO] = self._manejarEnemigo
-        self._manejadores[EV_CIERRE_PUERTA] = self._manejarCierrePuerta
-        self._manejadores[EV_REARME_TRAMPA] = self._manejarRearmeTrampa
+
+    def reiniciar(self):
+        # El cargado descarta la partida en curso antes de reconstruir el mundo desde el archivo.
+        self._prepararEstado()
 
 
     # Interfaz reversible (la usan Jorge y Jurnier)
@@ -151,7 +159,7 @@ class Modelo:
             raise ValueError("La sala inicial %s no existe en el esqueleto." % (self.salaInicialId,))
         self.proveedor.fijarPredicadoEnUso(self.fichaEnUso)
 
-        # El contenido de la sala inicial se carga antes de aceptar la primera acción (§2.4)
+        # El contenido de la sala inicial se carga antes de aceptar la primera acción (sección 2.4)
         self._asegurarContenido(inicial)
         self.jugador.sala = inicial
         inicial.rastro = 0
@@ -428,7 +436,7 @@ class Modelo:
             self.agregarA(sala.objetos, objeto)
 
     def cambiarVelocidad(self, actor, nueva):
-        """Cambio de velocidad con reescalado de la acción ya programada (§2.3)."""
+        """Cambio de velocidad con reescalado de la acción ya programada (sección 2.3)."""
         if nueva <= 0:
             raise ValueError("La velocidad debe ser positiva.")
         anterior = actor.velocidad
@@ -528,7 +536,7 @@ class Modelo:
 
     # Consultas
     def fichaEnUso(self, tipoId):
-        """Predicado para la caché (§4.4): ficha referenciada por una instancia activa.
+        """Predicado para la caché (sección 4.4): ficha referenciada por una instancia activa.
         Se evalúa solo al desalojar, no en cada búsqueda."""
         for enemigo in self.enemigosVivos:
             if enemigo.tipoId == tipoId:
@@ -548,3 +556,10 @@ class Modelo:
 
     def resultadoPartida(self):
         return ResultadoPartida(self.estado, self.jugador.acciones, self.jugador.derrotados, self.reloj)
+
+    # Guardado (sección 4.12): el modelo expone el estado como datos planos y sabe volver de ellos.
+    def capturarEstado(self):
+        return estado.capturar(self)
+
+    def restaurarEstado(self, datos):
+        estado.restaurar(self, datos)

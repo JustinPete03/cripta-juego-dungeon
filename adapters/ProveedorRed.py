@@ -1,5 +1,5 @@
-from adapters.estrategia_red import GestorRedPrecarga
-from adapters.persistencia_cache import AlmacenamientoPersistenteCache
+from adapters.estrategiaRed import GestorRedPrecarga
+from adapters.persistenciaCache import AlmacenamientoPersistenteCache
 from model.Interfaces import ProveedorDatos
 from model.cache_estructuras import CacheCatalogo, FichaCatalogo
 
@@ -12,7 +12,7 @@ class FichaConCrudo(FichaCatalogo):
 
 
 class CacheConDisco(CacheCatalogo):
-    """Caché de Keilor + disco: al insertar guarda; un fallo en RAM intenta disco antes de pedir por red."""
+    """Caché con disco: al insertar guarda; un fallo en RAM intenta disco antes de pedir por red (sección 4.4)."""
     def __init__(self, capacidad, almacen, versionCatalogo):
         CacheCatalogo.__init__(self, capacidad)
         self.almacen = almacen
@@ -20,15 +20,14 @@ class CacheConDisco(CacheCatalogo):
 
     def insertar(self, idEntidad, datos):
         if isinstance(datos, dict):
-            self.almacen.guardar_ficha_disco(self.versionCatalogo, idEntidad, datos)
+            self.almacen.guardarFichaDisco(self.versionCatalogo, idEntidad, datos)
             datos = FichaConCrudo(datos)
         CacheCatalogo.insertar(self, idEntidad, datos)
 
     def contiene(self, idEntidad, registrar_metrica=True):
-        # el gestor de red pregunta esto antes de pedir catálogo: debe ver también el disco
         if CacheCatalogo.contiene(self, idEntidad, registrar_metrica):
             return True
-        crudo = self.almacen.leer_ficha_disco(self.versionCatalogo, idEntidad)
+        crudo = self.almacen.leerFichaDisco(self.versionCatalogo, idEntidad)
         if crudo is None:
             return False
         CacheCatalogo.insertar(self, idEntidad, FichaConCrudo(crudo))
@@ -37,7 +36,7 @@ class CacheConDisco(CacheCatalogo):
     def obtener(self, idEntidad):
         ficha = CacheCatalogo.obtener(self, idEntidad)
         if ficha is None:
-            crudo = self.almacen.leer_ficha_disco(self.versionCatalogo, idEntidad)
+            crudo = self.almacen.leerFichaDisco(self.versionCatalogo, idEntidad)
             if crudo is not None:
                 ficha = FichaConCrudo(crudo)
                 CacheCatalogo.insertar(self, idEntidad, ficha)
@@ -45,12 +44,12 @@ class CacheConDisco(CacheCatalogo):
 
 
 class ProveedorRed(ProveedorDatos):
-    """Une el cliente de Diego (HTTP u offline) con la caché de Keilor para el modelo de Justin."""
+    """Une el cliente de Diego (HTTP u offline) con la caché para el modelo (sección 6 Adaptadores)."""
     def __init__(self, cliente, idCripta, capacidadCache=25, directorioCache=".cache_cripta"):
-        version = cliente.obtener_version_catalogo()["version"]
+        version = cliente.obtenerVersionCatalogo()["version"]
         self.cache = CacheConDisco(capacidadCache, AlmacenamientoPersistenteCache(directorioCache), version)
         self.gestor = GestorRedPrecarga(cliente, self.cache)
-        self.datos, self.salas = self.gestor.inicializar_cripta(idCripta)
+        self.datos, self.salas = self.gestor.inicializarCripta(idCripta)
         self.enUso = None
 
     def datosGenerales(self):
@@ -61,15 +60,21 @@ class ProveedorRed(ProveedorDatos):
 
     def contenidoSala(self, salaId):
         self._protegerEnUso()
-        c = self.gestor.asegurar_contenido_sala(salaId, self.salas)
-        return {"sala": c["sala"], "enemigos": list(c.get("enemigos", [])),
-                "objetos": list(c.get("objetos", [])), "trampas": list(c.get("trampas", []))}
+        c = self.gestor.asegurarContenidoSala(salaId, self.salas)
+        if c is None:
+            raise KeyError(f"No se pudo obtener el contenido para la sala {salaId}.")
+        return {
+            "sala": c["sala"],
+            "enemigos": list(c.get("enemigos", [])),
+            "objetos": list(c.get("objetos", [])),
+            "trampas": list(c.get("trampas", [])),
+        }
 
     def ficha(self, tipoId):
         ficha = self.cache.obtener(tipoId)
-        if ficha is None:                      # ni en RAM ni en disco: única razón de pedir por red
+        if ficha is None:  # Ni en RAM ni en disco: única razón de pedir por red (sección 4.4)
             self._protegerEnUso()
-            respuesta = self.gestor.cliente.obtener_catalogo_lote([tipoId])
+            respuesta = self.gestor.cliente.obtenerCatalogoLote([tipoId])
             for f in respuesta.get("entidades", []):
                 self.cache.insertar(f["id"], f)
             ficha = self.cache.obtener(tipoId)
@@ -79,13 +84,13 @@ class ProveedorRed(ProveedorDatos):
 
     def anticipar(self, salaId):
         self._protegerEnUso()
-        self.gestor.precargar_vecindad(salaId, self.salas)
+        self.gestor.precargarVecindad(salaId, self.salas)
 
     def fijarPredicadoEnUso(self, predicado):
         self.enUso = predicado
 
     def _protegerEnUso(self):
-        """Traduce el predicado del modelo (§4.4) a las referencias que respeta la caché."""
+        """Traduce el predicado del modelo (sección 4.4) a las referencias que respeta la caché."""
         if self.enUso is None:
             return
         for cubeta in self.cache.cubetas:
@@ -93,4 +98,4 @@ class ProveedorRed(ProveedorDatos):
                 entrada.referencias_activas = 1 if self.enUso(entrada.id_entidad) else 0
 
     def reporte(self):
-        return self.gestor.generar_reporte_rendimiento_red()
+        return self.gestor.generarReporteRendimientoRed()

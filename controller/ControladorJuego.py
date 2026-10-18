@@ -4,7 +4,7 @@ Sirve igual para el modo interactivo y para --replay (sin vista): reproducir() n
 Servicios opcionales (los aportan los demás): registro (bitácora de partida de Diego),
 puntajes (tabla de puntajes de Diego), guardado (guardado binario de Jurnier).
 """
-from model.Constantes import (EN_CURSO, ACC_MOVER, ACC_ABRIR, ACC_ATACAR, ACC_ESPERAR,
+from model.Constantes import (EN_CURSO, VICTORIA, ACC_MOVER, ACC_ABRIR, ACC_ATACAR, ACC_ESPERAR,
                                ACC_RECOGER, ACC_USAR, ACC_EQUIPAR, ACC_SOLTAR, ACC_RETROCESO,
                                ACC_SIGUIENTE, ACC_ANTERIOR)
 from model.Acciones import Accion, accionesDesdeTexto
@@ -13,7 +13,7 @@ from model.Interfaces import Resultado
 AYUDA = (
     "Comandos: n/s/e/o (mover) | abrir <n|s|e|o> | atacar [k] | esperar | recoger [k] | soltar |\n"
     "          equipar | usar | retroceso | sig | ant | inv | ordenar <peso|valor|nombre> |\n"
-    "          guardar <archivo> | cargar <archivo> | ayuda | salir"
+    "          puntajes | guardar <archivo> | cargar <archivo> | ayuda | salir"
 )
 
 
@@ -32,6 +32,9 @@ class Controlador:
         self.puntajes = puntajes
         self.guardado = guardado
         self.termino = False
+        self.nombre = "Jugador"
+        self.idCripta = ""
+        self.versionCripta = ""
 
     def interpretar(self, texto):
 
@@ -73,7 +76,7 @@ class Controlador:
         ##Ejecuta en el modelo y anota en la bitácora de partida lo que cambia el estado.
         resultado = self.modelo.ejecutar(accion)
         if resultado.ok and resultado.registrable and self.registro is not None:
-            self.registro.anotar(accion.aTexto())
+            self.registro.registrarAccion(accion.aTexto())
         if self.modelo.estado != EN_CURSO:
             self._cerrarPartida()
         return resultado
@@ -94,6 +97,9 @@ class Controlador:
             return False
         if comando == "ordenar":
             self._ordenar(palabra[1] if len(palabra) > 1 else "")
+            return False
+        if comando in ("puntajes", "tabla"):
+            self._mostrarPuntajes()
             return False
         if comando in ("guardar", "cargar"):
             self._guardarCargar(comando, palabra[1] if len(palabra) > 1 else "")
@@ -142,7 +148,20 @@ class Controlador:
             return
         self.termino = True
         if self.puntajes is not None:
-            self.puntajes.registrar(self.modelo.resultadoPartida())
+            r = self.modelo.resultadoPartida()
+            self.puntajes.registrarPartida(self.nombre, self.idCripta, self.versionCripta,
+                                           r.acciones, r.derrotados, r.tiempoFinal,
+                                           r.estado == VICTORIA)
+
+    def _mostrarPuntajes(self):
+        if self.puntajes is None:
+            self._decir("Tabla de puntajes no disponible.")
+            return
+        if hasattr(self.puntajes, "formatearTabla"):
+            self._decir(self.puntajes.formatearTabla())
+        else:
+            tabla = self.puntajes.obtenerTablaOrdenada()
+            self._decir("Partidas registradas: %d" % len(tabla))
 
     def _decir(self, texto):
         if self.vista is not None:
@@ -167,12 +186,17 @@ class Controlador:
 
     def _guardarCargar(self, comando, ruta):
         if self.guardado is None:
-            self._decir("El guardado binario lo aporta Jurnier (aún no conectado).")
+            self._decir("El guardado de partida no está disponible en este modo.")
             return
         if len(ruta) == 0:
             self._decir("Indica un archivo: %s <archivo>" % comando)
             return
-        if comando == "guardar":
-            self.guardado.guardar(self.modelo, ruta)
-        else:
-            self.guardado.cargar(self.modelo, ruta)
+        try:
+            if comando == "guardar":
+                self.guardado.guardar(self.modelo, ruta)
+                self._decir("Partida guardada en %s." % ruta)
+            else:
+                self.guardado.cargar(self.modelo, ruta)
+                self._decir("Partida cargada desde %s." % ruta)
+        except (OSError, ValueError) as error:
+            self._decir("No se pudo %s: %s" % (comando, error))

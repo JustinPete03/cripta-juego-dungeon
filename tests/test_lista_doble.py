@@ -1,133 +1,132 @@
-from model.cache.nodo import Nodo
-from model.cache.lista_doble import ListaDoble
+from model.cache.Nodo import Nodo
+from model.cache.ListaDoble import ListaDoble
 
-def test_un_solo_nodo():
+def testUnSoloNodo():
     lista = ListaDoble()
     a = Nodo("a","ficha_a")
-    lista.agregar_al_frente(a)
+    lista.agregarAlFrente(a)
     assert lista.primero is a
     assert lista.ultimo is a
     assert lista.tamanio == 1
     assert a.anterior is None
     assert a.siguiente is None
 
-def ids_hacia_adelante(lista):
+def idsHaciaAdelante(lista):
     ids = []
     actual = lista.primero
     while actual is not None:
-        ids.append(actual.id_ficha)
+        ids.append(actual.idFicha)
         actual = actual.siguiente
     return ids
 
-def ids_hacia_atras(lista):
+def idsHaciaAtras(lista):
     ids = []
     actual = lista.ultimo
     while actual is not None:
-        ids.append(actual.id_ficha)
+        ids.append(actual.idFicha)
         actual = actual.anterior
     return ids
 
-def lista_tres_nodos():
+def listaTresNodos():
     lista = ListaDoble()
     a = Nodo("a","ficha_a")
     b = Nodo("b","ficha_b")
     c = Nodo("c","ficha_c")
-    lista.agregar_al_frente(a)
-    lista.agregar_al_frente(b)
-    lista.agregar_al_frente(c)
+    lista.agregarAlFrente(a)
+    lista.agregarAlFrente(b)
+    lista.agregarAlFrente(c)
     return lista, [a,b,c]
 
-
-def test_tres_nodos():
+def testTresNodos():
     lista = ListaDoble()
     a = Nodo("a","ficha_a")
     b = Nodo("b","ficha_b")
     c = Nodo("c","ficha_c")
-    lista.agregar_al_frente(a)
-    lista.agregar_al_frente(b)
-    lista.agregar_al_frente(c)
+    lista.agregarAlFrente(a)
+    lista.agregarAlFrente(b)
+    lista.agregarAlFrente(c)
     assert lista.primero is c
     assert lista.ultimo is a
     assert lista.tamanio == 3
-    assert ids_hacia_adelante(lista) == ["c","b","a"]
-    assert ids_hacia_atras(lista) == ["a","b","c"]
+    assert idsHaciaAdelante(lista) == ["c", "b", "a"]
+    assert idsHaciaAtras(lista) == ["a", "b", "c"]
     assert lista.primero.anterior is None
     assert lista.ultimo.siguiente is None
 
-def test_quitar_primero():
-    lista, nodos = lista_tres_nodos()
+def testQuitarPrimero():
+    lista, nodos = listaTresNodos()
     [a,b,c] = nodos
     lista.quitar(c)
     assert lista.primero is b
     assert lista.ultimo is a
     assert lista.tamanio == 2
-    assert ids_hacia_adelante(lista) == ["b","a"]
-    assert ids_hacia_atras(lista) == ["a","b"]
+    assert idsHaciaAdelante(lista) == ["b", "a"]
+    assert idsHaciaAtras(lista) == ["a", "b"]
     assert b.anterior is None
     assert c.anterior is None
     assert c.siguiente is None
 
-def test_quitar_ultimo():
-    lista, nodos = lista_tres_nodos()
+def testQuitarUltimo():
+    lista, nodos = listaTresNodos()
     [a, b, c] = nodos
     lista.quitar(a)
     assert lista.primero is c
     assert lista.ultimo is b
     assert lista.tamanio == 2
-    assert ids_hacia_adelante(lista) == ["c", "b"]
-    assert ids_hacia_atras(lista) == ["b", "c"]
+    assert idsHaciaAdelante(lista) == ["c", "b"]
+    assert idsHaciaAtras(lista) == ["b", "c"]
     assert b.siguiente is None
     assert a.anterior is None
     assert a.siguiente is None
 
-def test_quitar_nodo_unico():
+def testQuitarNodoUnico():
     lista = ListaDoble()
     a = Nodo("a","ficha_a")
-    lista.agregar_al_frente(a)
+    lista.agregarAlFrente(a)
     lista.quitar(a)
     assert lista.primero is None
     assert lista.ultimo is None
     assert lista.tamanio == 0
-    assert ids_hacia_adelante(lista) == []
-    assert ids_hacia_atras(lista) == []
+    assert idsHaciaAdelante(lista) == []
+    assert idsHaciaAtras(lista) == []
     assert a.anterior is None
     assert a.siguiente is None
 
-def test_quitar_del_medio():
-    lista, nodos = lista_tres_nodos()
+def testQuitarDelMedio():
+    lista, nodos = listaTresNodos()
     [a, b, c] = nodos
     lista.quitar(b)
     assert lista.primero is c
     assert lista.ultimo is a
     assert lista.tamanio == 2
-    assert ids_hacia_adelante(lista) == ["c","a"]
-    assert ids_hacia_atras(lista) == ["a","c"]
+    assert idsHaciaAdelante(lista) == ["c", "a"]
+    assert idsHaciaAtras(lista) == ["a", "c"]
     assert c.siguiente is a
     assert a.anterior is c
     assert b.anterior is None
     assert b.siguiente is None
 
-def test_mover_primero_al_frente():
-    lista, nodos = lista_tres_nodos()
+def testMoverPrimeroAlFrente():
+    lista, nodos = listaTresNodos()
     [a, b, c] = nodos
-    lista.mover_al_frente(c)
+    lista.moverAlFrente(c)
     assert lista.primero is c
     assert lista.ultimo is a
     assert lista.tamanio == 3
-    assert ids_hacia_adelante(lista) == ["c", "b", "a"]
-    assert ids_hacia_atras(lista) == ["a", "b", "c"]
+    assert idsHaciaAdelante(lista) == ["c", "b", "a"]
+    assert idsHaciaAtras(lista) == ["a", "b", "c"]
     assert c.anterior is None
     assert a.siguiente is None
 
-def test_mover_del_medio_al_frente():
-    lista, nodos = lista_tres_nodos()
+def testMoverDelMedioAlFrente():
+    lista, nodos = listaTresNodos()
     [a, b, c] = nodos
-    lista.mover_al_frente(b)
+    lista.moverAlFrente(b)
     assert lista.primero is b
     assert lista.ultimo is a
     assert lista.tamanio == 3
-    assert ids_hacia_adelante(lista) == ["b", "c", "a"]
-    assert ids_hacia_atras(lista) == ["a", "c", "b"]
+    assert idsHaciaAdelante(lista) == ["b", "c", "a"]
+    assert idsHaciaAtras(lista) == ["a", "c", "b"]
     assert b.anterior is None
     assert b.siguiente is c
     assert c.anterior is b
@@ -135,23 +134,23 @@ def test_mover_del_medio_al_frente():
     assert a.anterior is c
     assert a.siguiente is None
 
-def test_mover_ultimo_al_frente():
-    lista, nodos = lista_tres_nodos()
+def testMoverUltimoAlFrente():
+    lista, nodos = listaTresNodos()
     [a, b, c] = nodos
-    lista.mover_al_frente(a)
+    lista.moverAlFrente(a)
     assert lista.primero is a
     assert lista.ultimo is b
     assert lista.tamanio == 3
-    assert ids_hacia_adelante(lista) == ["a", "c", "b"]
-    assert ids_hacia_atras(lista) == ["b", "c", "a"]
+    assert idsHaciaAdelante(lista) == ["a", "c", "b"]
+    assert idsHaciaAtras(lista) == ["b", "c", "a"]
     assert a.anterior is None
     assert b.siguiente is None
 
-def test_mover_nodo_unico():
+def testMoverNodoUnico():
     lista = ListaDoble()
     a = Nodo("a", "ficha_a")
-    lista.agregar_al_frente(a)
-    lista.mover_al_frente(a)
+    lista.agregarAlFrente(a)
+    lista.moverAlFrente(a)
     assert lista.primero is a
     assert lista.ultimo is a
     assert lista.tamanio == 1

@@ -1,12 +1,12 @@
 #Merge sort O(n log n)
 
-def merge_sort(entrada, clave=None, descendente=False, contador=None):
+def mergeSort(entrada, clave=None, descendente=False, contador=None):
     if clave is None:
         clave = lambda x: x
 
     datos = [(clave(elemento), elemento) for elemento in entrada]
 
-    def va_antes(a,b):
+    def vaAntes(a,b):
         if contador is not None:
             contador.incrementar()
         return a > b if descendente else a < b
@@ -20,7 +20,7 @@ def merge_sort(entrada, clave=None, descendente=False, contador=None):
 
         while i < medio and j < fin:
 
-            if va_antes(datos[j][0], datos[i][0]):
+            if vaAntes(datos[j][0], datos[i][0]):
                 buffer[k] = datos[j]
                 j += 1
             else:
@@ -37,13 +37,13 @@ def merge_sort(entrada, clave=None, descendente=False, contador=None):
             k+=1
         datos[inicio:fin] = buffer[inicio:fin]
 
-    def ordenar_rango(inicio,fin):
+    def ordenarRango(inicio,fin):
         if fin - inicio <= 1:
             return
         medio = (inicio + fin) // 2
-        ordenar_rango(inicio,medio)
-        ordenar_rango(medio,fin)
+        ordenarRango(inicio,medio)
+        ordenarRango(medio,fin)
         fusionar(inicio,medio,fin)
 
-    ordenar_rango(0,len(datos))
+    ordenarRango(0,len(datos))
     return [par[1] for par in datos]

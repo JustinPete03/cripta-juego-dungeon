@@ -1,184 +1,239 @@
 ﻿------Bench de Ordenamientos------
-semilla=2026  repeticiones=7
-algo        modo             n          ms     comps
-insertion   aleatorio        8       0.005        19
-insertion   aleatorio       16       0.014        69
-insertion   aleatorio       32       0.043       253
-insertion   aleatorio       64       0.168      1062
-insertion   aleatorio      128       0.614      3881
-insertion   aleatorio      256       2.535     16531
-insertion   aleatorio      512      10.117     65373
-insertion   aleatorio     1024      42.708    260900
-insertion   aleatorio     2048     176.185   1051360
-insertion   ordenado         8       0.004         7
-insertion   ordenado        16       0.005        15
-insertion   ordenado        32       0.009        31
-insertion   ordenado        64       0.017        63
-insertion   ordenado       128       0.033       127
-insertion   ordenado       256       0.066       255
-insertion   ordenado       512       0.135       511
-insertion   ordenado      1024       0.283      1023
-insertion   ordenado      2048       0.563      2047
-insertion   invertido        8       0.006        28
-insertion   invertido       16       0.022       120
-insertion   invertido       32       0.080       496
-insertion   invertido       64       0.315      2016
-insertion   invertido      128       1.241      8128
-insertion   invertido      256       4.986     32640
-insertion   invertido      512      20.340    130816
-insertion   invertido     1024      85.211    523776
-insertion   invertido     2048     347.975   2096128
-insertion   casi             8       0.005        10
-insertion   casi            16       0.007        16
-insertion   casi            32       0.010        38
-insertion   casi            64       0.036       166
-insertion   casi           128       0.111       634
-insertion   casi           256       0.401      2387
-insertion   casi           512       1.428      8106
-insertion   casi          1024       5.808     34594
-insertion   casi          2048      23.501    139643
-insertion   mitades          8       0.007        22
-insertion   mitades         16       0.015        78
-insertion   mitades         32       0.054       286
-insertion   mitades         64       0.172      1086
-insertion   mitades        128       0.662      4222
-insertion   mitades        256       2.541     16638
-insertion   mitades        512      10.639     66046
-insertion   mitades       1024      43.318    263166
-insertion   mitades       2048     181.595   1050622
-insertion   vecinos          8       0.004         8
-insertion   vecinos         16       0.007        16
-insertion   vecinos         32       0.009        32
-insertion   vecinos         64       0.017        66
-insertion   vecinos        128       0.034       133
-insertion   vecinos        256       0.067       267
-insertion   vecinos        512       0.142       535
-insertion   vecinos       1024       0.428      1072
-insertion   vecinos       2048       0.638      2145
-merge       aleatorio        8       0.015        16
-merge       aleatorio       16       0.031        45
-merge       aleatorio       32       0.077       123
-merge       aleatorio       64       0.147       304
-merge       aleatorio      128       0.293       736
-merge       aleatorio      256       0.741      1724
-merge       aleatorio      512       1.606      3963
-merge       aleatorio     1024       3.886      8950
-merge       aleatorio     2048       6.553     19922
-merge       ordenado         8       0.012        12
-merge       ordenado        16       0.026        32
-merge       ordenado        32       0.047        80
-merge       ordenado        64       0.111       192
-merge       ordenado       128       0.219       448
-merge       ordenado       256       0.438      1024
-merge       ordenado       512       1.068      2304
-merge       ordenado      1024       2.415      5120
-merge       ordenado      2048       5.233     11264
-merge       invertido        8       0.012        12
-merge       invertido       16       0.020        32
-merge       invertido       32       0.045        80
-merge       invertido       64       0.103       192
-merge       invertido      128       0.205       448
-merge       invertido      256       0.486      1024
-merge       invertido      512       1.229      2304
-merge       invertido     1024       2.469      5120
-merge       invertido     2048       5.793     11264
-merge       casi             8       0.013        13
-merge       casi            16       0.023        39
-merge       casi            32       0.046        86
-merge       casi            64       0.105       229
-merge       casi           128       0.232       589
-merge       casi           256       0.553      1435
-merge       casi           512       1.623      3402
-merge       casi          1024       3.093      7827
-merge       casi          2048       6.204     17734
-merge       mitades          8       0.014        12
-merge       mitades         16       0.028        32
-merge       mitades         32       0.061        80
-merge       mitades         64       0.105       192
-merge       mitades        128       0.255       448
-merge       mitades        256       0.516      1024
-merge       mitades        512       0.999      2304
-merge       mitades       1024       2.162      5120
-merge       mitades       2048       4.779     11264
-merge       vecinos          8       0.012        13
-merge       vecinos         16       0.019        32
-merge       vecinos         32       0.045        80
-merge       vecinos         64       0.091       193
-merge       vecinos        128       0.196       451
-merge       vecinos        256       0.436      1029
-merge       vecinos        512       0.956      2316
-merge       vecinos       1024       2.205      5147
-merge       vecinos       2048       4.626     11312
-selection   aleatorio        8       0.008        28
-selection   aleatorio       16       0.025       120
-selection   aleatorio       32       0.089       496
-selection   aleatorio       64       0.245      2016
-selection   aleatorio      128       0.948      8128
-selection   aleatorio      256       5.728     32640
-selection   aleatorio      512      25.752    130816
-selection   aleatorio     1024      66.853    523776
-selection   aleatorio     2048     264.285   2096128
-selection   ordenado         8       0.006        28
-selection   ordenado        16       0.019       120
-selection   ordenado        32       0.064       496
-selection   ordenado        64       0.248      2016
-selection   ordenado       128       0.932      8128
-selection   ordenado       256       3.566     32640
-selection   ordenado       512      15.655    130816
-selection   ordenado      1024      64.082    523776
-selection   ordenado      2048     258.584   2096128
-selection   invertido        8       0.007        28
-selection   invertido       16       0.020       120
-selection   invertido       32       0.076       496
-selection   invertido       64       0.278      2016
-selection   invertido      128       1.056      8128
-selection   invertido      256       4.084     32640
-selection   invertido      512      16.776    130816
-selection   invertido     1024      65.981    523776
-selection   invertido     2048     266.869   2096128
-selection   casi             8       0.006        28
-selection   casi            16       0.018       120
-selection   casi            32       0.064       496
-selection   casi            64       0.243      2016
-selection   casi           128       0.935      8128
-selection   casi           256       3.617     32640
-selection   casi           512      15.798    130816
-selection   casi          1024      64.740    523776
-selection   casi          2048     256.684   2096128
-selection   mitades          8       0.006        28
-selection   mitades         16       0.019       120
-selection   mitades         32       0.065       496
-selection   mitades         64       0.258      2016
-selection   mitades        128       0.940      8128
-selection   mitades        256       3.612     32640
-selection   mitades        512      15.898    130816
-selection   mitades       1024      63.940    523776
-selection   mitades       2048     262.718   2096128
-selection   vecinos          8       0.006        28
-selection   vecinos         16       0.019       120
-selection   vecinos         32       0.063       496
-selection   vecinos         64       0.261      2016
-selection   vecinos        128       1.042      8128
-selection   vecinos        256       3.821     32640
-selection   vecinos        512      16.077    130816
-selection   vecinos       1024      66.311    523776
-selection   vecinos       2048     287.958   2096128
+Semilla=2026  Repeticiones=7
+Algo        Modo             n          Ms     Comps
+insertion   Aleatorio        8       0.005        19
+insertion   Aleatorio       16       0.014        69
+insertion   Aleatorio       32       0.046       253
+insertion   Aleatorio       64       0.166      1062
+insertion   Aleatorio      128       0.609      3881
+insertion   Aleatorio      256       2.454     16531
+insertion   Aleatorio      512      10.276     65373
+insertion   Aleatorio     1024      42.239    260900
+insertion   Aleatorio     2048     183.415   1051360
+insertion   Ordenado         8       0.004         7
+insertion   Ordenado        16       0.007        15
+insertion   Ordenado        32       0.014        31
+insertion   Ordenado        64       0.020        63
+insertion   Ordenado       128       0.041       127
+insertion   Ordenado       256       0.081       255
+insertion   Ordenado       512       0.212       511
+insertion   Ordenado      1024       0.315      1023
+insertion   Ordenado      2048       0.590      2047
+insertion   Invertido        8       0.007        28
+insertion   Invertido       16       0.023       120
+insertion   Invertido       32       0.084       496
+insertion   Invertido       64       0.318      2016
+insertion   Invertido      128       1.216      8128
+insertion   Invertido      256       7.374     32640
+insertion   Invertido      512      26.806    130816
+insertion   Invertido     1024     116.100    523776
+insertion   Invertido     2048     373.369   2096128
+insertion   Casi             8       0.005        10
+insertion   Casi            16       0.005        16
+insertion   Casi            32       0.011        38
+insertion   Casi            64       0.036       166
+insertion   Casi           128       0.121       634
+insertion   Casi           256       0.405      2387
+insertion   Casi           512       1.447      8106
+insertion   Casi          1024       5.778     34594
+insertion   Casi          2048      23.776    139643
+insertion   Mitades          8       0.007        22
+insertion   Mitades         16       0.015        78
+insertion   Mitades         32       0.048       286
+insertion   Mitades         64       0.173      1086
+insertion   Mitades        128       0.656      4222
+insertion   Mitades        256       2.472     16638
+insertion   Mitades        512      10.597     66046
+insertion   Mitades       1024      44.503    263166
+insertion   Mitades       2048     191.214   1050622
+insertion   Vecinos          8       0.004         8
+insertion   Vecinos         16       0.007        16
+insertion   Vecinos         32       0.009        32
+insertion   Vecinos         64       0.017        66
+insertion   Vecinos        128       0.034       133
+insertion   Vecinos        256       0.066       267
+insertion   Vecinos        512       0.139       535
+insertion   Vecinos       1024       0.286      1072
+insertion   Vecinos       2048       0.576      2145
+merge       Aleatorio        8       0.012        16
+merge       Aleatorio       16       0.022        45
+merge       Aleatorio       32       0.047       123
+merge       Aleatorio       64       0.108       304
+merge       Aleatorio      128       0.253       736
+merge       Aleatorio      256       0.541      1724
+merge       Aleatorio      512       1.331      3963
+merge       Aleatorio     1024       2.818      8950
+merge       Aleatorio     2048       6.155     19922
+merge       Ordenado         8       0.012        12
+merge       Ordenado        16       0.019        32
+merge       Ordenado        32       0.040        80
+merge       Ordenado        64       0.088       192
+merge       Ordenado       128       0.194       448
+merge       Ordenado       256       0.430      1024
+merge       Ordenado       512       0.964      2304
+merge       Ordenado      1024       2.186      5120
+merge       Ordenado      2048       4.599     11264
+merge       Invertido        8       0.009        12
+merge       Invertido       16       0.019        32
+merge       Invertido       32       0.051        80
+merge       Invertido       64       0.089       192
+merge       Invertido      128       0.199       448
+merge       Invertido      256       0.426      1024
+merge       Invertido      512       0.974      2304
+merge       Invertido     1024       2.159      5120
+merge       Invertido     2048       5.677     11264
+merge       Casi             8       0.015        13
+merge       Casi            16       0.028        39
+merge       Casi            32       0.045        86
+merge       Casi            64       0.100       229
+merge       Casi           128       0.259       589
+merge       Casi           256       0.609      1435
+merge       Casi           512       1.550      3402
+merge       Casi          1024       4.524      7827
+merge       Casi          2048       9.829     17734
+merge       Mitades          8       0.015        12
+merge       Mitades         16       0.026        32
+merge       Mitades         32       0.061        80
+merge       Mitades         64       0.137       192
+merge       Mitades        128       0.331       448
+merge       Mitades        256       0.640      1024
+merge       Mitades        512       1.051      2304
+merge       Mitades       1024       2.745      5120
+merge       Mitades       2048       7.209     11264
+merge       Vecinos          8       0.012        13
+merge       Vecinos         16       0.024        32
+merge       Vecinos         32       0.051        80
+merge       Vecinos         64       0.125       193
+merge       Vecinos        128       0.266       451
+merge       Vecinos        256       0.699      1029
+merge       Vecinos        512       1.421      2316
+merge       Vecinos       1024       3.119      5147
+merge       Vecinos       2048       6.009     11312
+selection   Aleatorio        8       0.009        28
+selection   Aleatorio       16       0.027       120
+selection   Aleatorio       32       0.090       496
+selection   Aleatorio       64       0.294      2016
+selection   Aleatorio      128       1.009      8128
+selection   Aleatorio      256       3.712     32640
+selection   Aleatorio      512      20.252    130816
+selection   Aleatorio     1024      97.450    523776
+selection   Aleatorio     2048     260.578   2096128
+selection   Ordenado         8       0.006        28
+selection   Ordenado        16       0.018       120
+selection   Ordenado        32       0.064       496
+selection   Ordenado        64       0.239      2016
+selection   Ordenado       128       0.927      8128
+selection   Ordenado       256       3.588     32640
+selection   Ordenado       512      15.902    130816
+selection   Ordenado      1024      64.261    523776
+selection   Ordenado      2048     256.989   2096128
+selection   Invertido        8       0.006        28
+selection   Invertido       16       0.019       120
+selection   Invertido       32       0.066       496
+selection   Invertido       64       0.247      2016
+selection   Invertido      128       0.947      8128
+selection   Invertido      256       3.716     32640
+selection   Invertido      512      16.245    130816
+selection   Invertido     1024      66.599    523776
+selection   Invertido     2048     266.025   2096128
+selection   Casi             8       0.006        28
+selection   Casi            16       0.019       120
+selection   Casi            32       0.065       496
+selection   Casi            64       0.243      2016
+selection   Casi           128       0.953      8128
+selection   Casi           256       3.677     32640
+selection   Casi           512      16.151    130816
+selection   Casi          1024      64.981    523776
+selection   Casi          2048     258.913   2096128
+selection   Mitades          8       0.006        28
+selection   Mitades         16       0.019       120
+selection   Mitades         32       0.066       496
+selection   Mitades         64       0.246      2016
+selection   Mitades        128       0.949      8128
+selection   Mitades        256       3.879     32640
+selection   Mitades        512      17.636    130816
+selection   Mitades       1024      64.713    523776
+selection   Mitades       2048     258.137   2096128
+selection   Vecinos          8       0.006        28
+selection   Vecinos         16       0.018       120
+selection   Vecinos         32       0.065       496
+selection   Vecinos         64       0.242      2016
+selection   Vecinos        128       0.928      8128
+selection   Vecinos        256       3.626     32640
+selection   Vecinos        512      16.006    130816
+selection   Vecinos       1024      64.415    523776
+selection   Vecinos       2048     258.385   2096128
+
+--- Comparación costosa (nombres comparados carácter por carácter) ---
+     n    Ins ms    Mer ms  Ins comps  Mer comps  Gana
+     4     0.008     0.009          6          5  insertion
+     8     0.020     0.023         18         16  insertion
+    12     0.046     0.040         45         30  merge
+    16     0.078     0.059         81         46  merge
+    24     0.151     0.099        160         83  merge
+    32     0.264     0.144        286        124  merge
+    48     0.571     0.239        609        212  merge
+    64     0.962     0.346       1062        307  merge
+   128     3.914     0.809       4269        738  merge
 
 ==================================================
 
 ------Bench de Cache------
 semilla=2026  peticiones=1000
-patron         cap  aciertos    fallos    hit_rate   desalojos        ms
-uniforme         5        85       915        8.5%         910      2.20
-uniforme        10       156       844       15.6%         834      2.33
-uniforme        25       403       597       40.3%         572      2.64
-uniforme        50       799       201       79.9%         151      4.12
-sesgado          5       256       744       25.6%         739      1.99
-sesgado         10       493       507       49.3%         497      1.95
-sesgado         25       825       175       82.5%         150      1.65
-sesgado         50       917        83       91.7%          33      1.60
+patron      politica     cap  aciertos    fallos    hit_rate   desalojos        ms
+uniforme    LRU            5        85       915        8.5%         910      2.35
+uniforme    FIFO           5        83       917        8.3%         912      2.21
+uniforme    LRU           10       156       844       15.6%         834      2.42
+uniforme    FIFO          10       151       849       15.1%         839      2.40
+uniforme    LRU           25       403       597       40.3%         572      2.74
+uniforme    FIFO          25       400       600       40.0%         575      2.62
+uniforme    LRU           50       799       201       79.9%         151      2.42
+uniforme    FIFO          50       785       215       78.5%         165      2.25
+sesgado     LRU            5       256       744       25.6%         739      2.02
+sesgado     FIFO           5       252       748       25.2%         743      1.97
+sesgado     LRU           10       493       507       49.3%         497      1.93
+sesgado     FIFO          10       458       542       45.8%         532      1.86
+sesgado     LRU           25       825       175       82.5%         150      1.68
+sesgado     FIFO          25       742       258       74.2%         233      1.72
+sesgado     LRU           50       917        83       91.7%          33      1.61
+sesgado     FIFO          50       906        94       90.6%          44      1.77
 
---- persistencia (arranque) ---
+--- Recuperacion desde disco (patron sesgado, mismas peticiones) ---
+   cap   redSola  redConDisco  aciertosDisco    ahorro    msSola  msConDisco
+     5       744           59            685     92.1%      1.96      310.70
+    10       507           59            448     88.4%      2.20      243.38
+    25       175           59            116     66.3%      2.31      178.27
+    50        83           59             24     28.9%      1.60       77.86
+
+--- Búsqueda en la cache (µs por búsqueda) ---
+     n    presente     ausente    peorCaso
+    25        0.47        0.80        0.85
+   100        1.54        2.85        2.93
+   400        6.16       10.82       11.69
+  1600       23.32       44.33       44.59
+
+--- Persistencia (Arranque) ---
 peticiones=25   vacia=15  restaurada=0   ahorro=100.0%
 peticiones=50   vacia=23  restaurada=0   ahorro=100.0%
 peticiones=100  vacia=26  restaurada=13  ahorro=50.0%
+
+==================================================
+
+------Bench de Guardado (Binario vs JSON)------
+--- cargar UNA sala ---
+n=    20 | disco bin=     723 B  json=     600 B | cargar 1 sala: bin=    80.9 µs  json=     97.5 µs
+n=   200 | disco bin=    7296 B  json=    6434 B | cargar 1 sala: bin=    82.2 µs  json=    166.5 µs
+n=  2000 | disco bin=   73629 B  json=   67168 B | cargar 1 sala: bin=    87.5 µs  json=   1201.2 µs
+n= 20000 | disco bin=  742962 B  json=  698502 B | cargar 1 sala: bin=    97.7 µs  json=  24274.5 µs
+--- cargar TODAS las salas ---
+n=    20 | cargar TODO: bin=    0.13 ms  json=    0.11 ms
+n=   200 | cargar TODO: bin=    0.40 ms  json=    0.20 ms
+n=  2000 | cargar TODO: bin=    3.46 ms  json=    1.69 ms
+n= 20000 | cargar TODO: bin=   45.20 ms  json=   53.50 ms
+
+==================================================
+
+------Bench de Efectos (cancelar)------
+n=   100 | cancelar directo=    10.10 µs  buscando=     12.40 µs   (mediana de 51)
+n=  1000 | cancelar directo=    10.40 µs  buscando=     71.30 µs   (mediana de 51)
+n= 10000 | cancelar directo=    22.30 µs  buscando=    873.70 µs   (mediana de 51)

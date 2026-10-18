@@ -1,9 +1,10 @@
+# Imita los métodos de Modelo (Justin) que usan los efectos. NO es el modelo real.
 from model.Agenda import Agenda
 from model.Constantes import CANTIDAD_TIPOS_EVENTO, EV_JUGADOR
 from model.Entidades import Jugador
 
 
-class Proveedor:
+class proveedorFalso:
     def __init__(self, fichas):
         self.fichas = fichas
 
@@ -11,14 +12,14 @@ class Proveedor:
         return self.fichas[tipoId]
 
 
-class ModeloFalso:
+class modeloFalso:
     def __init__(self, efectos, fichas=None):
         self.reloj = 0
         self.diario = []                         # inversas, como el diario de Jorge
         self.agenda = Agenda(self._registrar)
         self.efectos = efectos
         self.jugador = Jugador(30, 6, 2, 100)
-        self.proveedor = Proveedor(fichas or {})
+        self.proveedor = proveedorFalso(fichas or {})
         self.mensajes = []
         self._manejadores = [None] * CANTIDAD_TIPOS_EVENTO
         efectos.registrarEn(self)
@@ -92,23 +93,23 @@ class ModeloFalso:
         self.asignar(actor, "velocidad", nueva)
         evento = actor.evento
         if evento is not None and not evento.cancelado:
-            restante = max(1, (evento.tiempo - self.reloj) * anterior // nueva)   # §2.3
+            restante = max(1, (evento.tiempo - self.reloj) * anterior // nueva)   # sección 2.3
             nuevo = self.agenda.reprogramar(evento, self.reloj + restante)
             self.asignar(actor, "evento", nuevo)
 
     # --- para las pruebas
-    def correr_hasta(self, limite):
+    def correrHasta(self, limite):
         parada = self.programarEvento(limite, EV_JUGADOR, None, "parada")
         while True:
-            e = self.agenda.proximo()
-            self.reloj = e.tiempo
-            if e is parada:
+            evento = self.agenda.proximo()
+            self.reloj = evento.tiempo
+            if evento is parada:
                 break
-            self._manejadores[e.tipo](e)
+            self._manejadores[evento.tipo](evento)
 
     def marca(self):
         return len(self.diario)
 
-    def retroceder_hasta(self, marca):
+    def retrocederHasta(self, marca):
         while len(self.diario) > marca:
             self.diario.pop()()

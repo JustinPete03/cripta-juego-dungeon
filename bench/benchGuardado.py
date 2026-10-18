@@ -1,8 +1,9 @@
 import os
 import time
 
-from adapters.guardado_binario import GuardadoBinario
-from adapters.guardado_json import GuardadoJSON
+from adapters.guardadoBinario import guardadoBinario
+from adapters.guardadoJson import guardadoJson
+
 
 def generar(n):
     # Datos sintéticos; ids ordenados por construcción
@@ -12,51 +13,51 @@ def generar(n):
             for i in range(1, n + 1)]
 
 
-def medir_carga(guardador, ruta, sala_id, repeticiones):
-    t0 = time.perf_counter()
+def medirCarga(guardador, ruta, salaId, repeticiones):
+    inicio = time.perf_counter()
     for _ in range(repeticiones):
-        guardador.cargar_sala(ruta, sala_id)
-    return (time.perf_counter() - t0) / repeticiones
+        guardador.cargarSala(ruta, salaId)
+    return (time.perf_counter() - inicio) / repeticiones
 
 
 def medir(n, repeticiones=200):
     salas = generar(n)
-    binario, js = GuardadoBinario(), GuardadoJSON()
+    binario, json = guardadoBinario(), guardadoJson()
 
     binario.guardar("b.sav", salas)
-    js.guardar("b.json", salas)
+    json.guardar("b.json", salas)
 
     objetivo = n // 2
-    t_bin = medir_carga(binario, "b.sav", objetivo, repeticiones)
-    t_json = medir_carga(js, "b.json", objetivo, repeticiones)
+    tBinario = medirCarga(binario, "b.sav", objetivo, repeticiones)
+    tJson = medirCarga(json, "b.json", objetivo, repeticiones)
 
     print(f"n={n:6d} | disco bin={os.path.getsize('b.sav'):8d} B  "
           f"json={os.path.getsize('b.json'):8d} B | "
-          f"cargar 1 sala: bin={t_bin * 1e6:8.1f} µs  json={t_json * 1e6:9.1f} µs")
+          f"cargar 1 sala: bin={tBinario * 1e6:8.1f} µs  json={tJson * 1e6:9.1f} µs")
     os.remove("b.sav")
     os.remove("b.json")
 
 
-def medir_carga_total(n, repeticiones=20):
+def medirCargaTotal(n, repeticiones=20):
     salas = generar(n)
-    binario, js = GuardadoBinario(), GuardadoJSON()
+    binario, json = guardadoBinario(), guardadoJson()
     binario.guardar("b.sav", salas)
-    js.guardar("b.json", salas)
+    json.guardar("b.json", salas)
 
     # Comprobar que ambas cargan lo mismo antes de medir
-    assert binario.cargar_todo("b.sav") == js.cargar_todo("b.json")
+    assert binario.cargarTodo("b.sav") == json.cargarTodo("b.json")
 
-    t0 = time.perf_counter()
+    inicio = time.perf_counter()
     for _ in range(repeticiones):
-        binario.cargar_todo("b.sav")
-    t_bin = (time.perf_counter() - t0) / repeticiones
+        binario.cargarTodo("b.sav")
+    tBinario = (time.perf_counter() - inicio) / repeticiones
 
-    t0 = time.perf_counter()
+    inicio = time.perf_counter()
     for _ in range(repeticiones):
-        js.cargar_todo("b.json")
-    t_json = (time.perf_counter() - t0) / repeticiones
+        json.cargarTodo("b.json")
+    tJson = (time.perf_counter() - inicio) / repeticiones
 
-    print(f"n={n:6d} | cargar TODO: bin={t_bin * 1e3:8.2f} ms  json={t_json * 1e3:8.2f} ms")
+    print(f"n={n:6d} | cargar TODO: bin={tBinario * 1e3:8.2f} ms  json={tJson * 1e3:8.2f} ms")
     os.remove("b.sav")
     os.remove("b.json")
 
@@ -67,7 +68,7 @@ def ejecutar(tamanos=(20, 200, 2000, 20000)):
         medir(n)
     print("--- cargar TODAS las salas ---")
     for n in tamanos:
-        medir_carga_total(n)
+        medirCargaTotal(n)
 
 
 def main():

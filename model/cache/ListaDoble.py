@@ -4,7 +4,7 @@ class ListaDoble:
         self.ultimo = None
         self.tamanio = 0
 
-    def agregar_al_frente(self,nodo):
+    def agregarAlFrente(self, nodo):
         nodo.anterior = None
         nodo.siguiente = self.primero
         if self.primero is not None:
@@ -27,9 +27,9 @@ class ListaDoble:
         nodo.siguiente = None
         self.tamanio -= 1
 
-    def mover_al_frente(self,nodo):
+    def moverAlFrente(self, nodo):
         if nodo is self.primero:
             return
         self.quitar(nodo)
-        self.agregar_al_frente(nodo)
+        self.agregarAlFrente(nodo)
 

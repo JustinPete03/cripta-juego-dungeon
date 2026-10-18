@@ -1,19 +1,20 @@
 import json
 
-class GuardadoJSON:
+class guardadoJson:
     def guardar(self, ruta, salas):
-        with open(ruta, "w" ,encoding="utf-8") as f:
-            json.dump(salas, f)
+        with open(ruta, "w", encoding="utf-8") as archivo:
+            json.dump(salas, archivo)
 
-    def cargar_sala(self, ruta, sala_id):
-        with open(ruta, encoding="utf-8") as f:
-            salas = json.load(f)
-        for s in salas:
-            if s[0]==sala_id:
-                return (s[0], [tuple(e) for e in s[1]], s[2])
-            return None
+    def cargarSala(self, ruta, salaId):
+        # Hay que leer y convertir
+        with open(ruta, encoding="utf-8") as archivo:
+            salas = json.load(archivo)
+        for sala in salas:
+            if sala[0] == salaId:
+                return (sala[0], [tuple(enemigo) for enemigo in sala[1]], sala[2])
+        return None
 
-    def cargar_todo(self, ruta):
-        with open(ruta, encoding="utf-8") as f:
-            salas = json.load(f)
-        return [(s[0], [tuple(e) for e in s[1]], s[2]) for s in salas]
+    def cargarTodo(self, ruta):
+        with open(ruta, encoding="utf-8") as archivo:
+            salas = json.load(archivo)
+        return [(sala[0], [tuple(enemigo) for enemigo in sala[1]], sala[2]) for sala in salas]

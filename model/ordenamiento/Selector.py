@@ -1,16 +1,17 @@
-from .insertion import insertion_sort
-from .merge import merge_sort
+from .Insertion import insertionSort
+from .Merge import mergeSort
 
-# Umbrales calibrados con bench/ordenamientos.py (12 oct 2026, semilla 2026, mediana de 7 repeticiones).
+# Umbrales calibrados con bench/Ordenamientos.py (12 oct 2026, semilla 2026, mediana de 7 repeticiones).
 
 # Modo "aleatorio": inserción gana hasta n=32, empata en n=64 (0.200 vs 0.204 ms) y merge gana desde n=128.
 MAX_INSERTION_SORT_SIZE = 32
 
-#Comparacion costosa donde el cruce baja a n=16
-MAX_INSERTION_SORT_SIZE_COSTOSA = 16
+# Comparación costosa (nombres comparados carácter por carácter): inserción gana hasta n=8
+# y merge desde n=12 (bench 17 oct 2026, semilla 2026, mediana de 15 repeticiones).
+MAX_INSERTION_SORT_SIZE_COSTOSA = 8
 
-#Con pocos descensos, inserción cuesta descensos * n y merge con n log n
-MAX_DESCENSOS = 20
+# Proporción de descensos hasta la cual inserción sigue ganando (modo "casi": ~5 % de desorden).
+LIMITE_DESCENSOS = 0.05
 
 # Modo "casi" (n//20 intercambios al azar): inserción gana hasta n=256 y merge desde n=512.
 # Tope necesario: en "mitades" (1 descenso pero ~n²/4 inversiones) inserción tarda 172 ms
@@ -31,17 +32,17 @@ def analizar(pares, descendente=False, contador=None):
     return {"n": n, "descensos": descensos}
 
 
-def seleccionar(propiedades, costosa=False):
+def seleccionar(propiedades,costosa=False):
     n = propiedades["n"]
     descensos = propiedades["descensos"]
     tope = MAX_INSERTION_SORT_SIZE_COSTOSA if costosa else MAX_INSERTION_SORT_SIZE
     if n <= tope:
-        return insertion_sort
+        return insertionSort
     if descensos == 0:         # ya ordenada: inserción aquí sería O(n)
-        return insertion_sort
-    if n <= MAX_ALMOST_SORTED and descensos <= min(MAX_DESCENSOS, n // 4):
-        return insertion_sort
-    return merge_sort
+        return insertionSort
+    if n <= MAX_ALMOST_SORTED and descensos <= LIMITE_DESCENSOS * n:
+        return insertionSort
+    return mergeSort
 
 
 def ordenar(entrada, clave=None, descendente=False, contador=None, costosa=False):

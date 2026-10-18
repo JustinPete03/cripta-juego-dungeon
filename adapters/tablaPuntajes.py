@@ -1,84 +1,90 @@
 import json
 import os
 
-# Clase para manejar la tabla de puntajes locales, con registro de partidas y ordenamiento.
+# Clase para manejar la tabla de puntajes locales, con registro de partidas y ordenamiento (sección 2.12 / sección 4.9).
 class GestorTablaPuntajes:
-    def __init__(self, ruta_archivo: str = "puntajes_locales.json"):
-        self.ruta_archivo = ruta_archivo
+    def __init__(self, rutaArchivo: str = "puntajes_locales.json"):
+        self.rutaArchivo = rutaArchivo
 
-    def registrar_partida(
+    @property
+    def ruta_archivo(self):
+        return self.rutaArchivo
+
+    def registrarPartida(
         self,
-        nombre_jugador: str,
-        id_cripta: str,
-        version_cripta: str,
-        acciones_ejecutadas: int,
-        enemigos_derrotados: int,
-        tiempo_final: int,
+        nombreJugador: str,
+        idCripta: str,
+        versionCripta: str,
+        accionesEjecutadas: int,
+        enemigosDerrotados: int,
+        tiempoFinal: int,
         victoria: bool,
     ):
-        # Carga los puntajes existentes, agrega el nuevo registro y guarda la lista ordenada.
-        puntajes = self._cargar_puntajes()
-        nuevo_registro = {
-            "nombre_jugador": nombre_jugador,
-            "id_cripta": id_cripta,
-            "version_cripta": version_cripta,
-            "acciones_ejecutadas": acciones_ejecutadas,
-            "enemigos_derrotados": enemigos_derrotados,
-            "tiempo_final": tiempo_final,
+        # Carga los puntajes existentes, agrega el nuevo registro y guarda la lista ordenada (sección 2.12)
+        puntajes = self._cargarPuntajes()
+        nuevoRegistro = {
+            "nombre_jugador": nombreJugador,
+            "id_cripta": idCripta,
+            "version_cripta": versionCripta,
+            "acciones_ejecutadas": accionesEjecutadas,
+            "enemigos_derrotados": enemigosDerrotados,
+            "tiempo_final": tiempoFinal,
             "victoria": victoria,
         }
-        puntajes.append(nuevo_registro)
+        puntajes.append(nuevoRegistro)
 
-        # Ordenamos antes de guardar usando Merge Sort o Insertion Sort (depende)y luego guardamos en disco.)
-        puntajes_ordenados = self.ordenar_puntajes(puntajes)
-        self._guardar_puntajes(puntajes_ordenados)
+        # Ordenamos antes de guardar usando Insertion Sort o Merge Sort según propiedades (sección 4.9)
+        puntajesOrdenados = self.ordenarPuntajes(puntajes)
+        self._guardarPuntajes(puntajesOrdenados)
 
-    def obtener_tabla_ordenada(self) -> list:
-        puntajes = self._cargar_puntajes()
-        return self.ordenar_puntajes(puntajes)
+    def obtenerTablaOrdenada(self) -> list:
+        puntajes = self._cargarPuntajes()
+        return self.ordenarPuntajes(puntajes)
 
-    def ordenar_puntajes(self, lista: list) -> list:
-       # Si la lista es pequeña o casi ordenada, usar Insertion Sort; de lo contrario, Merge Sort.
+    def ordenarPuntajes(self, lista: list) -> list:
+        # Selección adaptativa (sección 4.9): si la lista es pequeña o casi ordenada usa Insertion Sort; si no, Merge Sort.
         n = len(lista)
-        if n <= 1: return lista
+        if n <= 1:
+            return list(lista)
 
-        # Medimos si está casi ordenada contando pares adyacentes desordenados
+        # Medimos desorden contando pares adyacentes invertidos
         desordenes = 0
         for i in range(n - 1):
-            if not self._es_mejor_o_igual(lista[i], lista[i + 1]): desordenes += 1
+            if not self._esMejorOIgual(lista[i], lista[i + 1]):
+                desordenes += 1
 
-        # Si el arreglo es pequeño (n <= 24) o está casi ordenado (<= 15% desorden), Insertion Sort es O(n)
         if n <= 24 or (desordenes * 100 // n) <= 15:
-            return self._insertion_sort(lista)
+            return self._insertionSort(lista)
         else:
-            return self._merge_sort(lista)
-        
-#El criterio de ordenamiento es: primero victorias, luego menor tiempo_final, luego menos acciones ejecutadas.
-    def _es_mejor_o_igual(self, reg_a: dict, reg_b: dict) -> bool:
-        #Si los registros difieren en victoria, el que tiene victoria es mejor. Si son iguales, el que tiene menor tiempo_final es mejor. Si también son iguales, el que tiene menos acciones_ejecutadas es mejor.
-        if reg_a["victoria"] != reg_b["victoria"]: return reg_a["victoria"] > reg_b["victoria"]
-        # Si ambos tienen el mismo estado de victoria, comparamos por tiempo_final (menor es mejor)
-        if reg_a["tiempo_final"] != reg_b["tiempo_final"]: return reg_a["tiempo_final"] < reg_b["tiempo_final"]
-        # Si ambos tienen el mismo tiempo_final, comparamos por acciones_ejecutadas (menor es mejor)
-        return reg_a["acciones_ejecutadas"] <= reg_b["acciones_ejecutadas"]
-#Metodo de ordenamiento por inserción Insertion Sort para listas pequeñas o casi ordenadas.
-    def _insertion_sort(self, arr: list) -> list:
-        copia = [elem for elem in arr]
+            return self._mergeSort(lista)
+
+    def _esMejorOIgual(self, regA: dict, regB: dict) -> bool:
+        # Criterio (sección 2.12): Victorias primero -> Menor tiempo final -> Menos acciones -> Más enemigos derrotados
+        if regA["victoria"] != regB["victoria"]:
+            return regA["victoria"] > regB["victoria"]
+        if regA["tiempo_final"] != regB["tiempo_final"]:
+            return regA["tiempo_final"] < regB["tiempo_final"]
+        if regA["acciones_ejecutadas"] != regB["acciones_ejecutadas"]:
+            return regA["acciones_ejecutadas"] < regB["acciones_ejecutadas"]
+        return regA["enemigos_derrotados"] >= regB["enemigos_derrotados"]
+
+    def _insertionSort(self, arr: list) -> list:
+        copia = list(arr)
         for i in range(1, len(copia)):
             actual = copia[i]
             j = i - 1
-            while j >= 0 and not self._es_mejor_o_igual(copia[j], actual):
+            while j >= 0 and not self._esMejorOIgual(copia[j], actual):
                 copia[j + 1] = copia[j]
                 j -= 1
             copia[j + 1] = actual
         return copia
-# Metodo de ordenamiento Merge Sort para listas grandes o desordenadas.
-    def _merge_sort(self, arr: list) -> list:
+
+    def _mergeSort(self, arr: list) -> list:
         if len(arr) <= 1:
-            return arr
+            return list(arr)
         medio = len(arr) // 2
-        izquierda = self._merge_sort(arr[:medio])
-        derecha = self._merge_sort(arr[medio:])
+        izquierda = self._mergeSort(arr[:medio])
+        derecha = self._mergeSort(arr[medio:])
         return self._merge(izquierda, derecha)
 
     def _merge(self, izq: list, der: list) -> list:
@@ -86,7 +92,7 @@ class GestorTablaPuntajes:
         i = 0
         j = 0
         while i < len(izq) and j < len(der):
-            if self._es_mejor_o_igual(izq[i], der[j]):
+            if self._esMejorOIgual(izq[i], der[j]):
                 resultado.append(izq[i])
                 i += 1
             else:
@@ -100,12 +106,43 @@ class GestorTablaPuntajes:
             j += 1
         return resultado
 
-#Carga la lista de puntajes desde un archivo JSON, devolviendo una lista vacía si el archivo no existe o está corrupto.
-    def _cargar_puntajes(self) -> list:
-        if not os.path.exists(self.ruta_archivo): return []
+    def _cargarPuntajes(self) -> list:
+        if not os.path.exists(self.rutaArchivo):
+            return []
         try:
-            with open(self.ruta_archivo, "r", encoding="utf-8") as f: return json.load(f)
-        except Exception: return []
+            with open(self.rutaArchivo, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
 
-    def _guardar_puntajes(self, lista: list):
-        with open(self.ruta_archivo, "w", encoding="utf-8") as f: json.dump(lista, f, indent=2, ensure_ascii=False)
+    def _guardarPuntajes(self, lista: list):
+        with open(self.rutaArchivo, "w", encoding="utf-8") as f:
+            json.dump(lista, f, indent=2, ensure_ascii=False)
+
+    def formatearTabla(self, limite: int = 10) -> str:
+        tabla = self.obtenerTablaOrdenada()[:limite]
+        if not tabla:
+            return "No hay partidas registradas en la tabla de puntajes."
+        lineas = [
+            "=== TABLA DE PUNTAJES LOCALES ===",
+            f"{'#':<3} {'Jugador':<16} {'Cripta':<12} {'Resultado':<10} {'Tiempo':<8} {'Acciones':<9} {'Bajas':<6}",
+            "-" * 68,
+        ]
+        for idx, r in enumerate(tabla, 1):
+            estado = "Victoria" if r.get("victoria") else "Derrota"
+            lineas.append(
+                f"{idx:<3} {r.get('nombre_jugador', 'Anónimo')[:15]:<16} {r.get('id_cripta', '')[:11]:<12} "
+                f"{estado:<10} {r.get('tiempo_final', 0):<8} {r.get('acciones_ejecutadas', 0):<9} {r.get('enemigos_derrotados', 0):<6}"
+            )
+        lineas.append("=" * 68)
+        return "\n".join(lineas)
+
+    # Alias en snake_case
+    registrar_partida = registrarPartida
+    obtener_tabla_ordenada = obtenerTablaOrdenada
+    ordenar_puntajes = ordenarPuntajes
+    _es_mejor_o_igual = _esMejorOIgual
+    _insertion_sort = _insertionSort
+    _merge_sort = _mergeSort
+    _cargar_puntajes = _cargarPuntajes
+    _guardar_puntajes = _guardarPuntajes
