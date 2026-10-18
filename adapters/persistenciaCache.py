@@ -3,7 +3,7 @@ import os
 import tempfile
 
 
-# Guarda y lee fichas de catálogo en disco para persistencia entre sesiones (§4.4)
+# Guarda y lee fichas de catálogo en disco para persistencia entre sesiones (sección 4.4)
 class AlmacenamientoPersistenteCache:
     def __init__(self, directorioCache: str = ".cache_cripta"):
         self.directorioCache = directorioCache

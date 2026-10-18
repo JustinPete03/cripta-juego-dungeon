@@ -21,24 +21,24 @@ class ProveedorDatos:
         """Lista completa de salas (todas las páginas), tal como las entrega el JSON."""
         raise NotImplementedError
 
-    def contenidoSala(self, sala_id):
+    def contenidoSala(self, salaId):
         """Contenido de la sala. BLOQUEA hasta tenerlo; esperar nunca mueve el reloj virtual."""
         raise NotImplementedError
 
-    def ficha(self, tipo_id):
+    def ficha(self, tipoId):
         """Ficha de catálogo (pasa por la caché de Keilor)."""
         raise NotImplementedError
 
-    def anticipar(self, sala_id):
-        """Aviso de que el jugador está en sala_id: Diego decide qué precargar. No bloquea."""
+    def anticipar(self, salaId):
+        """Aviso de que el jugador está en salaId: Diego decide qué precargar. No bloquea."""
 
     def fijarPredicadoEnUso(self, predicado):
-        """predicado(tipo_id) -> bool: True si la ficha está en uso y no se puede desalojar (§4.4)."""
+        """predicado(tipoId) -> bool: True si la ficha está en uso y no se puede desalojar (4.4)."""
 
 
 class InventarioBase:
-    """Lo implementa Jorge. Toda mutación debe usar modelo.asignar / agregar_a / quitar_de /
-    insertar_en para que el retroceso pueda invertirla."""
+    """Lo implementa Jorge. Toda mutación debe pasar por modelo.asignar o registrar en
+    modelo.diario su inversa, para que el retroceso pueda deshacerla sin copias."""
 
     def configurar(self, capacidad):
         raise NotImplementedError

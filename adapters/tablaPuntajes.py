@@ -1,7 +1,7 @@
 import json
 import os
 
-# Clase para manejar la tabla de puntajes locales, con registro de partidas y ordenamiento (§2.12 / §4.9).
+# Clase para manejar la tabla de puntajes locales, con registro de partidas y ordenamiento (sección 2.12 / sección 4.9).
 class GestorTablaPuntajes:
     def __init__(self, rutaArchivo: str = "puntajes_locales.json"):
         self.rutaArchivo = rutaArchivo
@@ -20,7 +20,7 @@ class GestorTablaPuntajes:
         tiempoFinal: int,
         victoria: bool,
     ):
-        # Carga los puntajes existentes, agrega el nuevo registro y guarda la lista ordenada (§2.12)
+        # Carga los puntajes existentes, agrega el nuevo registro y guarda la lista ordenada (sección 2.12)
         puntajes = self._cargarPuntajes()
         nuevoRegistro = {
             "nombre_jugador": nombreJugador,
@@ -33,7 +33,7 @@ class GestorTablaPuntajes:
         }
         puntajes.append(nuevoRegistro)
 
-        # Ordenamos antes de guardar usando Insertion Sort o Merge Sort según propiedades (§4.9)
+        # Ordenamos antes de guardar usando Insertion Sort o Merge Sort según propiedades (sección 4.9)
         puntajesOrdenados = self.ordenarPuntajes(puntajes)
         self._guardarPuntajes(puntajesOrdenados)
 
@@ -42,7 +42,7 @@ class GestorTablaPuntajes:
         return self.ordenarPuntajes(puntajes)
 
     def ordenarPuntajes(self, lista: list) -> list:
-        # Selección adaptativa (§4.9): si la lista es pequeña o casi ordenada usa Insertion Sort; si no, Merge Sort.
+        # Selección adaptativa (sección 4.9): si la lista es pequeña o casi ordenada usa Insertion Sort; si no, Merge Sort.
         n = len(lista)
         if n <= 1:
             return list(lista)
@@ -59,7 +59,7 @@ class GestorTablaPuntajes:
             return self._mergeSort(lista)
 
     def _esMejorOIgual(self, regA: dict, regB: dict) -> bool:
-        # Criterio (§2.12): Victorias primero -> Menor tiempo final -> Menos acciones -> Más enemigos derrotados
+        # Criterio (sección 2.12): Victorias primero -> Menor tiempo final -> Menos acciones -> Más enemigos derrotados
         if regA["victoria"] != regB["victoria"]:
             return regA["victoria"] > regB["victoria"]
         if regA["tiempo_final"] != regB["tiempo_final"]:

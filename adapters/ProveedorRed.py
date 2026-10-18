@@ -12,7 +12,7 @@ class FichaConCrudo(FichaCatalogo):
 
 
 class CacheConDisco(CacheCatalogo):
-    """Caché con disco: al insertar guarda; un fallo en RAM intenta disco antes de pedir por red (§4.4)."""
+    """Caché con disco: al insertar guarda; un fallo en RAM intenta disco antes de pedir por red (sección 4.4)."""
     def __init__(self, capacidad, almacen, versionCatalogo):
         CacheCatalogo.__init__(self, capacidad)
         self.almacen = almacen
@@ -44,7 +44,7 @@ class CacheConDisco(CacheCatalogo):
 
 
 class ProveedorRed(ProveedorDatos):
-    """Une el cliente de Diego (HTTP u offline) con la caché para el modelo (§6 Adaptadores)."""
+    """Une el cliente de Diego (HTTP u offline) con la caché para el modelo (sección 6 Adaptadores)."""
     def __init__(self, cliente, idCripta, capacidadCache=25, directorioCache=".cache_cripta"):
         version = cliente.obtenerVersionCatalogo()["version"]
         self.cache = CacheConDisco(capacidadCache, AlmacenamientoPersistenteCache(directorioCache), version)
@@ -72,7 +72,7 @@ class ProveedorRed(ProveedorDatos):
 
     def ficha(self, tipoId):
         ficha = self.cache.obtener(tipoId)
-        if ficha is None:  # Ni en RAM ni en disco: única razón de pedir por red (§4.4)
+        if ficha is None:  # Ni en RAM ni en disco: única razón de pedir por red (sección 4.4)
             self._protegerEnUso()
             respuesta = self.gestor.cliente.obtenerCatalogoLote([tipoId])
             for f in respuesta.get("entidades", []):
@@ -90,7 +90,7 @@ class ProveedorRed(ProveedorDatos):
         self.enUso = predicado
 
     def _protegerEnUso(self):
-        """Traduce el predicado del modelo (§4.4) a las referencias que respeta la caché."""
+        """Traduce el predicado del modelo (sección 4.4) a las referencias que respeta la caché."""
         if self.enUso is None:
             return
         for cubeta in self.cache.cubetas:

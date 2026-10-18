@@ -5,6 +5,8 @@
 
 
 class Evento:
+    __slots__ = ("tiempo", "seq", "tipo", "propietario", "datos", "cancelado")
+
     def __init__(self, tiempo, tipo, propietario, datos=None):
         self.tiempo = tiempo
         self.seq = -1
@@ -27,11 +29,15 @@ class Agenda:
         return a.seq < b.seq
 
     def _subir(self, i):
+        # Comparación en línea: con cientos de enemigos activos esto se llama miles de veces
+        # por ciclo y el costo de la llamada pesa más que la comparación misma (sección 5.2).
         heap = self._heap
         while i > 0:
             padre = (i - 1) // 2
-            if self._menor(heap[i], heap[padre]):
-                heap[i], heap[padre] = heap[padre], heap[i]
+            hijo = heap[i]
+            actual = heap[padre]
+            if hijo.tiempo < actual.tiempo or (hijo.tiempo == actual.tiempo and hijo.seq < actual.seq):
+                heap[i], heap[padre] = actual, hijo
                 i = padre
             else:
                 break
@@ -43,10 +49,18 @@ class Agenda:
             izq = 2 * i + 1
             der = 2 * i + 2
             menor = i
-            if izq < n and self._menor(heap[izq], heap[menor]):
-                menor = izq
-            if der < n and self._menor(heap[der], heap[menor]):
-                menor = der
+            if izq < n:
+                candidato = heap[izq]
+                actual = heap[menor]
+                if candidato.tiempo < actual.tiempo or (candidato.tiempo == actual.tiempo
+                                                       and candidato.seq < actual.seq):
+                    menor = izq
+            if der < n:
+                candidato = heap[der]
+                actual = heap[menor]
+                if candidato.tiempo < actual.tiempo or (candidato.tiempo == actual.tiempo
+                                                       and candidato.seq < actual.seq):
+                    menor = der
             if menor == i:
                 break
             heap[i], heap[menor] = heap[menor], heap[i]
@@ -115,6 +129,14 @@ class Agenda:
         return None
     def secuencia(self):
         return self._siguienteSeq
+
+    def reconstruir(self, eventos, secuencia):
+        #Rearma el heap desde cero al cargar una partida. No informa inversas: no hay nada
+        #que deshacer, el estado anterior se descarta entero.
+        self._heap = []
+        for evento in eventos:
+            self._empujar(evento)
+        self._siguienteSeq = secuencia
 
     def restaurarSecuencia(self, valor):
         # Solo lo usa el retroceso

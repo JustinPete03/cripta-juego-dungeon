@@ -93,7 +93,7 @@ class modeloFalso:
         self.asignar(actor, "velocidad", nueva)
         evento = actor.evento
         if evento is not None and not evento.cancelado:
-            restante = max(1, (evento.tiempo - self.reloj) * anterior // nueva)   # §2.3
+            restante = max(1, (evento.tiempo - self.reloj) * anterior // nueva)   # sección 2.3
             nuevo = self.agenda.reprogramar(evento, self.reloj + restante)
             self.asignar(actor, "evento", nuevo)
 

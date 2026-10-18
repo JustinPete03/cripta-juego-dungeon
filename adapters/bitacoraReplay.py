@@ -17,19 +17,19 @@ class GestorBitacoraReplay:
         versionCatalogo: str,
         semilla: int,
     ):
-        # Crea el encabezado canónico de la bitácora (§4.11)
+        # Crea el encabezado canónico de la bitácora (sección 4.11)
         with open(self.rutaLog, "w", encoding="utf-8") as archivo:
             archivo.write(f"HEADER|{idCripta}|{versionCripta}|{versionCatalogo}|{semilla}\n")
 
     def registrarAccion(self, comandoAccion: str):
-        # Agrega la acción canónica en modo append (§4.11)
+        # Agrega la acción canónica en modo append (sección 4.11)
         with open(self.rutaLog, "a", encoding="utf-8") as archivo:
             archivo.write(f"ACCION|{comandoAccion}\n")
 
     registrar_accion = registrarAccion
 
     def cargarYValidarReplay(self, cliente: ClienteCripta) -> tuple:
-        """Lee un archivo .log para --replay y verifica que las versiones coincidan (§4.11)."""
+        """Lee un archivo .log para --replay y verifica que las versiones coincidan (sección 4.11)."""
         if not os.path.exists(self.rutaLog):
             raise RuntimeError(f"[Replay] No existe el archivo de bitácora: {self.rutaLog}")
 
@@ -55,14 +55,14 @@ class GestorBitacoraReplay:
             raise RuntimeError(
                 f"[Replay Incompatible] La versión de la cripta '{idCripta}' en el log "
                 f"({verCriptaLog}) no coincide con la versión disponible ({verCriptaActual}). "
-                f"No se puede garantizar una reproducción fiel (§4.11)."
+                f"No se puede garantizar una reproducción fiel (sección 4.11)."
             )
 
         if verCatActual != verCatLog:
             raise RuntimeError(
                 f"[Replay Incompatible] La versión del catálogo en el log "
                 f"({verCatLog}) no coincide con la versión disponible ({verCatActual}). "
-                f"No se puede garantizar una reproducción fiel (§4.11)."
+                f"No se puede garantizar una reproducción fiel (sección 4.11)."
             )
 
         # Extraer acciones registradas

@@ -28,7 +28,7 @@ class GestorRedPrecarga:
         return self.idCriptaActual
 
     def inicializarCripta(self, idCripta: str) -> tuple:
-        # Descarga datos generales, todo el esqueleto y precarga la sala inicial (§4.2 / §2.4)
+        # Descarga datos generales, todo el esqueleto y precarga la sala inicial (sección 4.2 / sección 2.4)
         self.idCriptaActual = idCripta
         datosGen = self.cliente.obtenerDatosGenerales(idCripta)
         self.presupuestoMaximo = datosGen["presupuesto_solicitudes"]
@@ -41,14 +41,14 @@ class GestorRedPrecarga:
             for sala in respPag.get("salas", []):
                 esqueletoSalas.append(sala)
 
-        # Precargar sala inicial y sus salas contiguas antes del instante 0 (§2.4)
+        # Precargar sala inicial y sus salas contiguas antes del instante 0 (sección 2.4)
         salaInicial = datosGen["sala_inicial"]
         self.precargarVecindad(salaInicial, esqueletoSalas)
 
         return datosGen, esqueletoSalas
 
     def asegurarContenidoSala(self, idSala: int, esqueletoSalas: list) -> dict:
-        # Garantiza que la sala destino esté en memoria antes de entrar (§2.5 / §4.2)
+        # Garantiza que la sala destino esté en memoria antes de entrar (sección 2.5 / sección 4.2)
         contenido = self.salasDescargadas.obtener(idSala)
         if contenido is None:
             self.precargarVecindad(idSala, esqueletoSalas)
@@ -56,7 +56,7 @@ class GestorRedPrecarga:
         return contenido
 
     def precargarVecindad(self, idSalaOrigen: int, esqueletoSalas: list):
-        # Cola FIFO para recolectar hasta 10 salas cercanas no descargadas (§4.2)
+        # Cola FIFO para recolectar hasta 10 salas cercanas no descargadas (sección 4.2)
         porDescargar = []
         colaPendientes = [idSalaOrigen]
         indiceFrente = 0
@@ -93,7 +93,7 @@ class GestorRedPrecarga:
         return contiguas
 
     def _descargarLoteSalasYCatalogo(self, loteSalas: list):
-        # Descarga salas en lotes de máximo 10 (§3.4)
+        # Descarga salas en lotes de máximo 10 (sección 3.4)
         for i in range(0, len(loteSalas), 10):
             subLoteSalas = loteSalas[i : i + 10]
             respuesta = self.cliente.obtenerContenidoLote(self.idCriptaActual, subLoteSalas)
@@ -102,7 +102,7 @@ class GestorRedPrecarga:
             for infoSala in respuesta.get("contenido", []):
                 self.salasDescargadas.guardar(infoSala["sala"], infoSala)
 
-                # Comprueba sin alterar métricas del jugador: registrar_metrica=False (§5.1)
+                # Comprueba sin alterar métricas del jugador: registrar_metrica=False (sección 5.1)
                 for enem in infoSala.get("enemigos", []):
                     tipo = enem["tipo"]
                     if (
@@ -126,7 +126,7 @@ class GestorRedPrecarga:
                     ):
                         idsCatalogoFaltantes.append(tipo)
 
-            # Orden determinista (§4.2 / §4.11) para garantizar reproducibilidad exacta
+            # Orden determinista (sección 4.2 / sección 4.11) para garantizar reproducibilidad exacta
             idsCatalogoFaltantes.sort()
 
             # Pedir al catálogo en lotes de máximo 10 IDs
@@ -142,7 +142,7 @@ class GestorRedPrecarga:
         aciertos = self.cacheCatalogo.aciertos
         fallos = self.cacheCatalogo.fallos
         return (
-            f"=== REPORTE DE RED Y CACHÉ (§5.1) ===\n"
+            f"=== REPORTE DE RED Y CACHÉ (sección 5.1) ===\n"
             f"Solicitudes HTTP realizadas : {realizadas} / {self.presupuestoMaximo}\n"
             f"Estado del presupuesto      : {'CUMPLIDO' if realizadas <= self.presupuestoMaximo else 'EXCEDIDO'}\n"
             f"Aciertos de caché (RAM)     : {aciertos}\n"

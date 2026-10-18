@@ -9,7 +9,7 @@ class ClienteHTTP(ClienteCripta):
     def __init__(self, baseUrl: str, timeout: int = 10):
         self.baseUrl = baseUrl.rstrip("/")
         self.timeout = timeout
-        # El UUID (Identificador único) se genera una sola vez por ejecución y se reutiliza (§Encabezado obligatorio)
+        # El UUID (Identificador único) se genera una sola vez por ejecución y se reutiliza (sección Encabezado obligatorio)
         self.clientId = str(uuid.uuid4())
         self.headers = {"X-Cripta-Client-Id": self.clientId}
         # Toda solicitud HTTP cuenta para el presupuesto (incluyendo reintentos 429)
@@ -37,7 +37,7 @@ class ClienteHTTP(ClienteCripta):
 
         while True:
             try:
-                # Cada solicitud cuenta para el presupuesto de solicitudes (§5.1)
+                # Cada solicitud cuenta para el presupuesto de solicitudes (sección 5.1)
                 self.solicitudesRealizadas += 1
                 respuesta = requests.get(
                     url, headers=self.headers, timeout=self.timeout
@@ -69,7 +69,7 @@ class ClienteHTTP(ClienteCripta):
                     continue
 
                 else:
-                    # Manejo de otros errores HTTP con contexto (§3.1)
+                    # Manejo de otros errores HTTP con contexto (sección 3.1)
                     raise RuntimeError(
                         f"Error HTTP {respuesta.status_code} en la operación GET '{ruta}'. "
                         f"Detalle: {respuesta.text}"

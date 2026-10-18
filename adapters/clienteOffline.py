@@ -3,12 +3,12 @@ import os
 from adapters.clienteCripta import ClienteCripta
 
 
-# Modo offline, leyendo datos desde archivos locales (§Modo sin conexión)
+# Modo offline, leyendo datos desde archivos locales (sección Modo sin conexión)
 class ClienteOffline(ClienteCripta):
 
     def __init__(self, directorioDatos: str):
         self.directorioDatos = directorioDatos
-        self.solicitudesRealizadas = 0  # Lecturas desde almacenamiento local o modo --offline no cuentan (§5.1)
+        self.solicitudesRealizadas = 0  # Lecturas desde almacenamiento local o modo --offline no cuentan (sección 5.1)
         self._cacheArchivos = {}
 
     @property

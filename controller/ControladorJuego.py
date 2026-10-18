@@ -186,12 +186,17 @@ class Controlador:
 
     def _guardarCargar(self, comando, ruta):
         if self.guardado is None:
-            self._decir("El guardado binario lo aporta Jurnier (aún no conectado).")
+            self._decir("El guardado de partida no está disponible en este modo.")
             return
         if len(ruta) == 0:
             self._decir("Indica un archivo: %s <archivo>" % comando)
             return
-        if comando == "guardar":
-            self.guardado.guardar(self.modelo, ruta)
-        else:
-            self.guardado.cargar(self.modelo, ruta)
+        try:
+            if comando == "guardar":
+                self.guardado.guardar(self.modelo, ruta)
+                self._decir("Partida guardada en %s." % ruta)
+            else:
+                self.guardado.cargar(self.modelo, ruta)
+                self._decir("Partida cargada desde %s." % ruta)
+        except (OSError, ValueError) as error:
+            self._decir("No se pudo %s: %s" % (comando, error))

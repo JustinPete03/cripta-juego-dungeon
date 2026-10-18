@@ -32,7 +32,7 @@ class EntradaCache:
         self.id_entidad = id_entidad
         self.datos_ficha = datos_ficha
         self.ultimo_acceso = ultimo_acceso
-        # Si es > 0, la ficha está "en uso" y no puede desalojarse (§4.4)
+        # Si es > 0, la ficha está "en uso" y no puede desalojarse (sección 4.4)
         self.referencias_activas = 0
 
 # cache de fichas de catálogo con política LRU y contadores de aciertos o fallos segun coresponda. Se usa para evitar descargas repetidas de fichas de enemigos, objetos y trampas.
