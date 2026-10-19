@@ -9,7 +9,8 @@ def generar(n):
     # Datos sintéticos; ids ordenados por construcción
     return [(i,
              [(f"e-{i}", "ent_rata_gigante", 12)] if i % 3 == 0 else [],
-             ["itm_antorcha"] if i % 2 == 0 else [])
+             ["itm_antorcha"] if i % 2 == 0 else [],
+             [(f"t-{i}", "trp_dardos")] if i % 5 == 0 else [])
             for i in range(1, n + 1)]
 
 

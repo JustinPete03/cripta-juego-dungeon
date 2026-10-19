@@ -34,5 +34,32 @@
     "enemigos_derrotados": 0,
     "tiempo_final": 421,
     "victoria": false
+  },
+  {
+    "nombre_jugador": "Explorador",
+    "id_cripta": "cripta-prueba",
+    "version_cripta": "v1",
+    "acciones_ejecutadas": 20,
+    "enemigos_derrotados": 3,
+    "tiempo_final": 1270,
+    "victoria": false
+  },
+  {
+    "nombre_jugador": "Explorador",
+    "id_cripta": "cripta-prueba",
+    "version_cripta": "v1",
+    "acciones_ejecutadas": 28,
+    "enemigos_derrotados": 4,
+    "tiempo_final": 1866,
+    "victoria": false
+  },
+  {
+    "nombre_jugador": "Explorador",
+    "id_cripta": "cripta-prueba",
+    "version_cripta": "v1",
+    "acciones_ejecutadas": 44,
+    "enemigos_derrotados": 6,
+    "tiempo_final": 2416,
+    "victoria": false
   }
 ]

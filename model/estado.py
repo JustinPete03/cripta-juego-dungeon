@@ -13,44 +13,58 @@ from model.Agenda import Evento
 from model.Bitacora import BitacoraCircular
 from model.Entidades import ObjetoInstancia
 from model.efectos import efectoActivo
+from model.Salas import IndiceOrdenado
 
-VERSION_FORMATO = 1
+VERSION_FORMATO = 2
 
 
 # ------------------------------------------------------------------ referencias
 def _índice(modelo):
-    """Mapa id(objeto) -> etiqueta, para serializar los dueños de los eventos."""
-    etiquetas = {}
+    """Índice ordenado id(objeto) -> etiqueta (IndiceOrdenado propio, sin dict)."""
+    etiquetas = IndiceOrdenado()
     if modelo.jugador is not None:
-        etiquetas[id(modelo.jugador)] = "j"
+        etiquetas.insertar(id(modelo.jugador), "j")
     for i in range(len(modelo.enemigosVivos)):
-        etiquetas[id(modelo.enemigosVivos[i])] = "e:%s" % modelo.enemigosVivos[i].instancia
+        etiquetas.insertar(id(modelo.enemigosVivos[i]), "e:%s" % modelo.enemigosVivos[i].instancia)
     activos = getattr(modelo.efectos, "activos", [])
     for i in range(len(activos)):
-        etiquetas[id(activos[i])] = "f:%d" % i
-    for i, puerta in enumerate(_listaPuertas(modelo)):
-        etiquetas[id(puerta)] = "p:%d" % i
+        etiquetas.insertar(id(activos[i]), "f:%d" % i)
+    puertas = _listaPuertas(modelo)
+    for i in range(len(puertas)):
+        etiquetas.insertar(id(puertas[i]), "p:%d" % i)
     for i in range(modelo.salas.cantidad()):
         sala = modelo.salas.enPosicion(i)
         for trampa in sala.trampas:
-            etiquetas[id(trampa)] = "t:%s" % trampa.instancia
+            etiquetas.insertar(id(trampa), "t:%s" % trampa.instancia)
     return etiquetas
 
 
+def _ladoCanonico(sala, salida):
+    """Una puerta la comparten dos salidas; se guarda una sola vez, desde el lado de id menor.
+
+    Si el otro lado no la comparte (esqueleto de un solo sentido), este lado es el único."""
+    destino = salida.destino
+    if destino is None or destino is sala or sala.id < destino.id:
+        return True
+    for otra in destino.salidas:
+        if otra.puerta is salida.puerta:
+            return False
+    return True
+
+
 def _listaPuertas(modelo):
-    """Puertas en un orden fijo: el índice del esqueleto y el de las salidas ya son canónicos."""
+    """Puertas en un orden fijo: salas por posición, salidas en su orden canónico."""
     puertas = []
-    vistas = set()
     for i in range(modelo.salas.cantidad()):
-        for salida in modelo.salas.enPosicion(i).salidas:
-            if id(salida.puerta) not in vistas:
-                vistas.add(id(salida.puerta))
+        sala = modelo.salas.enPosicion(i)
+        for salida in sala.salidas:
+            if _ladoCanonico(sala, salida):
                 puertas.append(salida.puerta)
     return puertas
 
 
 def _etiqueta(etiquetas, objeto):
-    etiqueta = etiquetas.get(id(objeto))
+    etiqueta = etiquetas.buscar(id(objeto))
     if etiqueta is None:
         raise ValueError("El guardado no conoce cómo referenciar un objeto del modelo.")
     return etiqueta
@@ -150,24 +164,24 @@ def _capturarEnemigos(modelo):
 
 def _capturarSalas(modelo):
     salas = []
-    vistas = set()
     for i in range(modelo.salas.cantidad()):
         sala = modelo.salas.enPosicion(i)
         puertas = []
         for salida in sala.salidas:
-            if id(salida.puerta) in vistas:
-                continue
-            vistas.add(id(salida.puerta))
-            puertas.append([salida.direccion, salida.puerta.cerrada])
+            if _ladoCanonico(sala, salida):
+                puertas.append([salida.direccion, salida.puerta.cerrada])
         trampas = []
         for trampa in sala.trampas:
             trampas.append([trampa.instancia, trampa.armada])
         objetos = []
         for objeto in sala.objetos:
             objetos.append([objeto.tipoId, objeto.serie])
+        enemigos = []                      # el orden dentro de la sala define «atacar k»
+        for enemigo in sala.enemigos:
+            enemigos.append(enemigo.instancia)
         salas.append({"id": sala.id, "rastro": sala.rastro,
                       "contenido": sala.contenidoIncorporado, "objetos": objetos,
-                      "trampas": trampas, "puertas": puertas})
+                      "trampas": trampas, "puertas": puertas, "enemigos": enemigos})
     return salas
 
 
@@ -184,11 +198,12 @@ def restaurar(modelo, datos):
 
     _restaurarSalas(modelo, datos["salas"])
     modelo.siguienteSerieObjeto = datos["siguienteSerieObjeto"]
-    _restaurarEnemigos(modelo, datos["enemigos"])
+    _restaurarEnemigos(modelo, datos["enemigos"], datos["salas"])
     _restaurarJugador(modelo, datos["jugador"])
     _restaurarInventario(modelo, datos["inventario"])
-    _restaurarEfectos(modelo, datos["efectos"])
-    _restaurarAgenda(modelo, datos["agenda"])
+    resolutor = _Resolutor(modelo)
+    _restaurarEfectos(modelo, datos["efectos"], resolutor)
+    _restaurarAgenda(modelo, datos["agenda"], resolutor)
     _restaurarDecision(modelo, datos["decision"])
     _restaurarBitacora(modelo, datos["bitacora"])
 
@@ -221,17 +236,17 @@ def _restaurarSalas(modelo, registros):
                 salida.puerta.cerrada = cerrada
 
 
-def _restaurarEnemigos(modelo, registros):
+def _restaurarEnemigos(modelo, registros, registrosSalas):
     # Los enemigos deambuladores cambian de sala, así que la lista por sala se rehace entera.
-    porInstancia = {}
+    porInstancia = IndiceOrdenado()
     for i in range(modelo.salas.cantidad()):
         sala = modelo.salas.enPosicion(i)
         for enemigo in sala.enemigos:
-            porInstancia[enemigo.instancia] = enemigo
+            porInstancia.insertar(enemigo.instancia, enemigo)
         del sala.enemigos[:]
     del modelo.enemigosVivos[:]
     for registro in registros:
-        enemigo = porInstancia.get(registro["instancia"])
+        enemigo = porInstancia.buscar(registro["instancia"])
         if enemigo is None:
             raise ValueError("La partida guardada menciona el enemigo inexistente %s."
                              % registro["instancia"])
@@ -241,8 +256,15 @@ def _restaurarEnemigos(modelo, registros):
         enemigo.sala = modelo.salas.buscar(registro["sala"])
         enemigo.vivo = True
         enemigo.evento = None
-        enemigo.sala.enemigos.append(enemigo)
         modelo.enemigosVivos.append(enemigo)
+    # Orden de los enemigos dentro de cada sala, tal como estaba al guardar.
+    for registro in registrosSalas:
+        sala = modelo.salas.buscar(registro["id"])
+        for instancia in registro["enemigos"]:
+            enemigo = porInstancia.buscar(instancia)
+            if enemigo is None:
+                raise ValueError("La partida guardada menciona el enemigo inexistente %s." % instancia)
+            sala.enemigos.append(enemigo)
 
 
 def _restaurarJugador(modelo, datos):
@@ -285,10 +307,10 @@ def _restaurarInventario(modelo, datos):
         inventario.armadura = nodos[datos["armadura"]]
 
 
-def _restaurarEfectos(modelo, registros):
+def _restaurarEfectos(modelo, registros, resolutor):
     activos = []
     for registro in registros:
-        efecto = efectoActivo(registro["clase"], _resolver(modelo, registro["actor"]),
+        efecto = efectoActivo(registro["clase"], resolutor.resolver(registro["actor"]),
                               registro["cantidad"], registro["fin"],
                               registro["velocidadAnterior"])
         efecto.activo = registro["activo"]
@@ -296,10 +318,10 @@ def _restaurarEfectos(modelo, registros):
     modelo.efectos.activos = activos
 
 
-def _restaurarAgenda(modelo, datos):
+def _restaurarAgenda(modelo, datos, resolutor):
     eventos = []
     for registro in datos["eventos"]:
-        evento = Evento(registro["t"], registro["tipo"], _resolver(modelo, registro["propietario"]))
+        evento = Evento(registro["t"], registro["tipo"], resolutor.resolver(registro["propietario"]))
         evento.seq = registro["seq"]
         eventos.append(evento)
     modelo.agenda.reconstruir(eventos, datos["secuencia"])
@@ -347,27 +369,39 @@ def _vaciarDiario(modelo):
         del intervalos[:]
 
 
-def _resolver(modelo, etiqueta):
-    if etiqueta == "j":
-        return modelo.jugador
-    clase, _, resto = etiqueta.partition(":")
-    if clase == "e":
+class _Resolutor:
+    """Convierte una etiqueta guardada en el objeto vivo del modelo (índices propios, sin dict)."""
+
+    def __init__(self, modelo):
+        self.modelo = modelo
+        self.enemigos = IndiceOrdenado()
         for enemigo in modelo.enemigosVivos:
-            if enemigo.instancia == resto:
-                return enemigo
-        raise ValueError("La partida guardada menciona el enemigo inexistente %s." % resto)
-    if clase == "t":
+            self.enemigos.insertar(enemigo.instancia, enemigo)
+        self.trampas = IndiceOrdenado()
         for i in range(modelo.salas.cantidad()):
             for trampa in modelo.salas.enPosicion(i).trampas:
-                if trampa.instancia == resto:
-                    return trampa
-        raise ValueError("La partida guardada menciona la trampa inexistente %s." % resto)
-    if clase == "p":
-        puertas = _listaPuertas(modelo)
-        indice = int(resto)
-        if indice >= len(puertas):
-            raise ValueError("La partida guardada menciona la puerta %s." % etiqueta)
-        return puertas[indice]
-    if clase == "f":
-        return modelo.efectos.activos[int(resto)]
-    raise ValueError("Etiqueta de referencia desconocida: %s." % etiqueta)
+                self.trampas.insertar(trampa.instancia, trampa)
+        self.puertas = _listaPuertas(modelo)
+
+    def resolver(self, etiqueta):
+        if etiqueta == "j":
+            return self.modelo.jugador
+        clase, _, resto = etiqueta.partition(":")
+        if clase == "e":
+            enemigo = self.enemigos.buscar(resto)
+            if enemigo is None:
+                raise ValueError("La partida guardada menciona el enemigo inexistente %s." % resto)
+            return enemigo
+        if clase == "t":
+            trampa = self.trampas.buscar(resto)
+            if trampa is None:
+                raise ValueError("La partida guardada menciona la trampa inexistente %s." % resto)
+            return trampa
+        if clase == "p":
+            indice = int(resto)
+            if indice >= len(self.puertas):
+                raise ValueError("La partida guardada menciona la puerta %s." % etiqueta)
+            return self.puertas[indice]
+        if clase == "f":
+            return self.modelo.efectos.activos[int(resto)]
+        raise ValueError("Etiqueta de referencia desconocida: %s." % etiqueta)
