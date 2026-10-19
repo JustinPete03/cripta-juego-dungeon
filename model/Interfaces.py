@@ -11,6 +11,14 @@ class Resultado:
         self.registrable = registrable   # True si debe anotarse en la bitácora de partida
 
 
+class SinDatos(Exception):
+    """El proveedor no pudo conseguir los datos que la acción necesitaba (sección 2.3)."""
+
+
+class PresupuestoAgotado(SinDatos):
+    """Ya se usaron las solicitudes HTTP que la cripta permite para esta partida (sección 3.3)."""
+
+
 class ProveedorDatos:
     """Lo implementan Diego (red / --offline). El modelo no sabe de dónde vienen los datos."""
 
@@ -32,8 +40,11 @@ class ProveedorDatos:
     def anticipar(self, salaId):
         """Aviso de que el jugador está en salaId: Diego decide qué precargar. No bloquea."""
 
-    def fijarPredicadoEnUso(self, predicado):
-        """predicado(tipoId) -> bool: True si la ficha está en uso y no se puede desalojar (4.4)."""
+    def asegurarFichas(self, tipoIds):
+        """Pide de una vez, en lotes, las fichas que la sala va a necesitar. No mueve el reloj."""
+
+    def fijarFichasEnUso(self, productor):
+        """productor() -> lista de tipoId en uso: la caché no puede desalojarlos (4.4)."""
 
 
 class InventarioBase:

@@ -5,7 +5,8 @@ Diseño, implementación y evaluación de estructuras de datos propias en un jue
 por eventos, con contenido descargado de un servicio web.
 
 > Las reglas del juego están especificadas por el enunciado; las decisiones de estructuras
-> de datos son nuestras y están justificadas en `Documento_de_Decisiones`.
+> de datos son nuestras y se justifican en el Documento de Decisiones de Diseño (sección 8
+> del enunciado), que acompaña a esta entrega como documento aparte.
 
 ## Integrantes
 
@@ -159,16 +160,50 @@ el resultado final (reloj, acciones, derrotados, estado) coincide con la partida
 Si la versión de la cripta o del catálogo del log ya no coincide con la disponible, el programa
 **se detiene y lo informa** en lugar de reproducir contra datos distintos (sección 4.11).
 
-## Presupuesto de red y caché
+## Presupuesto de red
 
 - Cada cripta declara `presupuesto_solicitudes`; el valor se lee de los datos generales y
-  **no está escrito en el código**.
-- Se usan lotes (hasta 10 salas por solicitud de contenido, hasta 10 ids por solicitud de
-  catálogo) y precarga anticipada por búsqueda en anchura sobre el esqueleto.
-- Las fichas del catálogo se guardan en `.cache_cripta/cat_<version_catalogo>/<id>.json` y
-  sobreviven al cierre del programa; si cambia la versión del catálogo se descartan.
-- Al terminar la partida se imprime: solicitudes realizadas, presupuesto, aciertos y fallos
-  de caché.
+  **no está escrito en el código**. Antes de *cualquier* solicitud el gestor reserva el costo
+  (`_reservar`), así que el tope se respeta en la partida y no solo se reporta al final.
+- Se usan lotes: hasta 10 salas por solicitud de contenido y hasta 10 ids por solicitud de
+  catálogo, con los ids deduplicados y ordenados de forma determinista para que la misma
+  partida siempre pida lo mismo.
+- La precarga es cortés, no obligatoria: si el presupuesto no alcanza el lote de 10 salas, se
+  recorta; si queda una sola solicitud en la recámara, se precarga nada más la sala del
+  jugador; si se agota, la partida sigue y `asegurarContenidoSala` descarga la sala puntual
+  antes de entrar.
+- Cuando el presupuesto no da para meter una sala, el movimiento **se rechaza con un mensaje y
+  sin gastar tiempo virtual** (§2.3 deja el mando al presupuesto). El modelo nunca entra a una
+  sala sin contenido.
+- Lecturas locales no cuentan como red (§5.1): en `--offline` el presupuesto no aplica y el
+  reporte lo dice en lugar de mostrar un porcentaje vacío.
+- Los reintentos tras HTTP 429 sí cuentan, y el esqueleto se recorre por páginas hasta que la
+  *respuesta* dice cuántas hay (`total_paginas`), no con un número fijo escrito en el cliente.
+- El reporte de §5.1 —solicitudes realizadas, presupuesto, aciertos y fallos de caché, fichas
+  desalojadas y salas registradas— se imprime al terminar la partida en **ambas vistas**
+  (consola e interfaz gráfica), porque el controlador recibe la función de reporte del adaptador.
+
+## Caché y resolución del catálogo (§4.3 / §4.4)
+
+Resolver una ficha (`asegurarCatalogo`, en `adapters/estrategiaRed.py`) agrupa, deduplica y
+ordena los ids que una sala va a necesitar —enemigos, objetos del suelo y trampas— y los pide en
+lotes de 10; un id que ya está en memoria o en disco nunca vuelve a generarse una solicitud.
+
+- Tabla hash propia (`model/cache_estructuras.py`): cubetas que arrancan en 7 y crecen con el
+  factor de carga 0.75 al superar `cubetas × 0.75`, con tope `--cache-size`. Sin ese crecimiento,
+  un `--cache-size` grande degradaría cada búsqueda a un recorrido de cadena.
+- Desalojo LRU justificado: la menos usada. La política opera solo sobre fichas **fuera de uso**;
+  una ficha referenciada por un enemigo vivo, el inventario o la sala actual se protege en una
+  pasada con el conjunto de ids en uso, antes de cada acceso —incluida la reinserción que produce
+  un acierto en disco, que es justo la que puede desalojarla.
+- Una ficha liberada de memoria sigue en `.cache_cripta/cat_<version_catalogo>/<id>.json`:
+  recuperarla cuesta una lectura de disco, no una solicitud de red. Solo genera red una ficha
+  nunca persistida o de otra versión de catálogo, y la caché sobrevive al cerrar el programa.
+- El registro de salas que ya se conoce también es tabla hash propia, no `dict` (§7).
+- Medido en `--bench` (ver `resultados_bench.txt`): con patrón sesgado y tope 25, LRU acierta
+  82.5 % frente a 74.2 % de FIFO; con persistencia en disco la sesión restaurada necesita **0**
+  solicitudes frente a las 175 de la misma carga sin disco; y la búsqueda se mantiene en ~2-3 µs
+  con cadena media 0.78 tanto con 25 como con 1600 fichas en memoria.
 
 ## Archivos que genera el programa
 
@@ -189,7 +224,15 @@ python -m pytest          # recoge también TestMotor.py, PruebaRetroceso.py, pr
 
 `pytest.ini` declara los patrones de nombre del proyecto (`Test*.py`, `Prueba*.py`,
 `prueba*.py`, `Diario*.py` y `test_*.py`); sin él, pytest ignora en silencio la mitad de las
-pruebas porque no siguen la convención `test_*.py`.
+pruebas porque no siguen la convención `test_*.py`. La suite son 173 pruebas.
+
+Dos de los archivos pinan las reglas que más fácil se rompen:
+
+- `tests/test_cache_catalogo.py` — la caché viva: las cubetas crecen con `--cache-size`, se
+  desaloja la menos usada, una ficha en uso **no** se desaloja (ni por un acierto en disco), la
+  persistencia relee sin red y `asegurarCatalogo` deduplica, ordena y corta los lotes en 10.
+- `tests/test_presupuesto_red.py` — `presupuesto_solicitudes` se agota antes de pedir, no
+  después; en `--offline` no aplica; y el movimiento rechazado por presupuesto no avanza el reloj.
 
 `TestMotor.py` incluye la prueba del requisito de procesamiento (sección 5.2): con 600 enemigos
 activos, el ciclo de eventos entre dos decisiones del jugador toma **~7 ms de mediana**
@@ -202,10 +245,12 @@ interrupciones del sistema operativo, no del motor).
 python main.py --bench
 ```
 
-Ejecuta cargas sintéticas y reporta tiempos por subsistema: ordenamientos, caché, guardado
-binario frente a JSON y efectos. Los resultados de referencia están en `resultados_bench.txt`
-y se analizan en el Documento de Decisiones. Los tiempos dependen del equipo; los conteos
-(comparaciones, solicitudes) no.
+Ejecuta cargas sintéticas y reporta tiempos por subsistema en seis bloques: ordenamientos,
+caché (LRU frente a FIFO, disco y costo de búsqueda), guardado binario frente a JSON, efectos,
+motor (agenda, rastro y bitácora) y retroceso con inventario. Cada bloque compara la estructura
+viva contra alternativas, así que la salida es la evidencia de las decisiones. Los resultados de
+referencia están en `resultados_bench.txt` y se analizan en el Documento de Decisiones. Los
+tiempos dependen del equipo; los conteos (comparaciones, solicitudes) no.
 
 ## Arquitectura (MVC + adaptadores)
 
@@ -216,10 +261,14 @@ model/                   Reglas del juego y estructuras de datos (sin red, disco
   Agenda.py              Agenda de eventos (montículo con cancelación y desempate por secuencia)
   Diario.py              Historial reversible (máx. 5 acciones, sin copias del estado)
   Inventario.py          Lista doblemente enlazada con cursor
+  Tabla.py               Tabla hash propia: cubetas, factor de carga, djb2 (restricción sección 7)
   Rastro.py, Bitacora.py Rastro del jugador y bitácora circular de 20 mensajes
   efectos.py             Veneno, regeneración, antorcha, velocidad
-  cache_estructuras.py   Caché de fichas y registro de salas
+  efectosTrampa.py       Extensión que contagia el veneno que declara la ficha de una trampa
+  cache_estructuras.py   Caché de fichas (hash + LRU + en uso) y registro de salas
+  estado.py              Traductor modelo <-> datos planos para el guardado
   ordenamiento/          Inserción, mezcla, selección y selector automático
+  cache/                 Alternativa descartada (recorre la lista doble, O(n)); ver sección 4.4
 controller/              ControladorJuego.py: traduce texto a acciones y coordina el flujo
 view/                    Dos vistas del mismo estado, intercambiables
   Consola.py             Vista de consola
@@ -227,15 +276,19 @@ view/                    Dos vistas del mismo estado, intercambiables
   presentacion.py        Instantáneas del modelo para dibujar (no importa pygame)
   sprites.py             Hoja de sprites pixel art (rectángulos sobre una cuadrícula 16x16)
 adapters/                Red y disco detrás de interfaces
-  clienteCripta.py       Interfaz del cliente
+  clienteCripta.py       Interfaz del cliente (incluye cuentaComoRed para el presupuesto)
   clienteHttp.py         Cliente HTTP (encabezado X-Cripta-Client-Id, manejo de 429)
-  clienteOffline.py      Cliente que lee desde disco
-  estrategiaRed.py       Precarga por lotes y reporte de red
+  clienteOffline.py      Cliente que lee desde disco (no gasta presupuesto)
+  estrategiaRed.py       Presupuesto, precarga por lotes y reporte de red
   ProveedorRed.py        Une cliente + caché para el modelo
   proveedor_demo.py      Fuente local para la GUI sin red
   bitacoraReplay.py      Bitácora de partida y validación de versiones
   tablaPuntajes.py       Tabla de puntajes local
-  guardadoBinario.py     Formato binario propio (índice por sala, versión de formato)
+  codBinary.py           Codificador binario propio (tag + cuerpo), sin JSON ni compresores
+  guardadoBinario.py     Formato binario sección 4.10: índice por sala, versión de formato
+  guardadoPartida.py     Partida completa sobre ese mismo contenedor (cripta/esqueleto/estado)
+  guardadoJson.py        Contraparte JSON que usa el bench de sección 4.10 para comparar
+  persistenciaCache.py   Fichas en disco por versión de catálogo (sección 4.4)
 datos_demo/              Paquete sin conexión de las cuatro criptas del servicio
 bench/                   Benchmarks
 tests/                   Pruebas
@@ -252,8 +305,10 @@ HTTP ni archivos: recibe sus datos a través de la interfaz `ProveedorDatos`.
 - Daño: `max(1, ataque + randint(0, 4) - defensa)`, con un `random.Random(semilla)` propio.
 - Los enemigos se activan cuando el jugador entra a su sala. Hay tres comportamientos:
   guardián, errante y rastreador (este sigue el rastro fresco, de menos de 400 unidades).
-- El jugador **gana** al entrar a la sala de salida tras abrir con la llave la puerta que
-  da acceso a ella, y **pierde** si su vida llega a 0.
+- El jugador **gana** al entrar a la sala de salida con la puerta que da acceso a ella abierta —
+  la abrió él con la llave, o la cripta ya la entregó abierta (una puerta `cerrada: false` en el
+  esqueleto no deja nada que abrir, y el requisito es entrar con acceso, no pulsar `abrir`)—,
+  y **pierde** si su vida llega a 0.
 - El pergamino de retroceso revierte la última acción del jugador y todo lo ocurrido después
   (máximo 5 acciones hacia atrás); no consume tiempo virtual.
 
@@ -264,12 +319,13 @@ prohibido sustituirlas por equivalentes de bibliotecas, usar `dict` como índice
 y `list.sort()` / `sorted()` en los ordenamientos evaluados. Se permite `list` como
 almacenamiento contiguo, y `struct`, `json`, `requests` y `argparse`.
 
-## Documentación del proyecto
+## Documentación de la entrega
 
-- `Documento_de_Decisiones` — una sección por cada problema del sección 4 con problema,
-  alternativas, decisión, complejidad, evidencia empírica y límites conocidos.
-- `PROMPTS_LLM` — bitácora de uso de modelos de lenguaje.
-- `resultados_bench.txt` — salida de referencia de `--bench`.
+- Documento de Decisiones de Diseño (sección 8 del enunciado): una sección por cada problema de
+  sección 4 con problema, alternativas, decisión, complejidad, evidencia empírica y límites
+  conocidos. La escribe el equipo aparte de este README.
+- Bitácora de prompts de LLM (sección 10.3): archivo aparte de la entrega.
+- `resultados_bench.txt` — salida de referencia de `--bench`, generada en el equipo local.
 
 ## Estado y limitaciones conocidas
 
@@ -282,12 +338,48 @@ almacenamiento contiguo, y `struct`, `json`, `requests` y `argparse`.
 - [x] `guardar` / `cargar` conectados a la interfaz. `model/estado.py` expone `capturar` /
   `restaurar` (reloj, posición, inventario, efectos, agenda, semilla y estado del azar) y
   `Modelo.capturarEstado` / `restaurarEstado` los publican; `adapters/guardadoPartida.py` los
-  guarda en un contenedor binario propio (`*.sav`, índice al final, payloads zlib+JSON).
-  `adapters/guardadoBinario.py` (por sala) queda intacto y sigue sirviendo para su sección.
-- [x] El requisito de 20 ms (sección 5.2) verificado en el equipo local (mediana ~7 ms con 600 enemigos).
+  guarda sobre el **mismo** contenedor binario de `adapters/guardadoBinario.py` (índice al final,
+  payloads con `adapters/codBinary.py`: tag + cuerpo, sin JSON ni compresores), con magic y
+  versión de formato para detectar archivos incompatibles.
 - [x] El veneno se origina en trampas del contenido: la ficha declara `veneno` (daño por pulso)
   y `model/efectosTrampa.py` (extensión de `efectosJuego`, no lo modifica) lo contagia en
-  `alActivarTrampa`. Ejercitado en `datos_demo/catalogo.json` y en la demo gráfica.
+  `alActivarTrampa`. §2.10 fija la regla pero no el nombre del campo, y las fichas publicadas del
+  servicio solo traen `{id, nombre, clase, daño, rearme}`, así que el veneno es una extensión
+  opcional: se ejercita en `adapters/proveedor_demo.py` (demo gráfica) y en
+  `tests/pruebaTrampaVeneno.py`, que incluye el caso de ficha sin el campo.
 - [x] Persistencia de esqueleto y contenido por versión de cripta: el archivo `*.sav` embebe
   `esqueleto` y `contenido` junto a `cripta` (id, versión de cripta y de catálogo, semilla);
   al cargar se valida la identidad y se reconstruye el mundo con `_construirSalas`, sin red.
+- [x] Ningún `dict` hace de índice, caché o tabla de búsqueda en el camino evaluado (§7). La
+  tabla hash propia está en dos sitios con el mismo esquema (cubetas encadenadas, factor de
+  carga, djb2): `model/Tabla.py` —`Tabla` y `Conjunto`, que usan el cliente offline, la
+  deduplicación de lotes, el conjunto de fichas en uso y el índice de `model/estado.py`— y las
+  cubetas de `model/cache_estructuras.py` (caché de fichas y registro de salas). El índice del
+  guardado es un arreglo ordenado con búsqueda binaria, que es lo que da el acceso aleatorio por
+  sala de §4.10.
+- [x] `presupuesto_solicitudes` se respeta antes de solicitar, no solo se reporta (§5.1), con
+  rechazo de movimiento sin gasto de tiempo cuando no alcanza y precarga recortable.
+- [x] §9 sin datos de una cripta específica en el código: ni ids de sala, ni ids de entidad, ni
+  cantidad de páginas, ni presupuestos, ni estadísticas. Las únicas literales de catálogo están
+  en `bench/benchGuardado.py` (datos sintéticos) y en las fuentes de prueba y demo.
+
+## Limitaciones conocidas
+
+- **Agenda**: el montículo propio gana claramente frente al escaneo lineal (47 ms frente a
+  2 984 ms con 5 000 eventos), pero `--bench` mide que con pocos eventos simultáneos una lista
+  ordenada es más rápida que el montículo (n = 100: 47.9 ms frente a 116.7 ms; n = 1 500:
+  29.7 frente a 36.9) porque el desplazamiento de `list` va en C mientras el sift compara en
+  Python. Se mantiene el montículo por §4.1 —obtener el siguiente sin examinar todos— y porque
+  el enunciado espera cientos de eventos simultáneos con decenas de miles de operaciones; la
+  cruza empírica está en `resultados_bench.txt` y es honesta reportarla.
+- **Campos de catálogo que el enunciado nombra pero el servicio no publica**: `regeneracion` y
+  `modificador_velocidad` (§2.10 y §2.7) no aparecen en ninguna de las fichas reales cacheadas en
+  `.cache_cripta/cat_be68d322d2f5/`. Se leen con valor por defecto, así que sus efectos quedan
+  inactivos con los datos de hoy y solo se ejercitan con fichas de prueba. Si una cripta nueva
+  los trae, el camino ya está escrito; la unidad de `modificador_velocidad` (multiplicador) es
+  una suposición documentada en `model/efectos.py`.
+- **El requisito de 20 ms (§5.2)** se verifica con la mediana del ciclo de 600 enemigos; en este
+  equipo la mediana ronda 7-17 ms, pero bajo carga del sistema la prueba `testCicloMenorA20ms`
+  puede tocar 25 ms por interrupciones del planificador de Windows, no del motor.
+- El Documento de Decisiones (sección 8) y la bitácora de prompts (sección 10.3) son documentos
+  aparte que el equipo debe escribir antes de la entrega.

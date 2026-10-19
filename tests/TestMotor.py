@@ -200,6 +200,21 @@ class PruebasMotor(unittest.TestCase):
         self.assertEqual(m.estado, VICTORIA)
         self.assertEqual(m.resultadoPartida().acciones, 7 if False else m.jugador.acciones)
 
+    def testVictoriaConLaPuertaDeSalidaYaAbierta(self):
+        # Una cripta puede entregar la salida sin cerrar (sección 9): no se le puede exigir al
+        # jugador un ABRIR sobre una puerta que nunca estuvo cerrada.
+        f = FuentePrueba(ancho=2, alto=2, enemigosPorSala=0, trampas=False)
+        for sala in f.salas:
+            for info in sala["salidas"].values():
+                info.pop("cerrada", None)
+                info.pop("llave", None)
+        m = nuevoModelo(f)
+        self.assertTrue(m.puertaSalidaAbierta)
+        self.assertTrue(m.ejecutar(Accion(ACC_MOVER, "E")).ok)
+        m.ejecutar(Accion(ACC_MOVER, "S"))
+        self.assertEqual(m.jugador.sala.id, 4)
+        self.assertEqual(m.estado, VICTORIA)
+
     def testCombateMuerteYSuelta(self):
         f = FuentePrueba(enemigosPorSala=0, trampas=False, vidaJugador=500)
         f.contenidos[1]["enemigos"].append({"instancia": "e-1", "tipo": "ent_rata", "vida": 3})

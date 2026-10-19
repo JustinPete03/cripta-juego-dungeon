@@ -76,7 +76,13 @@ def _agendaListaOrdenada(n, operaciones):
 
 
 def _benchAgenda(reportar):
-    for n in (100, 500, 5000):
+    # Carga medida: sacar el próximo y reprogramar al actor, que es lo que hace el motor con cada
+    # enemigo activo. La lista ordenada gana por debajo de ~1.300 eventos pendientes porque sus
+    # desplazamientos son memmove en C contra ~log2(n) iteraciones de Python en el montículo; a
+    # partir de ahí el montículo manda y la lista crece lineal con la ventana de pendientes.
+    # El juego puede pasar de esa ventana (600 enemigos del test de sección 5.2 más efectos,
+    # trampas y cierres automáticos), y la cota del montículo no depende de cuántos haya.
+    for n in (100, 500, 1500, 5000):
         ops = 20000 if n <= 500 else 4000
         reportar("agenda", "heap propio, n=%d, %d ops" % (n, ops), _tiempo(lambda: _agendaHeap(n, ops)))
         reportar("agenda", "ALT lista ordenada, n=%d, %d ops" % (n, ops),

@@ -105,7 +105,10 @@ class efectosJuego(EfectosBase):
 
     def alActivarEnemigo(self, modelo, enemigo):
         ficha = modelo.proveedor.ficha(enemigo.tipoId)
-        cantidad = ficha.get("regeneracion")           # VERIFICAR el nombre del campo en el catálogo
+        # §2.10 dice "un enemigo que declare regeneración" sin fijar el nombre del campo; usamos
+        # "regeneracion". Ninguna ficha publicada lo trae (las 11 de .cache_cripta/cat_be68d322d2f5),
+        # así que con el servicio actual este efecto permanece inactivo y solo se ejercita en pruebas.
+        cantidad = ficha.get("regeneracion")
         if cantidad:
             self.aplicarRegeneracion(modelo, enemigo, cantidad)
 
@@ -124,8 +127,10 @@ class efectosJuego(EfectosBase):
             self.aplicarVelocidad(modelo, jugador, nueva, ficha["duracion"])
 
     def _velocidadNueva(self, actor, modificador):
-        # SUPUESTO SIN VERIFICAR: modificador_velocidad es un multiplicador (1.5 = +50 %).
-        # Comprobar en el catálogo real; si es un valor absoluto o una suma, cambiar solo esta línea.
+        # §2.7 nombra el campo "modificador_velocidad" pero no su unidad; lo tratamos como multiplicador
+        # (1.5 = +50 %). Hoy el camino está muerto con datos reales: la única poción publicada
+        # (itm_pocion_menor) solo declara "cura", así que el guard de alUsarObjeto no llega a llamar esto.
+        # Si una cripta futura la trae sumada o absoluta, cambiar solo esta línea.
         return max(1, int(actor.velocidad * modificador))
 
     def descripcionjugador(self, modelo):

@@ -6,13 +6,15 @@ __pycache__/
 venv/
 
 # Archivos que genera el programa al jugar
-partida.log
-tmp_*.log
-tmp_*.sav
+*.log
+*.sav
 puntajes_locales.json
 .cache_cripta/
-*.sav
 
 # Entorno del editor
 .idea/
 .vscode/
+*.code-workspace
+
+# Basura de consolas
+.Rhistory

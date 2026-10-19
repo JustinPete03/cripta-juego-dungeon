@@ -1,5 +1,8 @@
 from adapters.clienteCripta import ClienteCripta
+from model.Interfaces import PresupuestoAgotado
+from model.Tabla import Conjunto
 from model.cache_estructuras import CacheCatalogo, RegistroSalas
+from model.ordenamiento.Selector import ordenar
 
 
 class GestorRedPrecarga:
@@ -27,19 +30,50 @@ class GestorRedPrecarga:
     def id_cripta_actual(self):
         return self.idCriptaActual
 
+    def presupuestoRestante(self):
+        """Solicitudes que faltan antes de exceder el máximo de la cripta; None si no aplica.
+
+        No aplica en modo offline ni antes de conocer el presupuesto: la versión del catálogo y los
+        datos generales se piden para saberlo y una lectura local nunca cuenta (sección 3.4)."""
+        if not self.presupuestoMaximo or not self.cliente.cuentaComoRed():
+            return None
+        return self.presupuestoMaximo - self.cliente.obtenerSolicitudesRealizadas()
+
+    def _reservar(self, cuantas: int):
+        restante = self.presupuestoRestante()
+        if restante is not None and cuantas > restante:
+            raise PresupuestoAgotado("quedan %d de %d solicitudes y esta operación necesita %d"
+                                     % (restante, self.presupuestoMaximo, cuantas))
+
+    def _recortarPorPresupuesto(self, porDescargar):
+        restante = self.presupuestoRestante()
+        if restante is None or restante > 1:
+            return porDescargar
+        if restante <= 0:
+            return []
+        # Con una sola solicitud en la recámara se precarga nada más la sala del jugador: el lote
+        # de catálogo que trae necesitaría viajes propios y excedería el máximo (sección 3.3).
+        return porDescargar[:1]
+
     def inicializarCripta(self, idCripta: str) -> tuple:
         # Descarga datos generales, todo el esqueleto y precarga la sala inicial (sección 4.2 / sección 2.4)
         self.idCriptaActual = idCripta
         datosGen = self.cliente.obtenerDatosGenerales(idCripta)
         self.presupuestoMaximo = datosGen["presupuesto_solicitudes"]
 
-        # Descargar todas las páginas del esqueleto para tener la lista completa de salas y sus salidas
-        totalPaginas = datosGen.get("paginas", datosGen.get("total_paginas", 1))
+        # Descargar todas las páginas del esqueleto para tener la lista completa de salas y sus salidas.
+        # El mando lo tiene la respuesta: datosGen declara "paginas", pero si el servicio cambia el
+        # tamaño de página quedarnos con el primero dejaría salas sin descubrir.
         esqueletoSalas = []
-        for pag in range(1, totalPaginas + 1):
-            respPag = self.cliente.obtenerEsqueleto(idCripta, pag)
+        pagina = 1
+        totalPaginas = 1
+        while pagina <= totalPaginas:
+            self._reservar(1)
+            respPag = self.cliente.obtenerEsqueleto(idCripta, pagina)
             for sala in respPag.get("salas", []):
                 esqueletoSalas.append(sala)
+            totalPaginas = max(totalPaginas, int(respPag.get("total_paginas", pagina)))
+            pagina += 1
 
         # Precargar sala inicial y sus salas contiguas antes del instante 0 (sección 2.4)
         salaInicial = datosGen["sala_inicial"]
@@ -52,6 +86,12 @@ class GestorRedPrecarga:
         contenido = self.salasDescargadas.obtener(idSala)
         if contenido is None:
             self.precargarVecindad(idSala, esqueletoSalas)
+            contenido = self.salasDescargadas.obtener(idSala)
+        if contenido is None:
+            # La precarga se recorta con el presupuesto y la sala pudo quedarse fuera del lote.
+            # Entrar sin contenido no es una opción, así que se pide sola; si ni siquiera cabe una
+            # solicitud, PresupuestoAgotado sube al modelo y la acción se rechaza con mensaje.
+            self._descargarLoteSalasYCatalogo([idSala])
             contenido = self.salasDescargadas.obtener(idSala)
         return contenido
 
@@ -78,8 +118,14 @@ class GestorRedPrecarga:
                     registradasEnCola.append(idContigua)
                     colaPendientes.append(idContigua)
 
-        if len(porDescargar) > 0:
+        porDescargar = self._recortarPorPresupuesto(porDescargar)
+        if len(porDescargar) == 0:
+            return
+        try:
             self._descargarLoteSalasYCatalogo(porDescargar)
+        except PresupuestoAgotado:
+            # Precargar es una cortesía: quedarse corto solo cuesta un viaje cuando el jugador entra.
+            pass
 
     def _obtenerSalasContiguas(self, idSala: int, esqueletoSalas: list) -> list:
         contiguas = []
@@ -96,57 +142,59 @@ class GestorRedPrecarga:
         # Descarga salas en lotes de máximo 10 (sección 3.4)
         for i in range(0, len(loteSalas), 10):
             subLoteSalas = loteSalas[i : i + 10]
+            self._reservar(1)
             respuesta = self.cliente.obtenerContenidoLote(self.idCriptaActual, subLoteSalas)
-            idsCatalogoFaltantes = []
+            idsCatalogo = []
 
             for infoSala in respuesta.get("contenido", []):
                 self.salasDescargadas.guardar(infoSala["sala"], infoSala)
-
-                # Comprueba sin alterar métricas del jugador: registrar_metrica=False (sección 5.1)
                 for enem in infoSala.get("enemigos", []):
-                    tipo = enem["tipo"]
-                    if (
-                        not self.cacheCatalogo.contiene(tipo, registrar_metrica=False)
-                        and tipo not in idsCatalogoFaltantes
-                    ):
-                        idsCatalogoFaltantes.append(tipo)
-
-                for objId in infoSala.get("objetos", []):
-                    if (
-                        not self.cacheCatalogo.contiene(objId, registrar_metrica=False)
-                        and objId not in idsCatalogoFaltantes
-                    ):
-                        idsCatalogoFaltantes.append(objId)
-
+                    idsCatalogo.append(enem["tipo"])
+                idsCatalogo.extend(infoSala.get("objetos", []))
                 for trampa in infoSala.get("trampas", []):
-                    tipo = trampa["tipo"]
-                    if (
-                        not self.cacheCatalogo.contiene(tipo, registrar_metrica=False)
-                        and tipo not in idsCatalogoFaltantes
-                    ):
-                        idsCatalogoFaltantes.append(tipo)
+                    idsCatalogo.append(trampa["tipo"])
 
-            # Orden determinista (sección 4.2 / sección 4.11) para garantizar reproducibilidad exacta
-            idsCatalogoFaltantes.sort()
+            self.asegurarCatalogo(idsCatalogo)
 
-            # Pedir al catálogo en lotes de máximo 10 IDs
-            for j in range(0, len(idsCatalogoFaltantes), 10):
-                subLoteCat = idsCatalogoFaltantes[j : j + 10]
-                respCat = self.cliente.obtenerCatalogoLote(subLoteCat)
-                for ficha in respCat.get("entidades", []):
-                    self.cacheCatalogo.insertar(ficha["id"], ficha)
+    def asegurarCatalogo(self, idsFichas: list):
+        """Pide en lotes de 10 solo las fichas que faltan en RAM y en disco."""
+        vistos = Conjunto()
+        pendientes = []
+        for idFicha in idsFichas:
+            if vistos.contiene(idFicha):
+                continue
+            vistos.agregar(idFicha)
+            # registrar_metrica=False: la precarga no debe contar como acierto del jugador (5.1)
+            if not self.cacheCatalogo.contiene(idFicha, registrar_metrica=False):
+                pendientes.append(idFicha)
+        if not pendientes:
+            return
+        # Orden determinista (sección 4.2 / 4.11) para que el replay sea reproducible.
+        # Es el ordenamiento del proyecto, no sorted(): misma sección 4.9 y su selector.
+        pendientes = ordenar(pendientes)
+        for i in range(0, len(pendientes), 10):
+            self._reservar(1)
+            respuesta = self.cliente.obtenerCatalogoLote(pendientes[i : i + 10])
+            for ficha in respuesta.get("entidades", []):
+                self.cacheCatalogo.insertar(ficha["id"], ficha)
 
     def generarReporteRendimientoRed(self) -> str:
         """Regla 5.1: Reporta solicitudes realizadas, presupuesto, aciertos y fallos de caché."""
         realizadas = self.cliente.obtenerSolicitudesRealizadas()
-        aciertos = self.cacheCatalogo.aciertos
-        fallos = self.cacheCatalogo.fallos
+        restante = self.presupuestoRestante()
+        if restante is None:
+            estado = "sin límite: las lecturas locales no cuentan como red (sección 3.4)"
+        else:
+            estado = "%s, quedan %d" % ("CUMPLIDO" if realizadas <= self.presupuestoMaximo
+                                        else "EXCEDIDO", max(0, restante))
         return (
             f"=== REPORTE DE RED Y CACHÉ (sección 5.1) ===\n"
             f"Solicitudes HTTP realizadas : {realizadas} / {self.presupuestoMaximo}\n"
-            f"Estado del presupuesto      : {'CUMPLIDO' if realizadas <= self.presupuestoMaximo else 'EXCEDIDO'}\n"
-            f"Aciertos de caché (RAM)     : {aciertos}\n"
-            f"Fallos de caché (RAM)       : {fallos}\n"
+            f"Estado del presupuesto      : {estado}\n"
+            f"Aciertos de caché (RAM)     : {self.cacheCatalogo.aciertos}\n"
+            f"Fallos de caché (RAM)       : {self.cacheCatalogo.fallos}\n"
+            f"Fichas desalojadas          : {self.cacheCatalogo.desalojos}\n"
+            f"Salas registradas           : {self.salasDescargadas.cantidad}\n"
             f"====================================="
         )
 
@@ -156,4 +204,6 @@ class GestorRedPrecarga:
     precargar_vecindad = precargarVecindad
     _obtener_salas_contiguas = _obtenerSalasContiguas
     _descargar_lote_salas_y_catalogo = _descargarLoteSalasYCatalogo
+    asegurar_catalogo = asegurarCatalogo
+    presupuesto_restante = presupuestoRestante
     generar_reporte_rendimiento_red = generarReporteRendimientoRed

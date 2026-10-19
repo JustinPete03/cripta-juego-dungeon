@@ -1,6 +1,8 @@
 import json
 import os
 
+from model.ordenamiento.Selector import ordenar
+
 # Clase para manejar la tabla de puntajes locales, con registro de partidas y ordenamiento (sección 2.12 / sección 4.9).
 class GestorTablaPuntajes:
     def __init__(self, rutaArchivo: str = "puntajes_locales.json"):
@@ -42,69 +44,18 @@ class GestorTablaPuntajes:
         return self.ordenarPuntajes(puntajes)
 
     def ordenarPuntajes(self, lista: list) -> list:
-        # Selección adaptativa (sección 4.9): si la lista es pequeña o casi ordenada usa Insertion Sort; si no, Merge Sort.
-        n = len(lista)
-        if n <= 1:
-            return list(lista)
+        # Delegado en el selector automático de la sección 4.9: en el proyecto hay una sola
+        # implementación de inserción y mezcla, y esta tabla no va a mantener la suya.
+        return ordenar(lista, self._clave, False)
 
-        # Medimos desorden contando pares adyacentes invertidos
-        desordenes = 0
-        for i in range(n - 1):
-            if not self._esMejorOIgual(lista[i], lista[i + 1]):
-                desordenes += 1
-
-        if n <= 24 or (desordenes * 100 // n) <= 15:
-            return self._insertionSort(lista)
-        else:
-            return self._mergeSort(lista)
-
-    def _esMejorOIgual(self, regA: dict, regB: dict) -> bool:
-        # Criterio (sección 2.12): Victorias primero -> Menor tiempo final -> Menos acciones -> Más enemigos derrotados
-        if regA["victoria"] != regB["victoria"]:
-            return regA["victoria"] > regB["victoria"]
-        if regA["tiempo_final"] != regB["tiempo_final"]:
-            return regA["tiempo_final"] < regB["tiempo_final"]
-        if regA["acciones_ejecutadas"] != regB["acciones_ejecutadas"]:
-            return regA["acciones_ejecutadas"] < regB["acciones_ejecutadas"]
-        return regA["enemigos_derrotados"] >= regB["enemigos_derrotados"]
-
-    def _insertionSort(self, arr: list) -> list:
-        copia = list(arr)
-        for i in range(1, len(copia)):
-            actual = copia[i]
-            j = i - 1
-            while j >= 0 and not self._esMejorOIgual(copia[j], actual):
-                copia[j + 1] = copia[j]
-                j -= 1
-            copia[j + 1] = actual
-        return copia
-
-    def _mergeSort(self, arr: list) -> list:
-        if len(arr) <= 1:
-            return list(arr)
-        medio = len(arr) // 2
-        izquierda = self._mergeSort(arr[:medio])
-        derecha = self._mergeSort(arr[medio:])
-        return self._merge(izquierda, derecha)
-
-    def _merge(self, izq: list, der: list) -> list:
-        resultado = []
-        i = 0
-        j = 0
-        while i < len(izq) and j < len(der):
-            if self._esMejorOIgual(izq[i], der[j]):
-                resultado.append(izq[i])
-                i += 1
-            else:
-                resultado.append(der[j])
-                j += 1
-        while i < len(izq):
-            resultado.append(izq[i])
-            i += 1
-        while j < len(der):
-            resultado.append(der[j])
-            j += 1
-        return resultado
+    @staticmethod
+    def _clave(registro: dict):
+        # Criterio (sección 2.12): victorias primero -> menor tiempo final -> menos acciones ->
+        # más enemigos derrotados. Una tupla ascendente lo expresa sin comparaciones a medida.
+        return (0 if registro.get("victoria") else 1,
+                registro.get("tiempo_final", 0),
+                registro.get("acciones_ejecutadas", 0),
+                -registro.get("enemigos_derrotados", 0))
 
     def _cargarPuntajes(self) -> list:
         if not os.path.exists(self.rutaArchivo):
@@ -141,8 +92,5 @@ class GestorTablaPuntajes:
     registrar_partida = registrarPartida
     obtener_tabla_ordenada = obtenerTablaOrdenada
     ordenar_puntajes = ordenarPuntajes
-    _es_mejor_o_igual = _esMejorOIgual
-    _insertion_sort = _insertionSort
-    _merge_sort = _mergeSort
     _cargar_puntajes = _cargarPuntajes
     _guardar_puntajes = _guardarPuntajes
