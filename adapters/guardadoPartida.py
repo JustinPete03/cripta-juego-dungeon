@@ -78,8 +78,11 @@ class FuenteEmbebida:
     def anticipar(self, salaId):
         pass
 
-    def fijarPredicadoEnUso(self, predicado):
-        self._real.fijarPredicadoEnUso(predicado)
+    def asegurarFichas(self, tipoIds):
+        self._real.asegurarFichas(tipoIds)
+
+    def fijarFichasEnUso(self, productor):
+        self._real.fijarFichasEnUso(productor)
 
 
 class guardadoPartida:

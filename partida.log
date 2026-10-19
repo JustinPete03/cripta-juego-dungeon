@@ -1,3 +1,16 @@
 HEADER|cripta-prueba|v1|demo|1
-ACCION|mover N
+ACCION|recoger 1
+ACCION|recoger 1
+ACCION|recoger 1
+ACCION|recoger 1
+ACCION|recoger 1
+ACCION|recoger 1
+ACCION|sig
+ACCION|equipar
+ACCION|sig
+ACCION|sig
+ACCION|sig
+ACCION|sig
+ACCION|equipar
 ACCION|mover S
+ACCION|atacar 1

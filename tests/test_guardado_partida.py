@@ -5,7 +5,7 @@ import os
 import struct
 
 from adapters.codBinary import codificar, decodificar
-from adapters.guardadoBinario import Contenedor
+import adapters.guardadoPartida as modulo_guardado
 from adapters.guardadoPartida import guardadoPartida, MAGIC, VERSION_FORMATO
 from model.Acciones import Accion
 from model.Constantes import ACC_MOVER, ACC_RECOGER, ACC_USAR
@@ -42,16 +42,26 @@ def _jugarUnRato(modelo):
     modelo.ejecutar(Accion(ACC_USAR, 0))
 
 
-class ContenedorContable(Contenedor):
-    """Mide cuantos bloques lee el acceso aleatorio; la prueba exige que sean pocos."""
+class _ArchivoContable:
+    """Envuelve un archivo y cuenta los bytes que se leen de él."""
 
-    def __init__(self):
-        super().__init__(MAGIC, VERSION_FORMATO)
-        self.bytesLeidos = 0
+    def __init__(self, archivo, contador):
+        self._archivo = archivo
+        self._contador = contador
 
-    def _bytes(self, archivo, posicion, largo):
-        self.bytesLeidos += largo
-        return super()._bytes(archivo, posicion, largo)
+    def read(self, n=-1):
+        datos = self._archivo.read(n)
+        self._contador[0] += len(datos)
+        return datos
+
+    def __getattr__(self, nombre):
+        return getattr(self._archivo, nombre)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self._archivo.close()
 
 
 def testIdaYVueltaDelEstado():
@@ -72,14 +82,20 @@ def testSalaSeCargaSinLeerElArchivoCompleto():
     _jugarUnRato(modelo)
     _guardado().guardar(modelo, RUTA)
     try:
-        contenedor = ContenedorContable()
+        contador = [0]
         tamano = os.path.getsize(RUTA)
         sala = max(i for i in range(1, modelo.salas.cantidad() + 1)
                    if modelo.salas.buscar(i).contenidoIncorporado)
-        bloque = contenedor.cargarSala(RUTA, sala)
+        abrirReal = open
+        # Se sustituye open solo dentro del módulo de guardado para contar lo que lee leerSala
+        modulo_guardado.open = lambda ruta, modo="r", *a, **k: _ArchivoContable(abrirReal(ruta, modo, *a, **k), contador)
+        try:
+            bloque = _guardado().leerSala(RUTA, sala)
+        finally:
+            del modulo_guardado.open
         assert bloque["sala"] == sala
         assert bloque == modelo.proveedor.contenidoSala(sala)
-        assert contenedor.bytesLeidos < tamano * 0.25, (contenedor.bytesLeidos, tamano)
+        assert contador[0] < tamano * 0.25, (contador[0], tamano)
     finally:
         os.remove(RUTA)
 
@@ -88,7 +104,7 @@ def testSalaInexistenteDevuelveNada():
     modelo = _modelo()
     _guardado().guardar(modelo, RUTA)
     try:
-        assert _guardado().cargarSala(RUTA, 9999) is None
+        assert _guardado().leerSala(RUTA, 9999) is None
     finally:
         os.remove(RUTA)
 
