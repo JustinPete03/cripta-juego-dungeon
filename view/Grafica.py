@@ -4,6 +4,7 @@
 # toda mutacion pasa por Controlador.ejecutarAccion -> Modelo.ejecutar.
 
 import math
+import random
 
 import pygame
 
@@ -182,7 +183,8 @@ class VistaGrafica:
         self.rutaGuardado = rutaGuardado
         self.pantalla = None
         self.terminar = False
-        self.escena = "titulo"
+        self.escena = "portada"
+        self.posRaton = (0, 0)
         self.indiceCripta = 0
         self.semilla = 1
         self.controlador = None
@@ -205,7 +207,9 @@ class VistaGrafica:
         self.posicionesBolsa = []
         self.zonas = []
         self.fuentes = []
+        self._fuentesMap = {}
         self.hojas = []
+        self._hojasMap = {}
         self.barras = []
         self.parpadeos = []
         self.flotantes = []
@@ -228,14 +232,20 @@ class VistaGrafica:
         self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
         for escala in (1, 2, 3, 4, 5):
             for nombre in sprites.NOMBRES:
-                self.hojas.append([nombre, escala, sprites.construir(pygame, nombre, escala)])
+                superficie = sprites.construir(pygame, nombre, escala)
+                self.hojas.append([nombre, escala, superficie])
+                self._hojasMap[(nombre, escala)] = superficie
 
     def apagar(self):
         pygame.quit()
 
     def fuente(self, tam):
+        f = self._fuentesMap.get(tam)
+        if f is not None:
+            return f
         for entrada in self.fuentes:
             if entrada[0] == tam:
+                self._fuentesMap[tam] = entrada[1]
                 return entrada[1]
         nueva = None
         for nombre in ("couriernew", "consolas", "courier"):
@@ -248,9 +258,13 @@ class VistaGrafica:
         if nueva is None:
             nueva = pygame.font.Font(None, tam + 4)
         self.fuentes.append([tam, nueva])
+        self._fuentesMap[tam] = nueva
         return nueva
 
     def hoja(self, nombre, escala=3):
+        surf = self._hojasMap.get((nombre, escala))
+        if surf is not None:
+            return surf
         mejor = None
         for entrada in self.hojas:
             if entrada[0] != nombre:
@@ -258,7 +272,7 @@ class VistaGrafica:
             if entrada[1] <= escala and (mejor is None or entrada[1] > mejor[1]):
                 mejor = entrada
         if mejor is None:
-            return self.hojas[0][2]
+            return self.hojas[0][2] if self.hojas else None
         return mejor[2]
 
     def blitear(self, nombre, x, y, escala=3, alpha=255, clave=None):
@@ -690,6 +704,10 @@ class VistaGrafica:
             avance = 1.0 - self.salto[1] / self.salto[2]
             return (self.salto[3] * math.sin(avance * math.pi),
                     self.salto[4] * math.sin(avance * math.pi))
+        if clave is not None:
+            ticks = pygame.time.get_ticks()
+            offset = (hash(clave) % 7) * 45
+            return (0, int(1.4 * math.sin((ticks + offset) / 320.0)))
         return (0, 0)
 
     def registrar(self, clave, rect):
@@ -772,7 +790,7 @@ class VistaGrafica:
             self._vibrar("jugador", -30, -22)
         salaAnterior = self.captura.sala.id
         self.controlador.ejecutarAccion(Accion(tipo, dato))
-        self._capturar()
+        self._capturar(tipo in (ACC_ABRIR, ACC_RETROCESO))
         self._refrescar()
         if self.captura.sala.id != salaAnterior:
             self.transicion = 1.0
@@ -843,13 +861,15 @@ class VistaGrafica:
                 habilitada = salida.transitable
                 detalle = "" if habilitada else ("cierra con llave" if salida.necesitaLlave
                                                  else "cerrada")
+                estadoColumna = ("costo %d" % salida.costo) if salida.transitable else "cerrada"
             else:
                 habilitada = salida.sePuedeAbrir
                 detalle = "" if habilitada else "falta la llave"
+                estadoColumna = "cerrada" if salida.cerrada else "abierta"
             entradas.append(Entrada("%s  ->  Sala %s" % (salida.direccion, salida.destinoId),
                                     ACC_MOVER if clase == "mover" else ACC_ABRIR,
                                     salida.direccion, habilitada, detalle,
-                                    "cerrada" if salida.cerrada else "abierta"))
+                                    estadoColumna))
         return entradas
 
     def _activar(self, entrada):
@@ -878,6 +898,19 @@ class VistaGrafica:
         if entrada.accion == UI_SERVICIO:
             if entrada.dato == "empezar":
                 self._pulsarA()
+            elif entrada.dato == "ir_portada":
+                self.transicion = 0.35
+                self.escena = "portada"
+            elif entrada.dato == "ir_titulo":
+                self.transicion = 0.35
+                self.escena = "titulo"
+            elif entrada.dato == "semilla_menos":
+                self.semilla = max(1, self.semilla - 1)
+            elif entrada.dato == "semilla_mas":
+                self.semilla += 1
+            elif entrada.dato == "semilla_azar":
+                self.semilla = random.randint(1, 99999)
+                self.flotantes.append(["¡Semilla al azar!", ANCHO - 200, 140, 0.9])
             elif entrada.dato[:7] == "cripta:":
                 self.indiceCripta = int(entrada.dato[7:])
                 self.cursorTitulo = self.indiceCripta
@@ -898,7 +931,7 @@ class VistaGrafica:
         self.submenu = None
 
     def _refrescarCaptura(self):
-        self._capturar()
+        self._capturar(True)
         self._refrescar()
 
     def _pulsarA(self):
@@ -907,11 +940,16 @@ class VistaGrafica:
             if self.modelo is not None and self.modelo.estado != EN_CURSO and not self.esperando:
                 self.escena = "final"
             return
+        if self.escena == "portada":
+            self.transicion = 0.4
+            self.escena = "titulo"
+            return
         if self.escena == "titulo":
             self.indiceCripta = min(self.indiceCripta, len(self.criptas) - 1)
             self.nuevaPartida()
             return
         if self.escena == "final":
+            self.transicion = 0.35
             self.escena = "titulo"
             return
         if self.escena == "bitacora":
@@ -946,6 +984,10 @@ class VistaGrafica:
             self.cola = []
             self.linea = None
             self.esperando = False
+            return
+        if self.escena == "titulo":
+            self.transicion = 0.4
+            self.escena = "portada"
             return
         if self.escena in ("bolsa", "sistema", "bitacora"):
             self.escena = "escenario"
@@ -1001,7 +1043,15 @@ class VistaGrafica:
         if evento.type == pygame.QUIT:
             self.terminar = True
             return
+        if evento.type == pygame.MOUSEMOTION:
+            self.posRaton = evento.pos
+            return
         if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
+            self.posRaton = evento.pos
+            if self.escena == "portada":
+                self.transicion = 0.35
+                self.escena = "titulo"
+                return
             if self.esperando:
                 self._avanzarTexto()
                 if self.modelo is not None and self.modelo.estado != EN_CURSO and not self.esperando:
@@ -1020,6 +1070,15 @@ class VistaGrafica:
         if evento.type != pygame.KEYDOWN:
             return
         tecla = evento.key
+        if self.escena == "portada":
+            if tecla in (pygame.K_RETURN, pygame.K_z, pygame.K_SPACE, pygame.K_x, pygame.K_ESCAPE):
+                self.transicion = 0.35
+                self.escena = "titulo"
+            return
+        if tecla in (pygame.K_ESCAPE, pygame.K_x) and self.escena == "titulo":
+            self.transicion = 0.35
+            self.escena = "portada"
+            return
         if tecla in (pygame.K_ESCAPE,) and self.escena in ("escenario", "bolsa", "sistema", "bitacora"):
             self._pulsarB()
             return
@@ -1064,18 +1123,18 @@ class VistaGrafica:
                 self._enviar(ACC_ATACAR, indice, True)
 
     def _teclaTitulo(self, tecla):
-        total = len(self.criptas) + 1
-        enSemilla = self.cursorTitulo >= len(self.criptas)
+        total = len(self.criptas)
         if tecla in (pygame.K_UP, pygame.K_w):
             self.cursorTitulo = _desplazar(self.cursorTitulo, -1, total)
         elif tecla in (pygame.K_DOWN, pygame.K_s):
             self.cursorTitulo = _desplazar(self.cursorTitulo, 1, total)
         elif tecla in (pygame.K_LEFT, pygame.K_a):
-            if enSemilla:
-                self.semilla = max(1, self.semilla - 1)
+            self.semilla = max(1, self.semilla - 1)
         elif tecla in (pygame.K_RIGHT, pygame.K_d):
-            if enSemilla:
-                self.semilla += 1
+            self.semilla += 1
+        elif tecla == pygame.K_r:
+            self.semilla = random.randint(1, 99999)
+            self.flotantes.append(["¡Semilla al azar!", ANCHO - 200, 140, 0.9])
         if self.cursorTitulo < len(self.criptas):
             self.indiceCripta = self.cursorTitulo
 
@@ -1142,65 +1201,257 @@ class VistaGrafica:
         self.zonas = []
         self.posicionesBolsa = []
 
-    def _dibujarTitulo(self):
-        self._lienzo((18, 18, 30))
-        for escala, x, y in ((4, 60, 120), (4, 820, 140)):
+    def _dibujarPortada(self):
+        self._lienzo((14, 14, 24))
+        ticks = pygame.time.get_ticks()
+
+        # Antorchas en columnas laterales con halos de luz dinámica
+        for escala, x, y in ((5, 50, 90), (5, 850, 90)):
             lado = sprites.MEDIDA * escala
-            pulso = 0.6 + 0.4 * math.sin(pygame.time.get_ticks() / 260.0 + x)
-            capa = self._halo(300).copy()
+            pulso = 0.70 + 0.30 * math.sin(ticks / 220.0 + x)
+            capa = self._halo(320).copy()
             capa.set_alpha(int(255 * pulso))
-            self.pantalla.blit(capa, (x + lado // 2 - 150, y + int(lado * 0.28) - 150))
+            self.pantalla.blit(capa, (x + lado // 2 - 160, y + int(lado * 0.28) - 160))
             self.blitear("antorcha", x, y, escala)
-        self.texto(ANCHO // 2, 96, "CRIPTA", 74, DORADO, centrado=True, sombra=TINTA)
-        self.texto(ANCHO // 2, 158, "JUEGO DE MAZMORRA DIRIGIDO POR EVENTOS", 20, CIAN,
+
+        # Logotipo monumental CRIPTA con levitación sutil y relieve 8-bits
+        levitacion = int(3.0 * math.sin(ticks / 360.0))
+        yLogo = 90 + levitacion
+        self.texto(ANCHO // 2 + 4, yLogo + 4, "CRIPTA", 86, TINTA, centrado=True)
+        self.texto(ANCHO // 2 + 2, yLogo + 2, "CRIPTA", 86, DORADO_OSCURO, centrado=True)
+        self.texto(ANCHO // 2, yLogo, "CRIPTA", 86, DORADO, centrado=True)
+        self.texto(ANCHO // 2, yLogo - 2, "CRIPTA", 82, CREMA, centrado=True)
+
+        self.texto(ANCHO // 2, 160 + levitacion // 2,
+                   "MAZMORRA DE EVENTOS DISCRETOS · 8-BIT RETRO EDITION", 18, CIAN,
                    centrado=True, sombra=TINTA)
-        caja = pygame.Rect(120, 210, 420, 240)
-        self.caja(caja)
-        self._encabezado(caja, "elige tu cripta")
+
+        # Marco del diorama central estilo portada retro / Pokémon
+        areaDiorama = pygame.Rect(100, 195, 780, 280)
+        pygame.draw.rect(self.pantalla, _oscurece(PANEL, 0.40), areaDiorama, border_radius=14)
+        pygame.draw.rect(self.pantalla, AGUA_CLARA, areaDiorama, 2, border_radius=14)
+
+        # Plataforma 1 (Izquierda): El Explorador / Héroe
+        platHeroe = pygame.Rect(140, 395, 190, 50)
+        pygame.draw.ellipse(self.pantalla, (24, 30, 52), platHeroe)
+        pygame.draw.ellipse(self.pantalla, BORDE_ACERO, platHeroe, 2)
+        idleHeroe = int(2.5 * math.sin(ticks / 280.0))
+        self._dibujarSombra(195, 335 + idleHeroe, sprites.MEDIDA * 5)
+        self.blitear("heroe", 195, 335 + idleHeroe, 5)
+        self.texto(235, 452, "EL EXPLORADOR", 16, PERLA, centrado=True, sombra=TINTA)
+
+        # Plataforma 2 (Centro): Pedestal de la Llave Sagrada
+        platLlave = pygame.Rect(ANCHO // 2 - 95, 405, 190, 50)
+        pygame.draw.ellipse(self.pantalla, (32, 38, 64), platLlave)
+        pygame.draw.ellipse(self.pantalla, DORADO_OSCURO, platLlave, 2)
+
+        haloLlave = self._halo(220).copy()
+        haloLlave.set_alpha(int(140 + 60 * math.sin(ticks / 240.0)))
+        self.pantalla.blit(haloLlave, (ANCHO // 2 - 110, 280 - 110))
+
+        # Llave flotante con oscilación sinusoidal
+        floatLlave = int(8.0 * math.sin(ticks / 250.0))
+        yLlave = 280 + floatLlave
+        self.blitear("llave", ANCHO // 2 - 40, yLlave, 5)
+
+        # Destellos mágicos retro alrededor de la llave
+        for ang, dist in ((0.2, 54), (1.8, 60), (3.4, 48), (4.9, 56)):
+            fase = ticks / 300.0 + ang
+            brillo = max(0.0, math.sin(fase))
+            if brillo > 0.4:
+                sx = int(ANCHO // 2 + dist * math.cos(fase * 0.8))
+                sy = int(yLlave + 40 + dist * 0.5 * math.sin(fase * 0.8))
+                pygame.draw.circle(self.pantalla, CREMA, (sx, sy), 3)
+                pygame.draw.circle(self.pantalla, DORADO, (sx, sy), 5, 1)
+
+        self.texto(ANCHO // 2, 456, "LA LLAVE DE SALIDA", 17, DORADO, centrado=True, sombra=TINTA)
+
+        # Plataforma 3 (Derecha): Monstruos de la Mazmorra (Esqueleto + Murciélago)
+        platMonstruos = pygame.Rect(650, 395, 200, 50)
+        pygame.draw.ellipse(self.pantalla, (28, 24, 44), platMonstruos)
+        pygame.draw.ellipse(self.pantalla, (120, 60, 70), platMonstruos, 2)
+        idleEsqueleto = int(2.5 * math.sin(ticks / 290.0 + 1.2))
+        self._dibujarSombra(680, 335 + idleEsqueleto, sprites.MEDIDA * 5)
+        self.blitear("esqueleto", 680, 335 + idleEsqueleto, 5)
+
+        # Murciélago acechando arriba a la derecha con aleteo/flotación
+        hoverMurcielago = int(5.0 * math.sin(ticks / 190.0 + 2.0))
+        self.blitear("murcielago", 770, 260 + hoverMurcielago, 4)
+        self.texto(750, 452, "GUARDIANES Y CAZADORES", 16, ROJO, centrado=True, sombra=TINTA)
+
+        # Banner retro interactivo pulsante estilo arcade "PRESS START"
+        pulsoTexto = int(170 + 85 * math.sin(ticks / 180.0))
+        cajaStart = pygame.Rect(ANCHO // 2 - 280, 502, 560, 58)
+        self.caja(cajaStart, relleno=_mezclar(PANEL, AGUA_CLARA, 0.25), borde=DORADO, radio=12)
+
+        tonoParpadeo = (min(255, pulsoTexto + 40), min(255, pulsoTexto + 20), 120)
+        self.texto(cajaStart.centerx, cajaStart.centery - 2,
+                   "»  PRESIONA [Z] O [ENTER] PARA COMENZAR  «", 22, tonoParpadeo,
+                   centrado=True, sombra=TINTA)
+
+        self.texto(ANCHO // 2, 584,
+                   "O HAZ CLIC EN CUALQUIER LUGAR CON EL RATÓN", 15, APAGADO, centrado=True)
+        self.texto(ANCHO // 2, 626,
+                   "ESTRUCTURAS DE DATOS II · PROYECTO CRIPTA 2026", 14, (70, 80, 110), centrado=True)
+
+        self.zona(pygame.Rect(0, 0, ANCHO, ALTO), UI_SERVICIO, "ir_titulo")
+
+    def _dibujarTitulo(self):
+        self._lienzo((16, 16, 28))
+        ticks = pygame.time.get_ticks()
+
+        self.texto(ANCHO // 2, 38, "CRIPTA", 44, DORADO, centrado=True, sombra=TINTA)
+        self.texto(ANCHO // 2, 74, "SELECCIÓN DE EXPEDICIÓN", 18, CIAN, centrado=True, sombra=TINTA)
+
+        # Botón volver a portada
+        btnVolver = pygame.Rect(28, 28, 170, 36)
+        hoverVolver = btnVolver.collidepoint(self.posRaton)
+        self.caja(btnVolver, relleno=_aclara(PANEL, 0.2) if hoverVolver else PANEL,
+                  borde=BLANCO if hoverVolver else BORDE_ACERO, radio=8)
+        self.texto(btnVolver.centerx, btnVolver.centery, "[X / ESC] PORTADA", 16,
+                   BLANCO if hoverVolver else PERLA, centrado=True)
+        self.zona(btnVolver, UI_SERVICIO, "ir_portada")
+
+        # Columna Izquierda: Criptas (Tarjetas)
+        cajaCriptas = pygame.Rect(28, 96, 500, 520)
+        self.caja(cajaCriptas)
+        self._encabezado(cajaCriptas, "elige tu cripta")
+
+        yCard = cajaCriptas.y + 46
         for i in range(len(self.criptas)):
             nombre, parametros = self.criptas[i]
-            rect = pygame.Rect(caja.x + 18, caja.y + 46 + i * 46, caja.width - 36, 40)
-            if i == self.cursorTitulo:
+            rect = pygame.Rect(cajaCriptas.x + 16, yCard, cajaCriptas.width - 32, 72)
+            yCard += 80
+
+            esSeleccionada = (i == self.cursorTitulo)
+            esHover = rect.collidepoint(self.posRaton)
+
+            if esSeleccionada:
                 self._resaltar(rect, SELECCION)
-            else:
-                pygame.draw.rect(self.pantalla, _oscurece(PANEL, 0.40), rect, border_radius=8)
-                pygame.draw.rect(self.pantalla, AGUA_CLARA, rect, 1, border_radius=8)
-            if i == self.cursorTitulo:
                 self.flecha(rect)
-            self._tecla(rect, DORADO if i == self.cursorTitulo else BORDE_ACERO)
-            self.texto(rect.x + 32, rect.y + 8, nombre.upper(), 20,
-                       BLANCO if i == self.cursorTitulo else APAGADO)
-            if "ancho" in parametros:
-                detalle = "%dx%d salas" % (parametros["ancho"], parametros["alto"])
+            elif esHover:
+                pygame.draw.rect(self.pantalla, _aclara(PANEL, 0.35), rect, border_radius=8)
+                pygame.draw.rect(self.pantalla, BORDE_ACERO, rect, 2, border_radius=8)
             else:
-                detalle = "%s salas · dif. %s" % (parametros.get("salas", "?"),
-                                                  parametros.get("dificultad", "?"))
-            self.texto(rect.right - 14, rect.y + 12, detalle, 17, ACERO, derecha=True)
+                pygame.draw.rect(self.pantalla, _oscurece(PANEL, 0.30), rect, border_radius=8)
+                pygame.draw.rect(self.pantalla, AGUA_CLARA, rect, 1, border_radius=8)
+
+            self._tecla(rect, DORADO if esSeleccionada else (BORDE_ACERO if esHover else AGUA_CLARA))
+
+            self.texto(rect.x + 36, rect.y + 12, nombre.upper(), 22,
+                       BLANCO if esSeleccionada else (PERLA if esHover else APAGADO), sombra=TINTA)
+
+            if "ancho" in parametros:
+                detalle = "%dx%d salas (%d totales)" % (
+                    parametros["ancho"], parametros["alto"], parametros["ancho"] * parametros["alto"]
+                )
+                if i == 0:
+                    difTexto, difTono = "★☆☆ FÁCIL", VERDE
+                elif i == 1:
+                    difTexto, difTono = "★★☆ MEDIA", DORADO
+                else:
+                    difTexto, difTono = "★★★ DIFÍCIL", ROJO
+            else:
+                salasCount = parametros.get("salas", "?")
+                difRaw = str(parametros.get("dificultad", "media")).lower()
+                detalle = "%s salas" % salasCount
+                if "facil" in difRaw or "fácil" in difRaw:
+                    difTexto, difTono = "★☆☆ FÁCIL", VERDE
+                elif "alta" in difRaw or "dificil" in difRaw or "difícil" in difRaw:
+                    difTexto, difTono = "★★★ DIFÍCIL", ROJO
+                else:
+                    difTexto, difTono = "★★☆ MEDIA", DORADO
+
+            self.texto(rect.x + 36, rect.y + 42, detalle, 16, ACERO)
+            self._chip((rect.right - 60, rect.centery), difTexto, difTono)
             self.zona(rect, UI_SERVICIO, "cripta:%d" % i)
-        cajaSemilla = pygame.Rect(caja.x, caja.bottom + 16, caja.width, 56)
+
+        # Columna Derecha: Configuración y Acción
+        colDerX = 554
+        anchoDer = 398
+
+        # Panel 1: Semilla del Azar
+        cajaSemilla = pygame.Rect(colDerX, 96, anchoDer, 116)
         self.caja(cajaSemilla)
-        self.texto(cajaSemilla.x + 20, cajaSemilla.y + 18, "SEMILLA", 18, DORADO, sombra=TINTA)
-        self.texto(cajaSemilla.right - 20, cajaSemilla.y + 14, str(self.semilla).zfill(5), 24,
-                   CIAN, derecha=True, sombra=TINTA)
-        self.texto(cajaSemilla.x + 130, cajaSemilla.y + 18, "<- -> AJUSTA", 16, APAGADO)
-        cajaSalir = pygame.Rect(580, 210, 280, 120)
-        self.caja(cajaSalir, relleno=_mezclar(PANEL, VERDE, 0.16), borde=VERDE)
-        self.texto(cajaSalir.centerx, cajaSalir.y + 24, "EMPEZAR", 30, BLANCO, centrado=True,
+        self._encabezado(cajaSemilla, "semilla del azar")
+
+        self.texto(cajaSemilla.x + 24, cajaSemilla.y + 46, str(self.semilla).zfill(5), 32, CIAN,
                    sombra=TINTA)
-        self._chip((cajaSalir.centerx, cajaSalir.y + 82), "Z  /  ENTER", VERDE)
-        self.zona(cajaSalir, UI_SERVICIO, "empezar")
-        controles = pygame.Rect(580, 350, 280, 100)
-        self.caja(controles)
-        arriba = self._encabezado(controles, "controles")
-        for i, (tecla, accion) in enumerate((("Z", "confirmar"), ("X", "retroceder"),
-                                             ("I", "bolsa   ESC   menu"))):
-            self._chip((controles.x + 32, arriba + 10 + i * 21), tecla, DORADO)
-            self.texto(controles.x + 54, arriba + 1 + i * 21, accion, 16, PERLA)
+
+        btnMenos = pygame.Rect(cajaSemilla.x + 160, cajaSemilla.y + 44, 38, 36)
+        btnMas = pygame.Rect(cajaSemilla.x + 204, cajaSemilla.y + 44, 38, 36)
+        btnAzar = pygame.Rect(cajaSemilla.x + 252, cajaSemilla.y + 44, 126, 36)
+
+        hoverMenos = btnMenos.collidepoint(self.posRaton)
+        hoverMas = btnMas.collidepoint(self.posRaton)
+        hoverAzar = btnAzar.collidepoint(self.posRaton)
+
+        self.caja(btnMenos, relleno=_aclara(PANEL, 0.2) if hoverMenos else PANEL,
+                  borde=BLANCO if hoverMenos else BORDE_ACERO, radio=6)
+        self.texto(btnMenos.centerx, btnMenos.centery, "<", 20, BLANCO, centrado=True)
+        self.zona(btnMenos, UI_SERVICIO, "semilla_menos")
+
+        self.caja(btnMas, relleno=_aclara(PANEL, 0.2) if hoverMas else PANEL,
+                  borde=BLANCO if hoverMas else BORDE_ACERO, radio=6)
+        self.texto(btnMas.centerx, btnMas.centery, ">", 20, BLANCO, centrado=True)
+        self.zona(btnMas, UI_SERVICIO, "semilla_mas")
+
+        self.caja(btnAzar, relleno=_aclara(PANEL, 0.25) if hoverAzar else PANEL,
+                  borde=DORADO if hoverAzar else DORADO_OSCURO, radio=6)
+        self.texto(btnAzar.centerx, btnAzar.centery, "[R] AL AZAR", 16, DORADO if hoverAzar else CREMA, centrado=True)
+        self.zona(btnAzar, UI_SERVICIO, "semilla_azar")
+
+        self.texto(cajaSemilla.x + 24, cajaSemilla.y + 88, "Ajusta con < > o pulsa [R] para azar", 14, APAGADO)
+
+        # Panel 2: Misión y Reglas
+        cajaMision = pygame.Rect(colDerX, 226, anchoDer, 154)
+        self.caja(cajaMision)
+        self._encabezado(cajaMision, "reglas de supervivencia")
+
+        pautas = (
+            ("•", "Explora la cripta y sortea las trampas ocultas."),
+            ("•", "Los cazadores persiguen por la ruta de menor costo."),
+            ("•", "Encuentra la Llave y llega a la Salida con vida."),
+            ("•", "Usa la Bolsa [I] y el Retroceso ante el peligro.")
+        )
+        for idx, (viñeta, textoPauta) in enumerate(pautas):
+            self.texto(cajaMision.x + 20, cajaMision.y + 38 + idx * 26, viñeta, 18, DORADO)
+            self.texto(cajaMision.x + 36, cajaMision.y + 38 + idx * 26, textoPauta, 15, PERLA)
+
+        # Panel 3: Botón Iniciar Aventura
+        cajaEmpezar = pygame.Rect(colDerX, 394, anchoDer, 102)
+        hoverEmpezar = cajaEmpezar.collidepoint(self.posRaton)
+        pulsoVerde = 0.85 + 0.15 * math.sin(ticks / 260.0)
+        tonoFondo = _mezclar(PANEL, VERDE, 0.25 if hoverEmpezar else 0.18 * pulsoVerde)
+        self.caja(cajaEmpezar, relleno=tonoFondo, borde=VERDE if hoverEmpezar else _mezclar(VERDE, ACERO, 0.4), radio=12)
+
+        self.texto(cajaEmpezar.centerx, cajaEmpezar.y + 26, "¡INICIAR EXPEDICIÓN!", 30, BLANCO,
+                   centrado=True, sombra=TINTA)
+        self._chip((cajaEmpezar.centerx, cajaEmpezar.y + 70), "PULSA [Z] O [ENTER]", VERDE)
+        self.zona(cajaEmpezar, UI_SERVICIO, "empezar")
+
+        # Panel 4: Atajos de teclado
+        cajaTeclas = pygame.Rect(colDerX, 510, anchoDer, 106)
+        self.caja(cajaTeclas)
+        arriba = self._encabezado(cajaTeclas, "atajos y controles")
+        controles = (
+            ("Z / ENTER", "confirmar / interactuar"),
+            ("X / ESC",   "cancelar / retroceder / salir"),
+            ("I / M",     "abrir bolsa / ver mapa"),
+            ("WASD / ◄►", "moverse y navegar menús"),
+        )
+        for idx, (tClave, descClave) in enumerate(controles):
+            px = cajaTeclas.x + 18 + (idx % 2) * 190
+            py = arriba + 10 + (idx // 2) * 26
+            self._chip((px + 36, py + 8), tClave, DORADO)
+            self.texto(px + 82, py + 2, descClave, 14, ACERO)
+
+        # Pie
         local = len(self.criptas) > 0 and "ancho" in self.criptas[0][1]
-        self.texto(ANCHO // 2, ALTO - 30,
-                   "datos de demostracion local: el motor y las estructuras no cambian" if local
-                   else "criptas del paquete --offline: el motor y las estructuras no cambian",
-                   16, APAGADO, centrado=True)
+        self.texto(ANCHO // 2, ALTO - 20,
+                   "modo demostración local: motor determinista y estructuras propias" if local
+                   else "modo conectado / offline: motor determinista y estructuras propias",
+                   14, (75, 85, 115), centrado=True)
 
     def _dibujarJuego(self):
         self._lienzo()
@@ -1269,11 +1520,12 @@ class VistaGrafica:
             etiqueta = pygame.Rect(rect.x - 6, rect.y - 26, 132, 22)
             # Con la sala llena sólo quedan el índice y la fila de enemigos del panel: la barra de
             # vida de cada sprite no cabría entre dos filas de la cuadrícula.
+            esCazador = getattr(enemigo, "comportamiento", "") == "cazador"
+            tagCaz = " [CAZ]" if esCazador else ""
+            etiquetaTexto = "%d) %s%s" % (i + 1, "" if salaLlena else enemigo.nombre.upper(), tagCaz)
             self.texto(etiqueta.x + 2, etiqueta.y,
-                       _recortar(self.fuente(17),
-                                 "%d) %s" % (i + 1, "" if salaLlena else enemigo.nombre.upper()),
-                                 etiqueta.width - 4), 17,
-                       BLANCO if enemigo.activo else APAGADO, sombra=TINTA)
+                       _recortar(self.fuente(17), etiquetaTexto, etiqueta.width - 4), 17,
+                       ROJO if esCazador else (BLANCO if enemigo.activo else APAGADO), sombra=TINTA)
             if salaLlena:
                 continue
             self.barraVida(pygame.Rect(rect.x, rect.bottom + 4, rect.width, 20),
@@ -1309,9 +1561,13 @@ class VistaGrafica:
                       (rect.centerx, base.bottom - 14) if salida.direccion == "S" else
                       (base.left + 22, rect.centery) if salida.direccion == "O" else
                       (base.right - 22, rect.centery))
-            self._chip(pasado, "%s %s" % (salida.direccion, texto), tono,
-                       base.inflate(-4, -4))
-            self.zona(rect.inflate(10, 10), UI_SUBMENU,
+            costoTexto = " (%d)" % salida.costo if salida.costo != 100 else ""
+            chipRect = self._chip(pasado, "%s %s%s" % (salida.direccion, texto, costoTexto), tono,
+                                  base.inflate(-4, -4))
+            esHover = rect.collidepoint(self.posRaton) or (chipRect and chipRect.collidepoint(self.posRaton))
+            if esHover:
+                pygame.draw.rect(self.pantalla, BLANCO, rect.inflate(8, 8), 2, border_radius=6)
+            self.zona(rect.inflate(14, 14), UI_SUBMENU,
                       "abrir" if salida.cerrada else "mover")
 
     def _arena(self, ancho, alto):
@@ -1359,17 +1615,24 @@ class VistaGrafica:
                                       enemigo.etiqueta)
             self.registrar(enemigo.etiqueta, rect)
             etiqueta = pygame.Rect(x - 30, max(base.y + 6, y - 30), 96 if compacto else 150, 26)
+            esCazador = getattr(enemigo, "comportamiento", "") == "cazador"
+            tagCaz = " [CAZ]" if compacto else (" [CAZADOR]" if esCazador else "")
+            nombreTexto = ("%d)" % (i + 1) if compacto else "%d) %s" % (i + 1, enemigo.nombre.upper()))
+            if esCazador:
+                nombreTexto += tagCaz
             self.texto(etiqueta.x + 6, etiqueta.y + 3,
-                       "%d)" % (i + 1) if compacto else "%d) %s" % (i + 1, enemigo.nombre.upper()),
-                       18, BLANCO, sombra=TINTA)
+                       nombreTexto,
+                       18, ROJO if esCazador else BLANCO, sombra=TINTA)
             self.barraVida(pygame.Rect(x - 30, y + 42 if compacto else y + 64,
                                        96 if compacto else 150, 20 if compacto else 24),
                            self._valorMostrado(enemigo.etiqueta, enemigo.vida),
                            enemigo.vidaMax, "", True)
-            if self.submenu is not None and self.submenu == "objetivo" and \
-                    self.cursorSub == i:
+            areaEnemigo = rect.inflate(14, 22)
+            hover = areaEnemigo.collidepoint(self.posRaton)
+            if (self.submenu is not None and self.submenu == "objetivo" and
+                    self.cursorSub == i) or hover:
                 self._dibujarBlanco(rect)
-            self.zona(rect.inflate(14, 22), ACC_ATACAR, enemigo.indice)
+            self.zona(areaEnemigo, ACC_ATACAR, enemigo.indice)
         jugador = self.captura.jugador
         rect = self._dibujarActor("heroe_espaldas", base.x + 430, base.bottom - 168, 5,
                                   self._alpha("jugador"), "jugador")
@@ -1592,14 +1855,17 @@ class VistaGrafica:
             entrada = entradas[i]
             rect = pygame.Rect(caja.x + 18, arriba + (i - inicio) * alto, caja.width - 36, alto - 3)
             acento = _tonoEntrada(entrada)
+            esHover = rect.collidepoint(self.posRaton)
             if i == cursor:
                 self._resaltar(rect, SELECCION)
                 self.flecha(rect)
+            elif esHover and entrada.habilitada:
+                pygame.draw.rect(self.pantalla, BORDE_ACERO, rect, 1, border_radius=6)
             if entrada.habilitada:
                 self._tecla(rect, acento)
             centro = rect.y + max(2, (rect.height - fuente.get_linesize()) // 2)
             etiqueta = self.texto(rect.x + 30, centro, entrada.texto.upper(), 17,
-                                  BLANCO if i == cursor and entrada.habilitada
+                                  BLANCO if (i == cursor or esHover) and entrada.habilitada
                                   else (PERLA if entrada.habilitada else APAGADO))
             if len(entrada.marca) > 0 and rect.right - 8 - etiqueta.right > 12:
                 texto = _recortar(self.fuente(13), entrada.marca.upper(),
@@ -1642,9 +1908,12 @@ class VistaGrafica:
             rect = pygame.Rect(lista.x + 6, y, lista.width - 12, fila - 4)
             self.posicionesBolsa.append(rect)
             seleccionado = i == min(self.cursorBolsa, len(inventario.bolsillos) - 1)
+            esHover = rect.collidepoint(self.posRaton)
             if seleccionado:
                 self._resaltar(rect, SELECCION)
                 self.flecha(rect)
+            elif esHover:
+                pygame.draw.rect(self.pantalla, BORDE_ACERO, rect, 1, border_radius=6)
             self.blitear(bolsillo.ficha.sprite, rect.x + 12, rect.y + (rect.height - 32) // 2, 2,
                          255 if bolsillo.esCursor else 210)
             estado = ""
@@ -1730,8 +1999,13 @@ class VistaGrafica:
             pygame.draw.line(self.pantalla, AGUA_CLARA, (panel.x + 60, y + 24),
                              (panel.right - 60, y + 24))
             y += 34
-        self.texto(panel.centerx, panel.bottom - 34, "Z VUELVE AL TITULO", 17, ACERO,
-                   centrado=True)
+        botonVolver = pygame.Rect(panel.centerx - 130, panel.bottom - 42, 260, 30)
+        hoverVolver = botonVolver.collidepoint(self.posRaton)
+        self.caja(botonVolver, relleno=_mezclar(PANEL, tono, 0.3 if hoverVolver else 0.15),
+                  borde=tono if hoverVolver else DORADO_OSCURO, radio=6)
+        self.texto(botonVolver.centerx, botonVolver.y + 5, "VOLVER AL MENÚ [Z]", 16,
+                   BLANCO if hoverVolver else PERLA, centrado=True)
+        self.zona(botonVolver, UI_SERVICIO, "ir_portada")
 
     def _dibujarFlotantes(self):
         for entrada in self.flotantes:
@@ -1754,10 +2028,13 @@ class VistaGrafica:
         for evento in pygame.event.get():
             self._manejarEvento(evento)
         self._avanzarAnimaciones(dt)
-        if self.escena == "titulo":
+        if self.escena == "portada":
+            self._dibujarPortada()
+        elif self.escena == "titulo":
             self._dibujarTitulo()
         else:
             self._dibujarJuego()
+        self._dibujarTransicion()
         pygame.display.flip()
 
     def ejecutar(self):

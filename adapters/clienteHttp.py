@@ -117,6 +117,9 @@ class ClienteHTTP(ClienteCripta):
         idsStr = ",".join(idsCatalogo)
         return self._hacerPeticionSegura(f"/catalogo?ids={idsStr}")
 
+    def obtenerLlaves(self, idCripta: str) -> dict:
+        return self._hacerPeticionSegura(f"/criptas/{idCripta}/llaves")
+
     def obtenerSolicitudesRealizadas(self) -> int:
         return self.solicitudesRealizadas
 
@@ -128,4 +131,5 @@ class ClienteHTTP(ClienteCripta):
     obtener_esqueleto = obtenerEsqueleto
     obtener_contenido_lote = obtenerContenidoLote
     obtener_catalogo_lote = obtenerCatalogoLote
+    obtener_llaves = obtenerLlaves
     obtener_solicitudes_realizadas = obtenerSolicitudesRealizadas

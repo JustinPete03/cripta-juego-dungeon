@@ -94,6 +94,32 @@ class ClienteOffline(ClienteCripta):
     def obtenerSolicitudesRealizadas(self) -> int:
         return 0
 
+    def obtenerLlaves(self, idCripta: str) -> dict:
+        nombreLlaves = f"{idCripta}_llaves.json"
+        ruta = os.path.join(self.directorioDatos, nombreLlaves)
+        if os.path.exists(ruta):
+            return self._leerJson(nombreLlaves)
+        nombreContenido = f"{idCripta}_contenido.json"
+        rutaContenido = os.path.join(self.directorioDatos, nombreContenido)
+        if os.path.exists(rutaContenido):
+            datosContenido = self._leerJson(nombreContenido)
+            catalogoCompleto = self._leerJson("catalogo.json")
+            fichasCat = {e["id"]: e for e in catalogoCompleto.get("entidades", [])}
+            llaves = []
+            for salaReg in datosContenido.get("contenido", []):
+                sId = salaReg.get("sala")
+                for objId in salaReg.get("objetos", []):
+                    if "llave" in objId:
+                        llaves.append({"id": objId, "sala": sId})
+                for enemigoReg in salaReg.get("enemigos", []):
+                    tipoId = enemigoReg.get("tipo")
+                    ficha = fichasCat.get(tipoId, {})
+                    for sueltaId in ficha.get("suelta", []):
+                        if "llave" in sueltaId:
+                            llaves.append({"id": sueltaId, "sala": sId, "enemigo": enemigoReg.get("instancia")})
+            return {"llaves": llaves}
+        return {"llaves": []}
+
     def cuentaComoRed(self) -> bool:
         return False        # leer un archivo local no gasta presupuesto (sección 3.4)
 
@@ -105,4 +131,5 @@ class ClienteOffline(ClienteCripta):
     obtener_esqueleto = obtenerEsqueleto
     obtener_contenido_lote = obtenerContenidoLote
     obtener_catalogo_lote = obtenerCatalogoLote
+    obtener_llaves = obtenerLlaves
     obtener_solicitudes_realizadas = obtenerSolicitudesRealizadas

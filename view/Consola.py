@@ -29,14 +29,15 @@ class VistaConsola:
         salidas = []
         for salida in sala.salidas:
             estado = "cerrada" if salida.puerta.cerrada else "abierta"
-            salidas.append("%s->%s (%s)" % (salida.direccion, salida.destino.nombre, estado))
+            salidas.append("%s->%s (costo: %d, %s)" % (salida.direccion, salida.destino.nombre, salida.costo, estado))
         lineas.append("Salidas: " + ("; ".join(salidas) if len(salidas) > 0 else "ninguna"))
 
         if len(sala.enemigos) > 0:
             lineas.append("Enemigos:")
             for i in range(len(sala.enemigos)):
                 enemigo = sala.enemigos[i]
-                lineas.append("  %d) %s  vida %d/%d" % (i + 1, enemigo.etiqueta(), enemigo.vida, enemigo.vidaMax))
+                tipoCazador = " [cazador]" if enemigo.comportamiento == "cazador" else ""
+                lineas.append("  %d) %s%s  vida %d/%d" % (i + 1, enemigo.etiqueta(), tipoCazador, enemigo.vida, enemigo.vidaMax))
         if len(sala.objetos) > 0:
             lineas.append("En el suelo:")
             for i in range(len(sala.objetos)):

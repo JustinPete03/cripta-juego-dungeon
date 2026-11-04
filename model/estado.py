@@ -14,6 +14,7 @@ from model.Bitacora import BitacoraCircular
 from model.Entidades import ObjetoInstancia
 from model.efectos import efectoActivo
 from model.Salas import IndiceOrdenado
+from model.MapaConocido import MapaConocido
 
 VERSION_FORMATO = 2
 
@@ -95,6 +96,19 @@ def capturar(modelo):
         "decision": _capturarDecision(modelo),
         "enemigos": _capturarEnemigos(modelo),
         "salas": _capturarSalas(modelo),
+        "mapaConocido": _capturarMapaConocido(modelo),
+    }
+
+
+def _capturarMapaConocido(modelo):
+    if not hasattr(modelo, "mapaConocido") or modelo.mapaConocido is None:
+        return None
+    puertas = []
+    for c in modelo.mapaConocido._memoriaPuertas.claves():
+        puertas.append([c, modelo.mapaConocido._memoriaPuertas.obtener(c)])
+    return {
+        "exploradas": modelo.mapaConocido.listaExploradas(),
+        "puertas": puertas
     }
 
 
@@ -213,6 +227,12 @@ def restaurar(modelo, datos):
     modelo.reloj = datos["reloj"]
     modelo.estado = datos["estado"]
     modelo.puertaSalidaAbierta = datos["puertaSalidaAbierta"]
+    if datos.get("mapaConocido") is not None:
+        modelo.mapaConocido = MapaConocido(modelo._registrar)
+        for sId in datos["mapaConocido"]["exploradas"]:
+            modelo.mapaConocido._exploradas.guardar(sId, True)
+        for item in datos["mapaConocido"]["puertas"]:
+            modelo.mapaConocido._memoriaPuertas.guardar(item[0], item[1])
     _vaciarDiario(modelo)
 
 

@@ -12,6 +12,7 @@ FICHAS = [
     {"id": "itm_pocion", "clase": "pocion", "nombre": "Poción", "peso": 1, "valor": 5, "cura": 5},
     {"id": "itm_llave_a", "clase": "llave", "nombre": "Llave A", "peso": 1, "valor": 1, "abre": "x"},
     {"id": "itm_llave_salida", "clase": "llave", "nombre": "Llave negra", "peso": 1, "valor": 1, "abre": "y"},
+    {"id": "itm_pergamino", "clase": "pergamino_retroceso", "nombre": "Pergamino de retroceso", "peso": 1, "valor": 50},
     {"id": "trp_dardos", "clase": "trampa", "nombre": "Dardos", "daño": 4, "rearme": 300},
 ]
 
@@ -86,6 +87,10 @@ class FuentePrueba:
                 "llave_salida": "itm_llave_salida", "presupuesto_solicitudes": 9, "inventario_max": 10,
                 "jugador": {"vida_max": self.vidaJugador, "ataque": 6, "defensa": 2, "velocidad": 100}}
 
+    @property
+    def datos(self):
+        return self.datosGenerales()
+
     def esqueleto(self):
         return self.salas
 
@@ -99,6 +104,24 @@ class FuentePrueba:
             if f["id"] == tipoId:
                 return f
         raise KeyError(tipoId)
+
+    def obtenerLlaves(self):
+        llaves = []
+        for c in self.contenidos:
+            sId = c["sala"]
+            for obj in c.get("objetos", []):
+                if "llave" in obj:
+                    llaves.append({"id": obj, "sala": sId})
+            for enem in c.get("enemigos", []):
+                tipo = enem.get("tipo")
+                try:
+                    f = self.ficha(tipo)
+                    for suelta in f.get("suelta", []):
+                        if "llave" in suelta:
+                            llaves.append({"id": suelta, "sala": sId, "enemigo": enem.get("instancia")})
+                except KeyError:
+                    pass
+        return {"llaves": llaves}
 
     def anticipar(self, salaId):
         pass

@@ -11,9 +11,9 @@ from model.Acciones import Accion, accionesDesdeTexto
 from model.Interfaces import Resultado
 
 AYUDA = (
-    "Comandos: n/s/e/o (mover) | abrir <n|s|e|o> | atacar [k] | esperar | recoger [k] | soltar |\n"
+    "Comandos: n/s/e/o (mover) | ir a <sala> | mapa | abrir <n|s|e|o> | atacar [k] | esperar | recoger [k] | soltar |\n"
     "          equipar | usar | retroceso | sig | ant | inv | ordenar <peso|valor|nombre> |\n"
-    "          puntajes | guardar <archivo> | cargar <archivo> | ayuda | salir"
+    "          historia <t> | historia #k | puntajes | guardar <archivo> | cargar <archivo> | ayuda | salir"
 )
 
 
@@ -105,6 +105,29 @@ class Controlador:
         if comando in ("guardar", "cargar"):
             self._guardarCargar(comando, palabra[1] if len(palabra) > 1 else "")
             return False
+        if comando == "mapa":
+            self._mostrarMapa()
+            return False
+        if comando == "historia":
+            self._mostrarHistoria(palabra[1] if len(palabra) > 1 else "")
+            return False
+        if comando == "ir":
+            if len(palabra) == 2 and _direccion(palabra[1]) is not None:
+                pass
+            elif len(palabra) >= 2 and palabra[1] == "a":
+                if len(palabra) >= 3:
+                    self._ejecutarIrA(palabra[2])
+                    return False
+                else:
+                    self._decir("Uso: ir a <id_sala>")
+                    return False
+            elif len(palabra) == 2 and palabra[1].isdigit():
+                self._ejecutarIrA(palabra[1])
+                return False
+            elif len(palabra) >= 2:
+                destinoStr = palabra[2] if (len(palabra) >= 3 and palabra[1] == "a") else palabra[1]
+                self._ejecutarIrA(destinoStr)
+                return False
         accion = self.interpretar(texto)
         if accion is None:
             self._decir("No entiendo ese comando. Escribe 'ayuda'.")
@@ -142,6 +165,61 @@ class Controlador:
             if self.modelo.estado != EN_CURSO:
                 break
         return (True, "")
+
+    def reproducirHasta(self, lineas, hastaReloj):
+        """Reproduce la partida hasta el instante t (§3.6) y muestra el estado en ese instante."""
+        if hastaReloj < 0:
+            return (False, "El instante de reproducción no puede ser negativo (--hasta %d)." % hastaReloj)
+        numero = 0
+        for linea in lineas:
+            numero += 1
+            if len(linea.strip()) == 0:
+                continue
+            accion = accionesDesdeTexto(linea)
+            if accion is None:
+                return (False, "Línea %d no es una acción válida: %r" % (numero, linea))
+            if self.modelo.reloj >= hastaReloj or self.modelo.estado != EN_CURSO:
+                break
+            resultado = self.modelo.ejecutar(accion)
+            if not resultado.ok:
+                return (False, "Línea %d fue rechazada (%s): %s" % (numero, linea, resultado.mensaje))
+            if self.modelo.estado != EN_CURSO:
+                break
+
+        if self.modelo.reloj < hastaReloj:
+            print("La partida terminó antes del instante t=%d (terminó en reloj=%d)."
+                  % (hastaReloj, self.modelo.reloj))
+
+        tiempoConsulta = min(hastaReloj, self.modelo.reloj)
+        try:
+            resumen = self.modelo.consultarHistoriaTiempo(tiempoConsulta)
+            print(resumen)
+        except (ValueError, RuntimeError) as err:
+            print("Error en consulta histórica: %s" % err)
+        return (True, "")
+
+    def _mostrarHistoria(self, arg):
+        if not arg:
+            self._decir("Uso: historia <t> | historia #k")
+            return
+        try:
+            if arg.startswith("#"):
+                numStr = arg[1:]
+                if not numStr.isdigit():
+                    self._decir("Número de acción inválido: %s" % arg)
+                    return
+                k = int(numStr)
+                res = self.modelo.consultarHistoriaAccion(k)
+                self._decir(res)
+            else:
+                if not arg.isdigit():
+                    self._decir("Instante de tiempo inválido: %s" % arg)
+                    return
+                t = int(arg)
+                res = self.modelo.consultarHistoriaTiempo(t)
+                self._decir(res)
+        except (ValueError, RuntimeError) as err:
+            self._decir("Error en historia: %s" % err)
 
 
     def _cerrarPartida(self):
@@ -201,5 +279,91 @@ class Controlador:
             else:
                 self.guardado.cargar(self.modelo, ruta)
                 self._decir("Partida cargada desde %s." % ruta)
-        except (OSError, ValueError) as error:
+        except Exception as error:
             self._decir("No se pudo %s: %s" % (comando, error))
+
+    def _mostrarMapa(self):
+        from model.ordenamiento.Selector import ordenar
+        mapa = self.modelo.mapaConocido
+        exploradas = ordenar(mapa.listaExploradas())
+        avistadas = ordenar(mapa.listaAvistadas(self.modelo.salas))
+        lineas = ["=== MAPA CONOCIDO ==="]
+        lineas.append("Salas exploradas (%d):" % len(exploradas))
+        for sId in exploradas:
+            sala = self.modelo.salas.buscar(sId)
+            if sala is None:
+                continue
+            salidas = []
+            for s in sala.salidas:
+                pCerrada = mapa.puertaRecordadaCerrada(sala.id, s.destinoId, s.puerta)
+                estadoP = "cerrada" if pCerrada else "abierta"
+                salidas.append("%s->Sala %s (costo: %d, %s)" % (s.direccion, s.destinoId, s.costo, estadoP))
+            lineas.append("  Sala %s (%s): %s" % (sala.id, sala.nombre, "; ".join(salidas) if salidas else "sin salidas"))
+        lineas.append("Salas avistadas (%d): %s" % (len(avistadas), ", ".join(str(x) for x in avistadas) if avistadas else "ninguna"))
+        self._decir("\n".join(lineas))
+
+    def _ejecutarIrA(self, destinoStr):
+        try:
+            destId = int(destinoStr)
+        except ValueError:
+            self._decir("Identificador de sala inválido: '%s'. Debe ser un número." % destinoStr)
+            return
+
+        salaDestino = self.modelo.salas.buscar(destId)
+        if salaDestino is None:
+            self._decir("La sala %s no existe en la cripta." % destinoStr)
+            return
+
+        if not self.modelo.mapaConocido.estaExplorada(destId):
+            self._decir("ir a hacia una sala no explorada: se rechaza y no consume tiempo.")
+            return
+
+        if self.modelo.jugador.sala.id == destId:
+            self._decir("Ya estás en la sala %s." % destId)
+            return
+
+        if self.registro is not None and hasattr(self.registro, "registrarComentario"):
+            self.registro.registrarComentario("ir a %s" % destId)
+
+        from model.Dijkstra import elegirPasoViajeAutomatico
+        from model.Constantes import ACC_MOVER
+        from model.Acciones import Accion
+
+        while self.modelo.estado == EN_CURSO and self.modelo.jugador.sala.id != destId:
+            # 1. Comprobar si hay enemigos en la sala actual
+            if len(self.modelo.jugador.sala.enemigos) > 0:
+                self._decir("El viaje se detiene: la sala contiene enemigos.")
+                break
+
+            # 2. Calcular siguiente paso sobre subgrafo conocido
+            salida, costo = elegirPasoViajeAutomatico(
+                self.modelo.jugador.sala, salaDestino, self.modelo.salas, self.modelo.mapaConocido
+            )
+            if salida is None:
+                self._decir("El viaje se detiene: no existe ruta conocida abierta hacia %s." % salaDestino.nombre)
+                break
+
+            vidaAntes = self.modelo.jugador.vida
+
+            # 3. Ejecutar acción de movimiento ordinaria
+            accion = Accion(ACC_MOVER, salida.direccion)
+            res = self.ejecutarAccion(accion)
+            if not res.ok:
+                self._decir("El viaje se detiene: %s" % res.mensaje)
+                break
+
+            # 4. Paradas tras el paso (§3.4)
+            if self.modelo.jugador.sala.id == destId:
+                self._decir("Has llegado a tu destino: %s." % salaDestino.nombre)
+                break
+
+            if self.modelo.jugador.vida < vidaAntes:
+                self._decir("El viaje se detiene: has recibido daño.")
+                break
+
+            if len(self.modelo.jugador.sala.enemigos) > 0:
+                self._decir("El viaje se detiene: la sala contiene enemigos.")
+                break
+
+            if self.modelo.estado != EN_CURSO:
+                break

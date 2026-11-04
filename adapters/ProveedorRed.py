@@ -59,6 +59,9 @@ class ProveedorRed(ProveedorDatos):
     def esqueleto(self):
         return self.salas
 
+    def obtenerLlaves(self):
+        return self.gestor.obtenerLlaves(self.datos["id"])
+
     def contenidoSala(self, salaId):
         self._protegerEnUso()
         c = self.gestor.asegurarContenidoSala(salaId, self.salas)

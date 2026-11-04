@@ -156,6 +156,10 @@ class GestorRedPrecarga:
 
             self.asegurarCatalogo(idsCatalogo)
 
+    def obtenerLlaves(self, idCripta: str) -> dict:
+        self._reservar(1)
+        return self.cliente.obtenerLlaves(idCripta)
+
     def asegurarCatalogo(self, idsFichas: list):
         """Pide en lotes de 10 solo las fichas que faltan en RAM y en disco."""
         vistos = Conjunto()

@@ -22,6 +22,9 @@ from model.Entidades import (Sala, Salida, Puerta, Jugador, Enemigo, ObjetoInsta
                               ordenarEnemigosPorInstancia)
 from model.Interfaces import Resultado, DiarioNulo, EfectosBase, SinDatos
 from model.Rastro import elegirDestinoRastreador
+from model.Dijkstra import dijkstraDesde
+from model.Cazador import elegirPasoCazador
+from model.MapaConocido import MapaConocido
 from model import estado
 
 
@@ -34,12 +37,13 @@ class ResultadoPartida:
 
 
 class Modelo:
-    def __init__(self, proveedor, semilla, inventario, diario=None, efectos=None):
+    def __init__(self, proveedor, semilla, inventario, diario=None, efectos=None, kCheckpoint=20):
         self.proveedor = proveedor
         self.semilla = semilla
         self.inventario = inventario
         self.diario = diario if diario is not None else DiarioNulo()
         self.efectos = efectos if efectos is not None else EfectosBase()
+        self.kCheckpoint = kCheckpoint
 
         # Tabla de manejadores indexada por tipo de evento (
         self._manejadores = [None] * CANTIDAD_TIPOS_EVENTO
@@ -65,6 +69,17 @@ class Modelo:
         self.llaveSalida = None
         self.siguienteSerieObjeto = 0
         self._grabando = False
+        self._rutasCazadorValidas = False
+        self._distanciasCazador = None
+        self.mapaConocido = MapaConocido(self._registrar)
+        from model.LineaTiempo import LineaTiempo
+        self.lineaTiempo = LineaTiempo(k=getattr(self, "kCheckpoint", 20))
+
+    def _obtenerDistanciasCazador(self):
+        if not self._rutasCazadorValidas or self._distanciasCazador is None:
+            self._distanciasCazador = dijkstraDesde(self.jugador.sala, self.salas)
+            self._rutasCazadorValidas = True
+        return self._distanciasCazador
 
     def reiniciar(self):
         # El cargado descarta la partida en curso antes de reconstruir el mundo desde el archivo.
@@ -170,6 +185,7 @@ class Modelo:
         self._asegurarContenido(inicial)
         self.jugador.sala = inicial
         inicial.rastro = 0
+        self.mapaConocido.explorarSala(inicial)
 
         evento = self.agenda.programar(0, EV_JUGADOR, self.jugador)
         self.jugador.evento = evento
@@ -178,6 +194,8 @@ class Modelo:
         self.proveedor.anticipar(inicial.id)
         self.mensaje("Comienza la partida en: %s." % inicial.nombre)
         self._correrHastaDecision()
+        if getattr(self, "lineaTiempo", None) is not None:
+            self.lineaTiempo.registrarPuntoControl(0, self.reloj, self.capturarEstado())
 
     def _construirSalas(self, esqueleto):
         for datos in esqueleto:
@@ -190,7 +208,8 @@ class Modelo:
                     puerta = Puerta(bool(info.get("cerrada", False)),
                                     info.get("llave"),
                                     info.get("cierre_automatico"))
-                    sala.salidas.append(Salida(direccion, sala, info["sala"], puerta))
+                    costo = info.get("costo", 100)
+                    sala.salidas.append(Salida(direccion, sala, info["sala"], puerta, costo))
 
         cantidad = self.salas.cantidad()
         for i in range(cantidad):
@@ -207,14 +226,20 @@ class Modelo:
             sala = self.salas.enPosicion(i)
             for salida in sala.salidas:
                 inversa = salida.destino.salida(direccionOpuesta(salida.direccion))
-                if inversa is not None and inversa.destino is sala and inversa.puerta is not salida.puerta:
-                    a = salida.puerta
-                    b = inversa.puerta
-                    unida = Puerta(a.cerrada or b.cerrada,
-                                   a.llave if a.llave is not None else b.llave,
-                                   a.cierreAutomatico if a.cierreAutomatico else b.cierreAutomatico)
-                    salida.puerta = unida
-                    inversa.puerta = unida
+                if inversa is not None and inversa.destino is sala:
+                    if inversa.puerta is not salida.puerta:
+                        a = salida.puerta
+                        b = inversa.puerta
+                        unida = Puerta(a.cerrada or b.cerrada,
+                                       a.llave if a.llave is not None else b.llave,
+                                       a.cierreAutomatico if a.cierreAutomatico else b.cierreAutomatico)
+                        salida.puerta = unida
+                        inversa.puerta = unida
+                    # El costo es el mismo en ambos sentidos (§3.1)
+                    if salida.costo != 100 and inversa.costo == 100:
+                        inversa.costo = salida.costo
+                    elif inversa.costo != 100 and salida.costo == 100:
+                        salida.costo = inversa.costo
 
     def _asegurarContenido(self, sala):
         #Incorpora el contenido al modelo (sin activar enemigos). Puede bloquear en red;
@@ -234,9 +259,11 @@ class Modelo:
         for datos in contenido["enemigos"]:
             ficha = self.proveedor.ficha(datos["tipo"])
             vida = datos.get("vida", ficha["vida_max"])
+            rango = ficha.get("rango", 0)
             enemigo = Enemigo(datos["instancia"], datos["tipo"], ficha["nombre"],
                               ficha["comportamiento"], vida, ficha["vida_max"],
-                              ficha["ataque"], ficha["defensa"], ficha["velocidad"])
+                              ficha["ataque"], ficha["defensa"], ficha["velocidad"],
+                              rango)
             enemigo.sala = sala
             nuevosEnemigos.append(enemigo)
         serieInicial = self.siguienteSerieObjeto
@@ -313,7 +340,13 @@ class Modelo:
             self.diario.registrar(restaurarContadores)
         self.asignar(self, "eventoDecision", None)   # la inversa restaura el evento del jugador
 
-        self._programarSiguienteJugador(COSTOS[tipo])
+        costo = COSTOS[tipo]
+        if tipo == ACC_MOVER:
+            salida = self.jugador.sala.salida(accion.argumento)
+            if salida is not None:
+                costo = salida.costo
+
+        self._programarSiguienteJugador(costo)
         self.asignar(self.jugador, "acciones", self.jugador.acciones + 1)
         self._aplicar(accion)
         if self.estado == EN_CURSO:
@@ -323,17 +356,93 @@ class Modelo:
 
         self.diario.cerrarIntervalo()
         self._grabando = False
+
+        if getattr(self, "lineaTiempo", None) is not None:
+            self.lineaTiempo.registrarAccion(self.jugador.acciones, accion, relojAnterior)
+            if self.lineaTiempo.debeCrearPuntoControl(self.jugador.acciones):
+                self.lineaTiempo.registrarPuntoControl(self.jugador.acciones, self.reloj, self.capturarEstado())
+
         return Resultado(True, "", True)
 
     def _retroceder(self):
         self._grabando = False
+        self._rutasCazadorValidas = False
         resultado = self.diario.retroceder(self)
         if resultado.ok:
+            if getattr(self, "lineaTiempo", None) is not None:
+                self.lineaTiempo.recortar(self.jugador.acciones)
             self.mensaje("El tiempo retrocede.")
             resultado.registrable = True
         else:
             self.mensaje(resultado.mensaje)
         return resultado
+
+    def _correrEventosHasta(self, tiempoTope):
+        """Ejecuta eventos con tiempo <= tiempoTope (§3.6)."""
+        while self.estado == EN_CURSO:
+            proximo = self.agenda.mirar()
+            if proximo is None:
+                break
+            if proximo.tiempo > tiempoTope:
+                break
+            if proximo.tipo == EV_JUGADOR:
+                evento = self.agenda.proximo()
+                self.reloj = evento.tiempo
+                self.asignar(self, "eventoDecision", evento)
+                self.asignar(self.jugador, "evento", None)
+                return
+            evento = self.agenda.proximo()
+            self.reloj = evento.tiempo
+            manejador = self._manejadores[evento.tipo]
+            if manejador:
+                manejador(evento)
+        if self.reloj < tiempoTope:
+            self.reloj = tiempoTope
+
+    def ejecutarHasta(self, accion, tiempoTope):
+        """Ejecuta una acción y corre eventos hasta tiempoTope (para re-simulación)."""
+        if self.estado != EN_CURSO:
+            return Resultado(False, "La partida ya terminó.")
+        tipo = accion.tipo
+        if tipo == ACC_RETROCESO:
+            return self._retroceder()
+        if tipo == ACC_SIGUIENTE:
+            self.inventario.avanzar()
+            return Resultado(True, "", True)
+        if tipo == ACC_ANTERIOR:
+            self.inventario.retroceder()
+            return Resultado(True, "", True)
+
+        validacion = self._validar(accion)
+        if not validacion.ok:
+            self.mensaje(validacion.mensaje)
+            return validacion
+
+        self.asignar(self, "eventoDecision", None)
+        costo = COSTOS[tipo]
+        if tipo == ACC_MOVER:
+            salida = self.jugador.sala.salida(accion.argumento)
+            if salida is not None:
+                costo = salida.costo
+
+        self._programarSiguienteJugador(costo)
+        self.asignar(self.jugador, "acciones", self.jugador.acciones + 1)
+        self._aplicar(accion)
+        if self.estado == EN_CURSO:
+            self.asignar(self.jugador.sala, "rastro", self.reloj)
+            self._correrEventosHasta(tiempoTope)
+
+        return Resultado(True, "", True)
+
+    def consultarHistoriaAccion(self, k):
+        if getattr(self, "lineaTiempo", None) is not None:
+            return self.lineaTiempo.consultarAccion(self, k)
+        raise RuntimeError("Línea de tiempo no configurada.")
+
+    def consultarHistoriaTiempo(self, t):
+        if getattr(self, "lineaTiempo", None) is not None:
+            return self.lineaTiempo.consultarTiempo(self, t)
+        raise RuntimeError("Línea de tiempo no configurada.")
 
     def _programarSiguienteJugador(self, costo):
         jugador = self.jugador
@@ -394,6 +503,11 @@ class Modelo:
         destino = origen.salida(direccion).destino
         self.asignar(self.jugador, "sala", destino)
         self.asignar(destino, "rastro", self.reloj)
+        self._rutasCazadorValidas = False
+        self.mapaConocido.explorarSala(destino)
+        if hasattr(self.efectos, "antorchaEncendida") and self.efectos.antorchaEncendida(self.jugador):
+            for salida in destino.salidas:
+                self.mapaConocido.explorarSala(salida.destino)
         self.mensaje("Entras a: %s." % destino.nombre)
         self._activarDormidos(destino)
         self._activarTrampas(destino)
@@ -408,6 +522,8 @@ class Modelo:
         salida = origen.salida(direccion)
         puerta = salida.puerta
         self.asignar(puerta, "cerrada", False)
+        self._rutasCazadorValidas = False
+        self.mapaConocido.actualizarPuertasObservadas(origen)
         self.mensaje("Abres la puerta hacia %s." % direccion)
         if puerta.cierreAutomatico:
             evento = self.agenda.programar(self.reloj + puerta.cierreAutomatico,
@@ -491,8 +607,8 @@ class Modelo:
             self._programarEnemigo(enemigo)
             self.efectos.alActivarEnemigo(self, enemigo)
 
-    def _programarEnemigo(self, enemigo):
-        tiempo = self.reloj + intervaloAccion(COSTO_ACCION_ENEMIGO, enemigo.velocidad)
+    def _programarEnemigo(self, enemigo, costo=COSTO_ACCION_ENEMIGO):
+        tiempo = self.reloj + intervaloAccion(costo, enemigo.velocidad)
         evento = self.agenda.programar(tiempo, EV_ENEMIGO, enemigo)
         self.asignar(enemigo, "evento", evento)
         self.asignar(enemigo, "tiempoSiguiente", tiempo)
@@ -501,12 +617,13 @@ class Modelo:
         enemigo = evento.propietario
         if not enemigo.vivo:
             return
+        costo = COSTO_ACCION_ENEMIGO
         if enemigo.sala is self.jugador.sala:
             self._enemigoAtaca(enemigo)
         else:
-            self._enemigoSeComporta(enemigo)
+            costo = self._enemigoSeComporta(enemigo)
         if self.estado == EN_CURSO and enemigo.vivo:
-            self._programarEnemigo(enemigo)
+            self._programarEnemigo(enemigo, costo)
 
     def _enemigoAtaca(self, enemigo):
         jugador = self.jugador
@@ -524,10 +641,26 @@ class Modelo:
             if len(abiertas) > 0:
                 elegida = abiertas[self.azar.randrange(len(abiertas))]
                 self._moverEnemigo(enemigo, elegida.destino)
+                return elegida.costo
+            return COSTO_ACCION_ENEMIGO
         elif comportamiento == "rastreador":
             destino = elegirDestinoRastreador(enemigo.sala, self.reloj)
             if destino is not None:
+                salida = None
+                for s in enemigo.sala.salidas:
+                    if s.destino is destino:
+                        salida = s
+                        break
                 self._moverEnemigo(enemigo, destino)
+                return salida.costo if salida is not None else COSTO_ACCION_ENEMIGO
+            return COSTO_ACCION_ENEMIGO
+        elif comportamiento == "cazador":
+            distancias = self._obtenerDistanciasCazador()
+            salida, costo = elegirPasoCazador(enemigo, self.jugador.sala, distancias)
+            if salida is not None:
+                self._moverEnemigo(enemigo, salida.destino)
+            return costo
+        return COSTO_ACCION_ENEMIGO
 
     def _moverEnemigo(self, enemigo, destino):
         origen = enemigo.sala
@@ -563,6 +696,12 @@ class Modelo:
         puerta = evento.propietario
         self.asignar(puerta, "cerrada", True)    # quien está al otro lado permanece allí
         self.asignar(puerta, "eventoCierre", None)
+        self._rutasCazadorValidas = False
+        if self.jugador is not None and self.jugador.sala is not None:
+            for salida in self.jugador.sala.salidas:
+                if salida.puerta is puerta:
+                    self.mapaConocido.actualizarPuertasObservadas(self.jugador.sala)
+                    break
 
     # Consultas
     def fichasEnUso(self):

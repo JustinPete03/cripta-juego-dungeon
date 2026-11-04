@@ -12,12 +12,13 @@ class Puerta:
 
 
 class Salida:
-    def __init__(self, direccion, origen, destinoId, puerta):
+    def __init__(self, direccion, origen, destinoId, puerta, costo=100):
         self.direccion = direccion
         self.origen = origen
         self.destinoId = destinoId
         self.destino = None          # referencia directa a la Sala (rastro en O(salidas))
         self.puerta = puerta
+        self.costo = costo           # costo de tránsito (§3.1 Parte II, default 100)
 
 
 class Sala:
@@ -76,12 +77,13 @@ class Jugador(Actor):
 
 class Enemigo(Actor):
     def __init__(self, instancia, tipoId, nombre, comportamiento,
-                 vida, vidaMax, ataque, defensa, velocidad):
+                 vida, vidaMax, ataque, defensa, velocidad, rango=0):
         Actor.__init__(self, vida, vidaMax, ataque, defensa, velocidad)
         self.instancia = instancia
         self.tipoId = tipoId
         self.nombre = nombre
         self.comportamiento = comportamiento
+        self.rango = rango
         self.sala = None
         self.activo = False
 

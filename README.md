@@ -70,9 +70,14 @@ Todos los comandos se ejecutan desde la raíz del proyecto
 | `python main.py --puntajes` | Muestra la tabla de puntajes locales sin iniciar una partida |
 | `python main.py --cache-size 10` | Cambia el tope de fichas de catálogo en memoria (por defecto 25) |
 | `python main.py --log mi_partida.log` | Elige el archivo de bitácora de la partida (por defecto `partida.log`) |
+| `python main.py --verificar <id>` | Verifica la resolubilidad de la cripta y sale (código 0 o 1) sin abrir la vista (§3.5) |
+| `python main.py --forzar` | Permite iniciar la partida aunque la cripta se reporte como no resoluble (§3.5) |
+| `python main.py --checkpoint-cada K` | Frecuencia de puntos de control de la línea de tiempo (por defecto $K=20$) (§3.6, §5.5) |
+| `python main.py --replay partida.log --hasta <t>` | Reproduce la bitácora hasta el instante $t$ e imprime el resumen de historia sin vista (§3.6) |
 
-Banderas disponibles: `--consola`, `--bench`, `--offline DIR`, `--replay LOG`, `--gui`,
-`--puntajes`, `--cache-size N`, `--cripta ID`, `--semilla N`, `--nombre NOMBRE`, `--log ARCHIVO`.
+Banderas disponibles: `--consola`, `--bench`, `--offline DIR`, `--replay LOG`, `--hasta T`, `--gui`,
+`--puntajes`, `--cache-size N`, `--cripta ID`, `--semilla N`, `--nombre NOMBRE`, `--log ARCHIVO`,
+`--verificar [ID]`, `--forzar`, `--checkpoint-cada K`.
 
 > **Importante:** cada partida nueva **sobrescribe** el archivo de bitácora indicado con `--log`.
 > Copie `partida.log` con otro nombre antes de jugar de nuevo si quiere conservarlo.
@@ -84,6 +89,10 @@ El modo texto se abre con `--consola`; sin esa bandera `python main.py` lanza la
 | Comando | Acción |
 |---|---|
 | `n` / `s` / `e` / `o` | Moverse al norte, sur, este u oeste |
+| `ir a <sala>` | Viaje automático paso a paso hacia una sala conocida (§3.4) |
+| `mapa` | Muestra el mapa conocido (salas exploradas, avistadas y memoria de puertas) (§3.3) |
+| `historia <t>` | Muestra el estado del juego en el instante $t$ sin alterar la partida viva (§3.6) |
+| `historia #k` | Muestra el estado del juego justo antes de la acción número $k$ (§3.6) |
 | `abrir <n\|s\|e\|o>` | Abrir una puerta cerrada con la llave correspondiente |
 | `atacar [k]` | Atacar al enemigo número *k* de la sala (por defecto el 1) |
 | `esperar` (o `z`) | Pasar tiempo sin hacer nada |
@@ -98,6 +107,27 @@ El modo texto se abre con `--consola`; sin esa bandera `python main.py` lanza la
 | `guardar <archivo>` / `cargar <archivo>` | Guardado y carga de la partida (ver *Estado*) |
 | `ayuda` | Mostrar la ayuda |
 | `salir` (o `q`) | Terminar la sesión de forma controlada |
+
+---
+
+## Metodología y Desarrollo Parte II (SDD / Spec-Kit)
+
+- **Metodología**: Specification-Driven Development (SDD) con GitHub Spec-Kit (`.specify/memory/constitution.md` y `specs/<NNN-capacidad>/`).
+- **Agente LLM utilizado**: Antigravity (Google DeepMind).
+- **Trazabilidad**: Cada capacidad cuenta con su `spec.md` (requisitos funcionales `FR-xxx`, historias de usuario y escenarios de aceptación del Apéndice B), `plan.md` (estructuras de datos propias, análisis de complejidad y módulos) y `tasks.md` (tareas verificables).
+
+### Cómo ejecutar las pruebas de aceptación
+
+```bash
+# Ejecutar la suite completa (214 pruebas automatizadas)
+python -m pytest
+
+# Ejecutar pruebas por capacidad específica de la Parte II:
+python -m pytest tests/test_terreno_cazador.py   # Capacidad 1: Terreno y Cazadores (FR-001 a FR-010)
+python -m pytest tests/test_niebla_viaje.py     # Capacidad 2: Niebla y Viaje 'ir a' (FR-011 a FR-020)
+python -m pytest tests/test_resolubilidad.py    # Capacidad 3: Verificación de Resolubilidad (FR-021 a FR-028)
+python -m pytest tests/test_linea_tiempo.py     # Capacidad 4: Línea de Tiempo y Checkpoints (FR-029 a FR-038)
+```
 
 `recoger` y `atacar` reciben el **número** que aparece en pantalla, no el nombre.
 `equipar`, `usar` y `soltar` actúan sobre el objeto que aparece como *«viendo»*; use `sig` y
