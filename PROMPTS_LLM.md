@@ -1294,3 +1294,14 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   Implementación completa de la Capacidad 4 con 214 pruebas pasando al 100%, verificación de PR-007 (3.57 ms < 50 ms) y documentación completa de las secciones 5.5 y 5.6.
 
 
+
+---
+
+### Entrada 2026-11-08 / Claude (Anthropic) — Keilor Baltodano
+* **Fecha**: 2026-11-08
+* **Herramienta**: Claude (Anthropic), en conversación con acceso a la carpeta del repositorio
+* **Comando / Prompt**:
+  Revisión de la Parte II con el enunciado, el reparto y el repositorio adjuntos: «Tengo que hacer este proyecto, el cual es una continuación del primero. Debo trabajar según la división de trabajo, yo soy Keilor.», seguido de «Y revisión en general de todas las partes?», «Dame un pdf con las correcciones exactas y cómo resolverlas exactamente.» y «Puedes hacerlo tú desde mi computadora?» (redactar el borrador de la especificación 005).
+* **Uso de la respuesta**:
+  Informe de revisión con hallazgos por capacidad (K-01 a K-07 para rutas e invalidación). Creación de la rama `005-rutas-e-invalidacion` y del borrador `specs/005-rutas-e-invalidacion/spec.md` (FR-039 a FR-047, PR-009 y PR-010), que queda pendiente de revisión propia y de `/speckit.clarify`. Este borrador no se generó con `/speckit.specify` porque spec-kit todavía no está instalado en el repositorio (hallazgo P-01).
+  Ajuste posterior (mismo día): con el acuerdo del grupo, se asignó a 005 la equivalencia observable ante cambios del mapa (incluido el caso del Apéndice B de la puerta que se cierra entre turnos), se decidió compartir la búsqueda de rutas entre el cazador e «ir a», y se registraron las clarificaciones Q1 a Q5.
