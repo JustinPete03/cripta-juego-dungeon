@@ -1305,3 +1305,13 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 * **Uso de la respuesta**:
   Informe de revisión con hallazgos por capacidad (K-01 a K-07 para rutas e invalidación). Creación de la rama `005-rutas-e-invalidacion` y del borrador `specs/005-rutas-e-invalidacion/spec.md` (FR-039 a FR-047, PR-009 y PR-010), que queda pendiente de revisión propia y de `/speckit.clarify`. Este borrador no se generó con `/speckit.specify` porque spec-kit todavía no está instalado en el repositorio (hallazgo P-01).
   Ajuste posterior (mismo día): con el acuerdo del grupo, se asignó a 005 la equivalencia observable ante cambios del mapa (incluido el caso del Apéndice B de la puerta que se cierra entre turnos), se decidió compartir la búsqueda de rutas entre el cazador e «ir a», y se registraron las clarificaciones Q1 a Q5.
+
+---
+
+### Entrada 2026-11-08 / Claude (Anthropic) — Keilor Baltodano
+* **Fecha**: 2026-11-08
+* **Herramienta**: Claude (Anthropic), en conversación con acceso a la carpeta del repositorio
+* **Comando / Prompt**:
+  «Hazlo con las mejores decisiones para que todo esté correcto y funcional» (redactar `plan.md` de la especificación 005).
+* **Uso de la respuesta**:
+  Borrador de `specs/005-rutas-e-invalidacion/plan.md`: núcleo único de Dijkstra para el cazador y para «ir a», búsqueda compartida acotada al mayor rango activo, arreglo de distancias con sellos (a confirmar con el bench), componente de rutas con invalidación fina, interfaces con Justin y Jurnier, y mediciones planificadas. Pendiente de revisión propia.
