@@ -108,8 +108,9 @@ Nuevo módulo `model/RutasCazador.py`, dueño de la caché que hoy son la bander
 
 ```text
 model/Dijkstra.py
-  calcularDistancias(origen, cantidadSalas, puedeUsar, cota=None) -> Distancias
+  calcularDistancias(origen, puedeUsar, cota=None, cantidadSalas=None) -> Distancias
       origen: Sala; puedeUsar(salaActual, salida) -> bool; cota: int o None
+      cantidadSalas: solo para el arreglo con sellos (T005); mientras tanto Distancias usa Tabla
   Distancias.de(sala) -> int o None          # None = desconocida o mayor que la cota
   Distancias.salasExaminadas -> int          # para medir PR-010
   elegirPrimerPaso(sala, distancias, puedeUsar) -> Salida o None
