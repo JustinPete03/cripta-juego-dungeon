@@ -189,3 +189,110 @@ def elegirPasoViajeAutomatico(salaActual, salaDestino, salasIndice, mapaConocido
         return (mejorSalida, mejorSalida.costo)
 
     return (None, None)
+
+
+# ============================================================================================
+# Núcleo único de búsqueda de rutas (spec 005; plan 005, D1 a D4; tareas T006 y T007).
+#
+# Lo usan el cazador (desde la sala del jugador, con salidas realmente abiertas y cota = mayor
+# rango activo) y «ir a» (desde el destino, con el conocimiento del jugador y sin cota). Las
+# funciones anteriores (dijkstraDesde, dijkstraSubgrafoConocido) se mantienen hasta que nadie
+# las use (T020).
+# ============================================================================================
+
+def puertaAbierta(sala, salida):
+    """Regla del cazador para `puedeUsar`: solo salidas abiertas en este instante (FR-043)."""
+    return not salida.puerta.cerrada
+
+
+class Distancias:
+    """Resultado de una búsqueda: costo mínimo de cada sala al origen (plan 005, D2 y D3).
+
+    Por ahora guarda las distancias en una Tabla; el arreglo con sellos (T005) la reemplaza por
+    dentro sin cambiar esta interfaz. Toda lectura pasa por `de()`.
+    """
+
+    def __init__(self, cota=None):
+        self._valores = Tabla()
+        self.cota = cota
+        self.salasExaminadas = 0       # salas extraídas y expandidas (para medir PR-010)
+
+    def de(self, sala):
+        """Distancia de `sala` al origen, o None si es desconocida.
+
+        Un valor mayor que la cota también es desconocido: por la eliminación perezosa, al
+        cortar la búsqueda pueden quedar valores provisionales que no son la distancia real.
+        """
+        valor = self._valores.obtener(sala.id)
+        if valor is None:
+            return None
+        if self.cota is not None and valor > self.cota:
+            return None
+        return valor
+
+    def __len__(self):
+        """Salas con algún valor registrado (definitivo o provisional)."""
+        return len(self._valores)
+
+
+def calcularDistancias(origen, puedeUsar, cota=None, cantidadSalas=None):
+    """Dijkstra con montículo propio y eliminación perezosa (plan 005, D1).
+
+    origen: Sala desde la que se mide.
+    puedeUsar(sala, salida) -> bool: decide si la búsqueda puede usar esa salida.
+    cota: si no es None, la búsqueda se detiene al extraer una distancia mayor (D2, PR-010).
+    cantidadSalas: reservado para el arreglo con sellos (T005); hoy no se usa.
+
+    Recorre con `salida.destino`, sin buscar salas por id en el índice. Complejidad
+    O((V + E) log E) sobre las V salas y E salidas que quedan dentro de la cota.
+    """
+    distancias = Distancias(cota)
+    valores = distancias._valores
+    salaPorId = Tabla()                # id -> Sala, para recuperar la sala al extraer del montículo
+    valores.guardar(origen.id, 0)
+    salaPorId.guardar(origen.id, origen)
+    heap = MinHeapDijkstra()
+    heap.empujar(0, origen.id)
+
+    while not heap.estaVacio():
+        d, uId = heap.extraerMin()
+        if d > valores.obtener(uId):
+            continue                   # entrada vieja: ya se encontró un camino más corto
+        if cota is not None and d > cota:
+            break                      # todo lo que queda en el montículo es aún más caro
+        distancias.salasExaminadas += 1
+        u = salaPorId.obtener(uId)
+        for salida in u.salidas:
+            if not puedeUsar(u, salida):
+                continue
+            v = salida.destino
+            if v is None:
+                continue
+            nueva = d + salida.costo
+            actual = valores.obtener(v.id)
+            if actual is None or nueva < actual:
+                valores.guardar(v.id, nueva)
+                salaPorId.guardar(v.id, v)
+                heap.empujar(nueva, v.id)
+    return distancias
+
+
+def elegirPrimerPaso(sala, distancias, puedeUsar):
+    d = distancias.de(sala)
+    if d is None:
+        return None
+    mejor = None
+    for salida in sala.salidas:
+        if not puedeUsar(sala, salida):
+            continue
+        v = salida.destino
+        if v is None:
+            continue
+        dv = distancias.de(v)
+        if dv is None or salida.costo + dv != d:
+            continue
+        # Se reemplaza solo si es estrictamente mejor, así gana la primera en orden N, S, E, O
+        if (mejor is None or v.id < mejor.destino.id
+                or (v.id == mejor.destino.id and salida.costo < mejor.costo)):
+            mejor = salida
+    return mejor

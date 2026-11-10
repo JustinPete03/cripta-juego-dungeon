@@ -24,10 +24,10 @@ Convenciones:
 
 ## Fase 3: Núcleo de búsqueda (`model/Dijkstra.py`)
 
-- [ ] **T005** [PR-010] Clase `Distancias`: listas de distancia y de sello del tamaño de la cripta, creadas una vez; `de(sala)` devuelve `None` si el sello no es el de la búsqueda actual o si la distancia supera la cota; `salasExaminadas`. **Depende de** T004.
-- [ ] **T006** [FR-043, PR-010] `calcularDistancias(origen, cantidadSalas, puedeUsar, cota=None)`: Dijkstra con `MinHeapDijkstra` y eliminación perezosa; recorre con `salida.destino`; se detiene al extraer una distancia mayor que la cota. **Depende de** T005.
-- [ ] **T007** [FR-042, FR-044] `elegirPrimerPaso(sala, distancias, puedeUsar)`: vecina de menor id que cumple `costo + dist(v) = d`; hacia ella, la salida más barata, y si empatan, la primera en orden N, S, E, O (spec Q4). **Depende de** T006.
-- [ ] **T008** [FR-042, FR-043] Pruebas del núcleo en `tests/test_rutas_invalidacion.py`: grafo con pesos; cuadrícula con todas las rutas de igual costo (US-1 escenario 10); dos salidas hacia la misma vecina (Q4); corte por cota sin cambiar decisiones dentro de ella. **Depende de** T007.
+- [ ] **T005** [PR-010] Arreglo con sellos dentro de `Distancias`: listas de distancia y de sello del tamaño de la cripta, creadas una vez; `de(sala)` devuelve `None` si el sello no es el de la búsqueda actual o si la distancia supera la cota. **Depende de** T004. *(Mientras tanto, `Distancias` guarda los valores en una `Tabla`; su interfaz no cambia.)*
+- [x] **T006** [FR-043, PR-010] `calcularDistancias(origen, puedeUsar, cota=None, cantidadSalas=None)`: Dijkstra con `MinHeapDijkstra` y eliminación perezosa; recorre con `salida.destino`; se detiene al extraer una distancia mayor que la cota. **Depende de**: nada; usa `Distancias` con `Tabla` y T005 la optimiza después.
+- [x] **T007** [FR-042, FR-044] `elegirPrimerPaso(sala, distancias, puedeUsar)`: vecina de menor id que cumple `costo + dist(v) = d`; hacia ella, la salida más barata, y si empatan, la primera en orden N, S, E, O (spec Q4). **Depende de** T006.
+- [x] **T008** [FR-042, FR-043] Pruebas del núcleo en `tests/test_rutas_invalidacion.py`: grafo con pesos; cuadrícula con todas las rutas de igual costo (US-1 escenario 10); dos salidas hacia la misma vecina (Q4); corte por cota sin cambiar decisiones dentro de ella. **Depende de** T007.
 
 ## Fase 4: Cazador con cota (`model/Cazador.py`)
 

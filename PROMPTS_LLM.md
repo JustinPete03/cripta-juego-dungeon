@@ -1325,3 +1325,13 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   «Haz los siguientes dos en un mismo paso» (redactar `tasks.md` de la especificación 005 y rehacer `bench/BenchCazador.py`, tareas T001 y T002).
 * **Uso de la respuesta**:
   `specs/005-rutas-e-invalidacion/tasks.md` (T001 a T026, con requisitos y dependencias). `bench/BenchCazador.py` reescrito: cálculo individual correcto y verificado contra el compartido, rango pequeño frente a grande en criptas de 100 a 5041 salas, modelo real con cazadores activados y contadores, escenarios de puertas A, B y C, y ciclo de eventos con 30 y 60 cazadores. Línea base guardada en `mediciones-antes.txt`: con el código actual, el ciclo de eventos en una cuadrícula de 900 salas con puertas que cambian supera los 20 ms en el peor caso.
+
+---
+
+### Entrada 2026-11-10 / Claude (Anthropic) — Keilor Baltodano
+* **Fecha**: 2026-11-10
+* **Herramienta**: Claude (Anthropic), en conversación con acceso a la carpeta del repositorio
+* **Comando / Prompt**:
+  «Sigamos. Qué debo hacer ahora. Explícame y guíame.» y luego «Puedes hacer esos cambios y yo hago el commit.» (tareas T006 a T008 de la especificación 005).
+* **Uso de la respuesta**:
+  Explicación del núcleo de búsqueda común y su implementación en `model/Dijkstra.py`: `Distancias` (con `Tabla` hasta T005), `calcularDistancias` con regla `puedeUsar` y cota, `elegirPrimerPaso` con el desempate de §3.2 y la decisión Q4, y `puertaAbierta`. Once pruebas nuevas en `tests/test_rutas_invalidacion.py`. Ajuste de la firma en el contrato de `plan.md` y del estado de T005 a T008 en `tasks.md`.
