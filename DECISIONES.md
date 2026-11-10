@@ -555,76 +555,132 @@ El binario pesa más que JSON con estos datos, entre un 37 % y un 55 % más, y l
 
 ## 5.1 La ruta más barata del cazador
 
-* **Especificación**: [specs/001-terreno-y-cazador/spec.md](specs/001-terreno-y-cazador/spec.md)
-* **Plan**: [specs/001-terreno-y-cazador/plan.md](specs/001-terreno-y-cazador/plan.md)
-* **Coincidencia con plan.md original**: Coincide plenamente con el diseño inicial.
+* **Especificación**: [specs/005-rutas-e-invalidacion/spec.md](specs/005-rutas-e-invalidacion/spec.md) (las reglas del cazador siguen en [specs/001-terreno-y-cazador/spec.md](specs/001-terreno-y-cazador/spec.md), FR-005 a FR-008)
+* **Plan**: [specs/005-rutas-e-invalidacion/plan.md](specs/005-rutas-e-invalidacion/plan.md), decisiones D1 a D4, D6 y D7
+* **Mediciones**: [mediciones-antes.txt](specs/005-rutas-e-invalidacion/mediciones-antes.txt) y [mediciones-despues.txt](specs/005-rutas-e-invalidacion/mediciones-despues.txt)
+* **Coincidencia con plan.md original**: No coincide con el plan original de 001. Aquel proponía un montículo con disminuir clave, una búsqueda sobre toda la cripta y distancias en `Tabla`. Las tablas que tenía esta sección venían de un bench que no medía lo que decía: el cálculo «individual» usaba distancias desde el cazador y ningún cazador se movía. Con el bench corregido, la línea base mostró que un cazador de rango 150 costaba 65 ms en una cripta de 5041 salas, por encima de los 20 ms de un ciclo completo. Por eso la búsqueda se acotó al rango y las distancias pasaron a un arreglo con sellos. El código coincide con el plan de 005.
 
 ### 1. Problema
-El enemigo cazador debe perseguir al jugador utilizando la ruta de costo mínimo basada en salidas con pesos variables ($\ge 1$, por defecto 100), sin abrir puertas cerradas y respetando su rango de persecución. En una partida pueden coexistir decenas de cazadores simultáneamente persiguiendo al mismo objetivo. Contar salas (BFS simple) no encuentra la ruta más barata porque las salidas tienen costos no uniformes. El desempate exige que, entre vecinas con igual costo total óptimo $d$, se escoja la vecina de menor ID.
+El cazador debe seguir la ruta de menor costo hacia el jugador, usando solo salidas abiertas, con costos distintos por salida, y desempatar por la vecina de menor id (§3.2). Contar salas no sirve, porque una ruta con menos salas puede costar más. Pueden perseguir decenas de cazadores a la vez (§6.1), y la decisión de un cazador de rango pequeño no debe costar en proporción al tamaño de la cripta, sino a la región que cae dentro de su rango (§5.1).
 
 ### 2. Alternativas consideradas
-* **(A) Dijkstra individual por cazador**: Cada cazador ejecuta un Dijkstra desde su posición hacia el jugador, deteniéndose al superar su rango. Se descartó como estrategia global porque con $N$ cazadores activos el costo escala como $O(N \cdot (V + E) \log V)$, ejecutando decenas de búsquedas redundantes en cada turno.
-* **(B) BFS ponderado (descomposición en aristas unitarias)**: Se descartó porque requiere expandir aristas proporcionales a su peso entero, lo cual dispara la memoria y el tiempo con pesos de 250 o superiores.
-* **(C) Dijkstra compartido inverso desde la sala del jugador (Elegida)**: Se ejecuta una única búsqueda de caminos mínimos desde la sala actual del jugador hacia todo el grafo de salidas abiertas. Todos los cazadores activos leen sus distancias en $O(1)$ sobre la `Tabla` propia resultante.
+* **(A) Una búsqueda por cazador desde su sala.** Para respetar el desempate, cada sala guarda, además de la distancia, el «primer salto» (la vecina por la que empieza el camino), y en un empate gana el de menor id. Con N cazadores son N búsquedas por ciclo.
+* **(B) BFS sobre aristas unitarias** (partir cada salida en `costo` pasos). Descartada: con costos de 200 o más multiplica el trabajo.
+* **(C) Una búsqueda compartida desde la sala del jugador sobre toda la cripta.** Era la implementación anterior. Da `dist(v, jugador)` para todas las salas a la vez, porque cada salida comparte puerta y costo con su inversa (§3.1), pero recorre la cripta entera aunque los rangos sean pequeños.
+* **(D) Búsqueda compartida desde el jugador, cortada en el mayor rango activo, con distancias en un arreglo con sellos (elegida).**
 
 ### 3. Decisión
-Se implementó un algoritmo de Dijkstra propio con un montículo binario de mínimos propio (`MinHeapDijkstra` en `model/Dijkstra.py`) y almacenamiento de distancias en `Tabla` propia (`model/Tabla.py`), cumpliendo con la prohibición estricta de `heapq`, `dict` y `set`. La búsqueda se ejecuta desde la sala del jugador; cada cazador consulta `d = distancias.obtener(u.id)`. Si $d > \text{rango}$ o no hay ruta, espera (costo 100). Si $d \le \text{rango}$, examina sus salidas abiertas y selecciona la vecina con menor ID que satisfaga $\text{costo}(u, v) + \text{dist}(v, \text{jugador}) = d$, garantizando el desempate determinista exigido por §3.2.
+Un solo núcleo, `calcularDistancias(origen, puedeUsar, cota, espacio)` en `model/Dijkstra.py`: Dijkstra con montículo binario propio y eliminación perezosa, que recorre por `salida.destino` y se detiene al extraer una distancia mayor que la cota. La regla «¿se puede usar esta salida?» es un parámetro, así que **el cazador e «ir a» usan la misma búsqueda y el mismo desempate** (`elegirPrimerPaso`: vecina de menor id con `costo + dist(v) = d`; si hay dos salidas hacia ella, la más barata y luego la primera en orden N, S, E, O).
+
+* **Cota.** La búsqueda del cazador se corta en el mayor rango entre los cazadores activos. No cambia ninguna decisión: si `d(u) ≤ rango ≤ cota`, u y toda vecina con `costo + dist(v) = d(u)` se extrajeron antes del corte y su distancia es definitiva. Cualquier valor que quede por encima de la cota puede ser provisional, por la eliminación perezosa, y `Distancias.de()` lo devuelve como desconocido.
+* **Arreglo con sellos.** Cada sala tiene un `indice` fijo y las distancias viven en listas del tamaño de la cripta, creadas una sola vez. Un valor solo vale si su sello coincide con el número de la búsqueda actual, así que no hay que limpiar las listas entre búsquedas. Leer distancias de una búsqueda vieja lanza un error en vez de devolver datos ajenos.
+* **Puertas compartidas (plan D7).** La prueba de simetría encontró, en las criptas de demostración 2, 3 y 4, conexiones de ida y vuelta por direcciones que no son opuestas (35 sale por N hacia 36 y 36 vuelve por O hacia 35). Esas conexiones quedaban con dos puertas. Ahora `_construirSalas` también las une, que es lo que exige §3.1 y lo que hace válida la búsqueda desde el jugador.
 
 ### 4. Análisis de complejidad
-* **Tiempo**: Un único Dijkstra por ciclo de eventos: $O((V + E) \log V)$, donde $V$ es el número de salas y $E \le 4V$ las salidas. La consulta y decisión de cada cazador toma $O(\text{salidas}) \le O(4) = O(1)$.
-* **Espacio**: $O(V)$ para el montículo y la tabla hash de distancias.
+* **Tiempo.** Una búsqueda cuesta O((Vr + Er) log Er), con Vr las salas dentro de la cota y Er ≤ 4·Vr sus salidas. Ya no depende del tamaño total de la cripta. Cada decisión de cazador cuesta O(salidas) ≤ O(4). Con la búsqueda individual (A), N cazadores cuestan N búsquedas.
+* **Espacio.** Tres listas de V entradas, creadas una sola vez por cripta, más el montículo.
 
-### 5. Evidencia empírica (`bench/BenchCazador.py`)
-Medición sobre cripta sintética de 100 salas con múltiples cazadores:
+### 5. Evidencia empírica (`bench/BenchCazador.py`, Windows, misma máquina para antes y después)
+Antes de comparar tiempos, el bench verifica que las alternativas toman exactamente las mismas decisiones para cada cazador.
 
-| Cantidad de cazadores | Cálculo Compartido (ms) | Cálculo Individual (ms) | Factor de ganancia |
-|-----------------------|-------------------------|-------------------------|--------------------|
-| 1 cazador             | 0.37 ms                 | 0.17 ms                 | 0.5x (sobrecosto despreciable) |
-| 10 cazadores          | 0.36 ms                 | 1.59 ms                 | **4.4x más rápido** |
-| 30 cazadores          | 0.38 ms                 | 4.93 ms                 | **13.0x más rápido** |
-| 60 cazadores          | 0.40 ms                 | 9.05 ms                 | **22.8x más rápido** |
+**Compartido frente a individual** (cuadrícula de 400 salas, costos de 10 a 200, rango 600, versión final):
 
-Con más de 2 cazadores, el cálculo compartido supera contundentemente al individual y su tiempo se mantiene plano (~0.38 ms) independientemente de cuántos cazadores existan.
+| Cazadores | Compartido (ms) | Individual (ms) | Ganancia |
+|---|---|---|---|
+| 1 | 0.217 | 1.514 | 7x |
+| 10 | 0.245 | 20.831 | 85x |
+| 30 | 0.205 | 51.641 | 252x |
+| 60 | 0.217 | 112.987 | 521x |
+
+El compartido se mantiene plano porque hace una sola búsqueda para todos. Antes de los cambios, con la búsqueda sobre toda la cripta, el compartido tardaba de 4.3 a 7.0 ms y con un solo cazador perdía contra el individual (5.9 frente a 1.7 ms). Ahora gana incluso con uno.
+
+**Rango pequeño frente a grande** (salas examinadas entre paréntesis, versión final):
+
+| Salas | Rango 150, completa | Rango 150, acotada | Rango 2000, acotada |
+|---|---|---|---|
+| 100 | 0.286 ms (100) | 0.007 ms (2) | 0.286 ms (100) |
+| 1024 | 3.755 ms (1024) | 0.058 ms (18) | 3.767 ms (1008) |
+| 5041 | 20.085 ms (5041) | 0.037 ms (10) | 9.562 ms (1880) |
+
+Con rango 150, el costo es el mismo en una cripta de 100 salas que en una de 5041: depende de la región dentro del rango, no del tamaño de la cripta (PR-010). En la línea base, la búsqueda completa de 5041 salas tardaba 65.1 ms.
+
+**Tabla frente a arreglo con sellos** (búsqueda completa): 1.418 frente a 0.313 ms con 100 salas (4.5x); 20.190 frente a 4.750 ms con 1024 (4.3x); 112.021 frente a 21.448 ms con 5041 (5.2x). La `Tabla` calcula `str(clave)` y un hash en cada consulta; la lista accede por índice.
 
 ### 6. Límites conocidos
-El cálculo compartido recorre la componente alcanzable completa desde el jugador. Si existiera un único cazador con rango diminuto en una cripta gigantesca (miles de salas), el Dijkstra individual local sería ligeramente más rápido; no obstante, el enunciado exige soportar decenas de cazadores activos a la vez, donde el cálculo compartido es óptimo.
+* La cota es el **mayor** rango activo (spec 005, Q2). Si hay un solo cazador de rango enorme, todos pagan la región de ese rango; aun así es una sola búsqueda por ciclo para todos.
+* La búsqueda desde el jugador depende de que cada conexión tenga la misma puerta y el mismo costo en ambos sentidos. Una cripta con salidas de un solo sentido (sin vuelta) rompería ese supuesto; la prueba de simetría lo verifica en las criptas de demostración.
+* «ir a» usa el mismo núcleo, pero con `Tabla` y sin caché, porque el conocimiento del jugador cambia en casi cada paso (plan D6).
+* Las mediciones varían entre corridas en la misma máquina; lo estable son las proporciones (compartido frente a individual, acotada frente a completa).
 
 ---
 
 ## 5.2 Rutas que dejan de ser válidas e invalidación inteligente
 
-* **Especificación**: [specs/001-terreno-y-cazador/spec.md](specs/001-terreno-y-cazador/spec.md)
-* **Plan**: [specs/001-terreno-y-cazador/plan.md](specs/001-terreno-y-cazador/plan.md)
-* **Coincidencia con plan.md original**: Coincide plenamente con el diseño inicial.
+* **Especificación**: [specs/005-rutas-e-invalidacion/spec.md](specs/005-rutas-e-invalidacion/spec.md), US-1 (FR-039 a FR-041)
+* **Plan**: [specs/005-rutas-e-invalidacion/plan.md](specs/005-rutas-e-invalidacion/plan.md), decisión D5
+* **Coincidencia con plan.md original**: No coincide con el plan original de 001, que invalidaba con una bandera ante cualquier cambio de puertas o del jugador. Además, la evidencia anterior de esta sección no medía cazadores: en el bench del ciclo no ocurría ninguna decisión de cazador, y por eso reportaba 0.02 ms. Con el bench corregido, la línea base mostró que con 60 cazadores el peor ciclo llegaba a 92.8 ms. La versión final coincide con el plan de 005.
 
 ### 1. Problema
-Entre los turnos de los cazadores ocurren eventos: el jugador se mueve, las puertas se abren o se cierran automáticamente, otros actores cambian de sala o mueren. La decisión del cazador debe ser estrictamente idéntica a la que produciría un cálculo desde cero (§3.2). Recalcular Dijkstra en cada turno de cada enemigo desperdicia CPU si el entorno no ha cambiado.
+Entre dos turnos de un cazador se abren y cierran puertas, el jugador se mueve, otros actores cambian de sala, cambian velocidades, se usa el pergamino o se carga una partida. La decisión del cazador debe ser siempre la misma que daría un cálculo desde cero en ese instante (§3.2), y solo se puede reutilizar un cálculo si se puede demostrar que el evento no cambia la respuesta (§5.2).
 
 ### 2. Alternativas consideradas
-* **(A) Recálculo siempre en cada turno**: Se ejecuta Dijkstra en cada turno de cazador. Garantiza corrección pero consume hasta 0.36 ms por cazador por turno.
-* **(B) Invalidación perezosa por eventos topológicos (Elegida)**: Se mantiene una bandera `_rutasCazadorValidas` y la tabla de distancias en caché. La bandera se invalida únicamente cuando ocurre un evento que altera la topología o el destino:
-  1. Movimiento del jugador (`_aplicarMover`).
-  2. Apertura de puerta (`_aplicarAbrir`).
-  3. Cierre automático de puerta (`_manejarCierrePuerta`).
-  4. Retroceso temporal con pergamino (`_retroceder`).
-  Eventos ajenos (daño, ataques, movimiento de otros enemigos, cambios de velocidad) NO invalidan la topología del grafo ni las distancias hacia el jugador.
+* **(A) Recalcular siempre**, en cada decisión de cada cazador.
+* **(B) Bandera gruesa**: cualquier cambio de puerta o del jugador invalida todo. Era la implementación anterior.
+* **(C) Invalidación fina (elegida)**: cada evento invalida solo si puede cambiar la tabla de distancias.
 
 ### 3. Decisión
-Se implementó la alternativa B con bandera en el `Modelo`. Cuando un cazador actúa, se verifica si las rutas siguen válidas. Si es así, se reutiliza la `Tabla` de distancias calculada previamente; si no, se recalcula y se marca como válida.
+El componente `model/RutasCazador.py` guarda la tabla de distancias, la sala del jugador y la cota con que se calculó.
+
+* **Recalcula** si no hay cálculo válido, si el jugador está en otra sala (lo compara en cada consulta, así que cubre movimientos, pergamino y carga sin depender de avisos) o si un cazador necesita más rango que la cota.
+* **Invalida siempre** en el pergamino y al restaurar un estado, porque ahí las puertas cambian sin pasar por los eventos.
+* **No invalida** por movimientos o muertes de otros actores, cambios de velocidad, daño ni efectos: la tabla depende solo de la sala del jugador, las puertas y los costos.
+* **Ante una puerta** entre u y v con costo c (una distancia desconocida o mayor que la cota cuenta como infinita):
+  * **Cierre**: si no se cumple `dist(u) + c = dist(v)` ni `dist(v) + c = dist(u)`, la tabla sigue válida.
+  * **Apertura**: si no se cumple `dist(u) + c < dist(v)` ni `dist(v) + c < dist(u)` (y, si el lado lejano está fuera de la cota, si el camino nuevo no lo deja dentro), la tabla sigue válida.
+  * En cualquier otro caso, invalida.
+
+**Demostración.** La decisión del cazador depende solo de la tabla y de las salidas actuales de su sala, y estas se leen en vivo en cada decisión. Si la tabla no cambia, la decisión es la misma que la de un cálculo desde cero. Falta ver que las reglas solo dejan pasar eventos que no cambian la tabla:
+
+* **Cierre.** Quitar una salida nunca acorta una distancia. Solo puede alargar la de una sala cuyos caminos mínimos usen esa salida. Pero si un camino mínimo usara u→v, se cumpliría `dist(v) = dist(u) + c`, porque todo tramo de un camino mínimo es mínimo. Si no se cumple en ningún sentido, ningún camino mínimo la usa y ninguna distancia cambia. Con cota: un camino mínimo hacia una sala dentro de la cota solo pasa por salas con distancia menor (los costos son de al menos 1), así que una salida con un extremo fuera de la cota no está en ninguno.
+* **Apertura.** Agregar una salida nunca alarga una distancia. Si alguna distancia se acorta, toma el primer tramo del nuevo camino que cruza la puerta: llega a un extremo con `dist(u) + c < dist(v)` (o al revés). Si no se cumple en ningún sentido, ninguna distancia baja.
 
 ### 4. Análisis de complejidad
-* **Con puertas y jugador estables**: $O(1)$ por cazador (solo consulta en tabla).
-* **Ante cambios topológicos**: $O((V + E) \log V)$ una sola vez para el primer cazador que actúe tras el cambio.
+* Decidir si un cambio de puerta invalida cuesta O(1): dos lecturas de la tabla y dos comparaciones.
+* Con caché válida, la decisión de un cazador cuesta O(4).
+* Un recálculo cuesta lo de 5.1, O((Vr + Er) log Er), y lo paga una sola vez el primer cazador que decide después del cambio.
 
-### 5. Evidencia empírica (`bench/BenchCazador.py`)
-Medición con 20 cazadores activos en escenario con puertas estables:
-* **Con recálculo continuo**: 0.365 ms por turno.
-* **Con reutilización inteligente**: 0.026 ms por turno.
-* **Ahorro de trabajo**: **13.9x menos tiempo de CPU**.
-* **Presupuesto de procesamiento (§6.1)**: Ciclo de eventos con cazadores activos: mediana = 0.02 ms, peor caso = 0.11 ms, cumpliendo holgadamente el límite de 20 ms.
+### 5. Evidencia empírica (`bench/BenchCazador.py`, Windows)
+El bench usa el modelo real con 30 cazadores activos en una cuadrícula de 900 salas, durante 30 ciclos. Antes de reportar, verifica que las tres estrategias producen exactamente la misma partida.
+
+| Escenario | Estrategia | Media (ms) | Peor (ms) | Búsquedas |
+|---|---|---|---|---|
+| A: puertas estables | recalcular siempre | 111.329 | 187.010 | 918 |
+| | bandera gruesa | 1.019 | 9.339 | 1 |
+| | invalidación fina | 1.218 | 10.708 | 1 |
+| B: una puerta al azar cambia cada ciclo | recalcular siempre | 106.852 | 183.430 | 918 |
+| | bandera gruesa | 3.982 | 12.570 | 30 |
+| | invalidación fina | 4.051 | 13.842 | **19** |
+| C: cambia una puerta de un camino mínimo | recalcular siempre | 128.139 | 220.965 | 924 |
+| | bandera gruesa | 6.763 | 24.081 | 30 |
+| | invalidación fina | 5.441 | 16.519 | 30 |
+
+* **Reutilizar frente a recalcular siempre:** unas 100 veces menos tiempo.
+* **Invalidación fina frente a bandera gruesa:** con puertas que cambian al azar (B), la fina evita el 37 % de las búsquedas (19 frente a 30). En tiempo, la diferencia queda dentro de la variación entre corridas, porque gracias a la cota y los sellos cada búsqueda ya es barata. Cuando la puerta que cambia está en un camino mínimo (C), las dos recalculan siempre, como debe ser.
+
+**Límite de 20 ms (§6.1)**, en el escenario B, con el peor ciclo incluyendo los puntos de control de la línea de tiempo:
+
+| Cazadores | Antes: mediana / p95 / peor | Después: mediana / p95 / peor |
+|---|---|---|
+| 30 | 11.566 / 14.883 / 19.011 ms | 4.178 / 9.493 / 9.946 ms |
+| 60 | 12.600 / 20.942 / **92.827 ms (no cumplía)** | 4.756 / 10.591 / **11.851 ms** |
+
+**Corrección.** `tests/test_rutas_invalidacion.py` incluye pruebas de cada escenario de US-1 y dos simulaciones «oráculo» de 300 turnos con puertas que cambian al azar: en cada decisión comparan la decisión con caché contra la de un cálculo desde cero. Para comprobar que las pruebas detectan errores, se rompió a propósito cada regla (cierre, apertura, pergamino, restaurar, cambio de sala y cota), y en los seis casos alguna prueba falló.
 
 ### 6. Límites conocidos
-Si en cada milisegundo se abriera y cerrara una puerta, la tasa de acierto de la caché de rutas se reduciría a la del recálculo continuo, pero nunca sería peor que él.
+* Las reglas son conservadoras: si al cerrar una puerta tensa existe otro camino del mismo costo, las distancias no cambian, pero igual se invalida. Demostrar eso costaría una búsqueda.
+* El pergamino y la carga de partida invalidan todo, porque revierten puertas sin pasar por los eventos.
+* El peor ciclo incluye el punto de control de la línea de tiempo (cada 20 acciones) y las posibles pausas del recolector de basura de Python. El bench libera memoria antes de medir y reporta mediana, p95 y peor caso.
+* La cripta de referencia de §6.1 todavía no está publicada; se midió con cuadrículas sintéticas de hasta 5041 salas.
 
 
 ---

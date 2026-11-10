@@ -1294,3 +1294,47 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   Implementación completa de la Capacidad 4 con 214 pruebas pasando al 100%, verificación de PR-007 (3.57 ms < 50 ms) y documentación completa de las secciones 5.5 y 5.6.
 
 
+
+---
+
+### Entrada 2026-11-08 / Claude (Anthropic)
+* **Fecha**: 2026-11-08
+* **Herramienta**: Claude (Anthropic), en conversación con acceso a la carpeta del repositorio
+* **Comando / Prompt**:
+  Revisión de la Parte II con el enunciado, el reparto y el repositorio adjuntos: «Tengo que hacer este proyecto, el cual es una continuación del primero. Debo trabajar según la división de trabajo [...]», seguido de «Y revisión en general de todas las partes?», «Dame un pdf con las correcciones exactas y cómo resolverlas exactamente.» (redactar el borrador de la especificación 005).
+* **Uso de la respuesta**:
+  Informe de revisión con hallazgos por capacidad (K-01 a K-07 para rutas e invalidación). Creación de la rama `005-rutas-e-invalidacion` y del borrador `specs/005-rutas-e-invalidacion/spec.md`, que queda pendiente de revisión propia y de `/speckit.clarify`. Este borrador no se generó con `/speckit.specify` porque spec-kit todavía no está instalado en el repositorio (hallazgo P-01).
+  Ajuste posterior (mismo día): con el acuerdo del grupo, se asignó a 005 la equivalencia observable ante cambios del mapa (incluido el caso del Apéndice B de la puerta que se cierra entre turnos), se decidió compartir la búsqueda de rutas entre el cazador e «ir a», se registraron las clarificaciones Q1 a Q5 y los requisitos quedaron como FR-039 a FR-044 y PR-009 a PR-013.
+
+---
+
+### Entrada 2026-11-10 / Claude (Anthropic)
+* **Fecha**: 2026-11-10
+* **Herramienta**: Claude (Anthropic), en conversación con acceso a la carpeta del repositorio
+* **Comando / Prompt**:
+  «Sigamos. Qué debo hacer ahora. Explícame y guíame.» (tareas T006 a T008 de la especificación 005).
+* **Uso de la respuesta**:
+  Explicación del núcleo de búsqueda común y su implementación en `model/Dijkstra.py`: `Distancias` (con `Tabla` hasta T005), `calcularDistancias` con regla `puedeUsar` y cota, `elegirPrimerPaso` con el desempate de §3.2 y la decisión Q4, y `puertaAbierta`. Once pruebas nuevas en `tests/test_rutas_invalidacion.py`. Ajuste de la firma en el contrato de `plan.md` y del estado de T005 a T008 en `tasks.md`.
+
+---
+
+---
+
+### Entrada 2026-11-10 / Antigravity CLI (Google)
+* **Fecha**: 2026-11-10
+* **Herramienta**: Antigravity CLI (`agy` 1.4.12) con Spec-Kit 1.2.3 (integración `agy`)
+* **Comando / Prompt**:
+  `/speckit-clarify specs/005-rutas-e-invalidacion`
+* **Uso de la respuesta**:
+  El agente no encontró ambigüedades que requieran nuevas preguntas: la sesión de clarificación del 2026-11-08 (Q1 a Q5) ya cubre alcance, dominio, rendimiento, casos borde y restricciones. No se modificó `spec.md`.
+
+---
+
+### Entrada 2026-11-10 / Antigravity CLI (Google)
+* **Fecha**: 2026-11-10
+* **Herramienta**: Antigravity CLI (`agy` 1.4.12) con Spec-Kit 1.2.3 (integración `agy`)
+* **Comando / Prompt**:
+  `/speckit-analyze specs/005-rutas-e-invalidacion`
+* **Uso de la respuesta**:
+  Reporte de consistencia entre spec, plan y tasks: 11 de 11 requisitos con tareas, 0 ambigüedades, 0 duplicados, 0 problemas críticos, altos o medios, y sin conflictos con la constitución. Se corrigieron los tres hallazgos de nivel bajo: I1 (dependencia de T005 respecto de T006 en `tasks.md`), I2 (tamaños de cripta 100, 1024 y 5041 salas en `spec.md` y `plan.md`) y C1 (etiquetas de requisitos en T025 y T026).
+
