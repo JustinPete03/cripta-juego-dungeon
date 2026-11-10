@@ -62,6 +62,7 @@ Hoy las distancias se guardan en `Tabla`, que calcula `str(clave)` y djb2 en cad
 - **Decisión**: cada `Sala` recibe un `indice` fijo (su posición en el índice ordenado) al construir la cripta. Las distancias se guardan en una `list` del tamaño de la cripta, creada una sola vez, junto a una lista de **sellos**: la distancia de una sala solo vale si su sello coincide con el número de la búsqueda actual. Así no hay que reinicializar el arreglo en cada búsqueda, y el costo sigue siendo proporcional a las salas examinadas (PR-010).
 - La búsqueda recorre usando `salida.destino` (una referencia directa), sin buscar por id.
 - **Alternativa**: mantener `Tabla`. Se mide en el bench (K-06). **Si el arreglo no mejora de forma medible, se mantiene `Tabla`** y se documenta.
+- **Implementación (2026-11-10)**: los arreglos viven en un `EspacioBusqueda` que crea su dueño (el componente de rutas del cazador) una sola vez. Una búsqueda nueva en el mismo espacio deja obsoletas las `Distancias` anteriores, y leer unas obsoletas lanza un error en vez de devolver datos ajenos. Sin espacio (salas armadas a mano en pruebas, «ir a»), `Distancias` usa una `Tabla`. Medición previa en una cuadrícula de 5041 salas: el arreglo es unas 3 veces más rápido que la `Tabla` (T022), así que se mantiene.
 
 ### D4. Desempate: un solo auxiliar para el cazador y para «ir a»
 
@@ -79,7 +80,7 @@ Nuevo módulo `model/RutasCazador.py`, dueño de la caché que hoy son la bander
 
 **Estado guardado**: las distancias, la sala del jugador usada, la cota usada y si el cálculo es válido.
 
-**`distanciasPara(salaJugador, rangoNecesario)`** recalcula si:
+**`distanciasPara(salaJugador, rangoNecesario, cotaActual)`** recalcula si (`cotaActual` es una función que devuelve el mayor rango activo; solo se llama al recalcular, para no recorrer los enemigos en cada decisión):
 - no hay un cálculo válido; o
 - la sala del jugador cambió (se compara en cada consulta, así que movimientos, pergamino y carga quedan cubiertos sin depender de enganches); o
 - `rangoNecesario` supera la cota usada (se activó un cazador de rango mayor; FR-040, escenario 9).
@@ -88,7 +89,11 @@ Nuevo módulo `model/RutasCazador.py`, dueño de la caché que hoy son la bander
 - **Cierre**: si **no** se cumple `dist(u) + c = dist(v)` ni `dist(v) + c = dist(u)`, la salida no está en ningún camino mínimo y la tabla sigue válida. Si se cumple alguna, se invalida.
 - **Apertura**: si **no** se cumple `dist(u) + c < dist(v)` ni `dist(v) + c < dist(u)`, no aparece ningún camino más corto y la tabla sigue válida. Si se cumple alguna, se invalida.
 
-**`invalidar()`**: se llama en `_retroceder` (el pergamino revierte puertas sin pasar por `puertaCambio`) y en `restaurarEstado` (defensivo).
+**`invalidar()`**: se llama en `_retroceder` (el pergamino revierte puertas sin pasar por `puertaCambio`) y en `restaurarEstado` (cargar partida cambia puertas sin pasar por eventos).
+
+**Detalle de la apertura con cota**: si una de las salas queda fuera de la cota, el camino nuevo solo cambia algo si la deja dentro de la cota (`dist(u) + c ≤ cota`); si no, la tabla dentro de la cota no cambia.
+
+**Contadores** para el bench y las pruebas: `recalculos`, `invalidaciones` y `puertasIgnoradas` (cambios de puerta que se demostró que no afectan).
 
 **Por qué basta con saber si la tabla cambió.** La decisión del cazador = f(tabla de distancias, salidas actuales de su sala), y las salidas actuales se leen en vivo en cada decisión (D4). Si la tabla no cambia, la decisión es la misma que la de un cálculo desde cero (FR-039, FR-041). La demostración completa de las dos reglas va en DECISIONES 5.2.
 
@@ -101,6 +106,13 @@ Nuevo módulo `model/RutasCazador.py`, dueño de la caché que hoy son la bander
 - `elegirPasoViajeAutomatico` llama al núcleo **desde el destino** sobre el conocimiento del jugador: `puedeUsar` = «el destino de la salida está explorado y la puerta se recuerda abierta», y sin cota. Luego aplica el mismo `elegirPrimerPaso` (FR-044).
 - Sin caché: el conocimiento cambia en casi cada paso (exploración y memoria de puertas) y §3.4 exige recalcular antes de cada paso. El límite de 5 ms se verifica en el bench de Jurnier.
 - La regla `puedeUsar` la define Jurnier (incluida la corrección N-02 de puertas sin observar); este plan solo fija la interfaz.
+- **Compatibilidad (T020, 2026-11-10)**: `dijkstraDesde` y `dijkstraSubgrafoConocido` no se eliminan porque las usan pruebas de 001 y 002. Quedan como envoltorios de una línea sobre `calcularDistancias` (devuelven una `Tabla`, como antes), así que ya no hay una segunda implementación del algoritmo.
+
+### D7. Puertas de conexiones con direcciones no opuestas (hallazgo de T024)
+
+La prueba de simetría encontró en las criptas de demostración 2, 3 y 4 pares de salas conectadas en ambos sentidos por direcciones que **no** son opuestas (por ejemplo, 35 sale por N hacia 36 y 36 vuelve por O hacia 35). `_construirSalas` solo unía la puerta si la vuelta estaba en la dirección opuesta, así que esas conexiones quedaban con dos puertas: abrir o cerrar «la puerta» afectaba un solo sentido, en contra de §3.1. Sin una sola puerta por conexión, la búsqueda desde el jugador no da la distancia de cada sala hacia el jugador.
+
+- **Decisión**: si la dirección opuesta no lleva de vuelta, se toma la salida del destino que vuelve a la sala, y se unen como siempre. Es un cambio en el archivo de Justin; va en un commit propio y él lo revisa.
 
 ---
 
@@ -108,24 +120,28 @@ Nuevo módulo `model/RutasCazador.py`, dueño de la caché que hoy son la bander
 
 ```text
 model/Dijkstra.py
-  calcularDistancias(origen, puedeUsar, cota=None, cantidadSalas=None) -> Distancias
+  EspacioBusqueda(cantidadSalas)             # arreglos con sellos, indexados por Sala.indice
+  calcularDistancias(origen, puedeUsar, cota=None, espacio=None) -> Distancias
       origen: Sala; puedeUsar(salaActual, salida) -> bool; cota: int o None
-      cantidadSalas: solo para el arreglo con sellos (T005); mientras tanto Distancias usa Tabla
+      espacio: EspacioBusqueda o None (sin espacio, Distancias usa una Tabla)
   Distancias.de(sala) -> int o None          # None = desconocida o mayor que la cota
   Distancias.salasExaminadas -> int          # para medir PR-010
   elegirPrimerPaso(sala, distancias, puedeUsar) -> Salida o None
+  puertaAbierta(sala, salida) -> bool        # regla del cazador para puedeUsar
 
 model/RutasCazador.py
   RutasCazador(cantidadSalas)
-  distanciasPara(salaJugador, rangoNecesario, rangoMaximoActivo) -> Distancias
+  distanciasPara(salaJugador, rangoNecesario, cotaActual) -> Distancias
+      cotaActual: función sin argumentos -> mayor rango entre los cazadores activos
   puertaCambio(puerta, seAbrio)
   invalidar()
-  recalculos -> int                          # contador para el bench
+  recalculos, invalidaciones, puertasIgnoradas -> int   # contadores para bench y pruebas
 ```
 
-**Cambios que hace Justin (acordados), o Keilor con su aviso:**
+**Cambios en archivos de Justin** (implementados por Keilor en un commit propio, para revisión de Justin):
 - `Puerta` guarda `salaA`, `salaB` y `costo` al unificarse en `_construirSalas`.
 - `Sala` guarda `indice`, su posición en el índice ordenado, al terminar `_construirSalas`.
+- La unión de puertas en conexiones con direcciones no opuestas (D7).
 
 ---
 
@@ -133,11 +149,11 @@ model/RutasCazador.py
 
 | Módulo | Dueño | Cambio |
 |---|---|---|
-| `model/Dijkstra.py` | Keilor | Núcleo único `calcularDistancias`, `Distancias` con sellos, `elegirPrimerPaso`. `dijkstraSubgrafoConocido` y `dijkstraDesde` pasan a ser envoltorios del núcleo y luego se eliminan. |
+| `model/Dijkstra.py` | Keilor | Núcleo único `calcularDistancias`, `EspacioBusqueda`, `Distancias`, `elegirPrimerPaso`, `puertaAbierta`. `dijkstraDesde`, `dijkstraSubgrafoConocido` y `elegirPasoViajeAutomatico` pasan a ser envoltorios del núcleo (D6). |
 | `model/RutasCazador.py` (nuevo) | Keilor | Caché, cota e invalidación fina (D5). |
 | `model/Cazador.py` | Keilor (avisando a Justin) | `elegirPasoCazador` usa `elegirPrimerPaso`; las reglas de atacar y esperar (001) no cambian. |
-| `model/Juego.py` | Justin, coordinado | Reemplazar `_rutasCazadorValidas` y `_distanciasCazador` por `RutasCazador`; llamar a `puertaCambio` en `_aplicarAbrir` y `_manejarCierrePuerta`; `invalidar()` en `_retroceder` y `restaurarEstado`. |
-| `model/Entidades.py` | Justin | `Puerta.salaA`, `salaB`, `costo`; `Sala.indice`. |
+| `model/Juego.py` | Justin (revisa; lo implementa Keilor) | Reemplazar `_rutasCazadorValidas` y `_distanciasCazador` por `RutasCazador`; `puertaCambio` en `_aplicarAbrir` y `_manejarCierrePuerta`; `invalidar()` en `_retroceder` y `restaurarEstado`; `indice`, salas de cada puerta y unión de puertas en direcciones no opuestas en `_construirSalas` (D7). |
+| `model/Entidades.py` | Justin (revisa; lo implementa Keilor) | `Puerta.salaA`, `salaB`, `costo`; `Sala.indice`. |
 | `bench/BenchCazador.py` | Keilor | Reescritura completa (ver «Mediciones planificadas»). |
 | `tests/test_rutas_invalidacion.py` (nuevo) | Keilor | Escenarios de US-1 a US-3 y prueba oráculo. |
 | `controller/ControladorJuego.py` | Jurnier | Sin cambios de este plan: «ir a» mantiene la firma de `elegirPasoViajeAutomatico`. |
@@ -181,4 +197,5 @@ Todas con criptas sintéticas deterministas por semilla. Se guardan los números
 
 - **`Juego.py` y `Entidades.py` son de Justin.** Esos cambios se integran con un PR revisado por él y van primero, antes de conectar `RutasCazador`.
 - **Pergamino.** El diario revierte las puertas sin avisar al componente de rutas; por eso `_retroceder` invalida todo (decisión conservadora y correcta).
+- **Peor caso del ciclo.** El ciclo en que la línea de tiempo guarda un punto de control (cada 20 acciones) y las pausas del recolector de basura de Python suben el peor caso. El bench libera la memoria antes de medir cada modelo y reporta mediana, p95 y peor caso para que se vea cuál es cuál.
 - **«ir a» y N-02.** Si Jurnier cambia la memoria de puertas a tres estados, solo cambia su `puedeUsar`; el núcleo no se toca.

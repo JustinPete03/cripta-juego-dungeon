@@ -9,6 +9,11 @@ class Puerta:
         self.llave = llave
         self.cierreAutomatico = cierreAutomatico
         self.eventoCierre = None
+        # Las dos salas que conecta y su costo (spec 005, T003). Las fija Juego._construirSalas;
+        # el cálculo de rutas las usa para decidir si un cambio de la puerta invalida las rutas.
+        self.salaA = None
+        self.salaB = None
+        self.costo = None
 
 
 class Salida:
@@ -26,6 +31,7 @@ class Sala:
         self.id = idSala
         self.nombre = nombre
         self.salidas = []            # máximo 4, en orden canónico N, S, E, O
+        self.indice = -1             # posición en el índice ordenado de salas (spec 005, T004)
         self.rastro = -1             # -1: el jugador nunca estuvo (2.9)
         self.contenidoIncorporado = False
         self.enemigos = []           # activos y dormidos que están en esta sala

@@ -8,6 +8,7 @@
 #
 # Todas las criptas son sintéticas y deterministas por semilla (PR-011).
 
+import gc
 import random
 import time
 
@@ -16,7 +17,8 @@ from model.Salas import IndiceOrdenado
 from model.Tabla import Tabla
 from model.Constantes import DIRECCIONES, ACC_ESPERAR
 from model.Acciones import Accion
-from model.Dijkstra import MinHeapDijkstra, dijkstraDesde
+from model.Dijkstra import (MinHeapDijkstra, dijkstraDesde, calcularDistancias, puertaAbierta,
+                            EspacioBusqueda)
 from model.Cazador import elegirPasoCazador
 import model.Juego as moduloJuego
 
@@ -71,6 +73,10 @@ def _cuadricula(ancho, alto, semilla):
                     salida = Salida(direccion, sala, destino.id, puerta, costo)
                     salida.destino = destino
                     sala.salidas.append(salida)
+                    if puerta.salaA is None:
+                        puerta.salaA, puerta.salaB, puerta.costo = sala, destino, costo
+    for i, sala in enumerate(lista):
+        sala.indice = i                # como Juego._construirSalas (spec 005, T004)
     return salas, lista, puertas
 
 
@@ -164,8 +170,9 @@ def benchCompartidoVsIndividual():
     for cantidad in (1, 10, 30, 60):
         cazadores = _repartirCazadores(lista, cantidad, 600, SEMILLA + cantidad, jugador)
 
+        espacio = EspacioBusqueda(len(lista))
         # Verificación (PR-013): ambas alternativas deciden lo mismo para cada cazador
-        dist = dijkstraDesde(jugador, salas)
+        dist = calcularDistancias(jugador, puertaAbierta, 600, espacio)
         for c in cazadores:
             a = _destinoDe(elegirPasoCazador(c, jugador, dist))
             b = _destinoDe(_decisionIndividual(c, jugador))
@@ -175,7 +182,7 @@ def benchCompartidoVsIndividual():
         repeticiones = 30
         t0 = time.perf_counter()
         for _ in range(repeticiones):
-            dist = dijkstraDesde(jugador, salas)
+            dist = calcularDistancias(jugador, puertaAbierta, 600, espacio)
             for c in cazadores:
                 elegirPasoCazador(c, jugador, dist)
         tCompartido = (time.perf_counter() - t0) / repeticiones * 1000
@@ -191,34 +198,62 @@ def benchCompartidoVsIndividual():
 # --------------------------------------------------------------------- 2. rango pequeño vs grande
 def benchRangoPequenoVsGrande():
     print("\n--- 2. Rango pequeño frente a grande, criptas de tamaño creciente (§5.1, PR-010) ---")
-    print("  Compara la búsqueda completa (actual) contra la búsqueda acotada al rango.")
+    print("  Búsqueda completa (como antes de la spec 005) frente a búsqueda acotada al rango (actual).")
     print("  %-7s | %-6s | %-22s | %-22s" % ("Salas", "Rango", "Completa ms (salas)", "Acotada ms (salas)"))
     for lado in (10, 32, 71):
         salas, lista, _ = _cuadricula(lado, lado, SEMILLA)
+        espacio = EspacioBusqueda(len(lista))
         jugador = lista[(lado // 2) * lado + lado // 2]
         for rango in (150, 2000):
             vecino = jugador.salidas[0].destino
             cazadores = [_cazador("c-cerca", vecino, rango)] + _repartirCazadores(lista, 9, rango, SEMILLA, jugador)
 
             # Verificación (PR-013): acotar no cambia ninguna decisión
-            completa = dijkstraDesde(jugador, salas)
-            acotada = dijkstraDesde(jugador, salas, rangoMax=rango)
+            completa = calcularDistancias(jugador, puertaAbierta)
             for c in cazadores:
-                if _destinoDe(elegirPasoCazador(c, jugador, completa)) != _destinoDe(elegirPasoCazador(c, jugador, acotada)):
+                antes = _destinoDe(elegirPasoCazador(c, jugador, completa))
+                acotada = calcularDistancias(jugador, puertaAbierta, rango, espacio)
+                if antes != _destinoDe(elegirPasoCazador(c, jugador, acotada)):
                     raise AssertionError("La búsqueda acotada cambió la decisión de %s" % c.instancia)
 
             repeticiones = 20 if lado < 71 else 5
             t0 = time.perf_counter()
             for _ in range(repeticiones):
-                dijkstraDesde(jugador, salas)
+                completa = calcularDistancias(jugador, puertaAbierta, None, espacio)
             tCompleta = (time.perf_counter() - t0) / repeticiones * 1000
+            examinadasCompleta = completa.salasExaminadas
             t0 = time.perf_counter()
             for _ in range(repeticiones):
-                dijkstraDesde(jugador, salas, rangoMax=rango)
+                acotada = calcularDistancias(jugador, puertaAbierta, rango, espacio)
             tAcotada = (time.perf_counter() - t0) / repeticiones * 1000
             print("  %-7d | %-6d | %10.3f (%7d)   | %10.3f (%7d)" %
-                  (lado * lado, rango, tCompleta, len(completa), tAcotada, len(acotada)))
-    print("  (salas) = salas con distancia registrada en la búsqueda.")
+                  (lado * lado, rango, tCompleta, examinadasCompleta, tAcotada, acotada.salasExaminadas))
+    print("  (salas) = salas examinadas por la búsqueda.")
+
+
+def benchTablaVsSellos():
+    print("\n--- 5. Distancias en Tabla frente a arreglo con sellos (plan 005, D3, T022) ---")
+    print("  Búsqueda completa desde el centro; mismas distancias en ambas (verificado).")
+    print("  %-7s | %-12s | %-12s | %s" % ("Salas", "Tabla ms", "Sellos ms", "Mejora"))
+    for lado in (10, 32, 71):
+        salas, lista, _ = _cuadricula(lado, lado, SEMILLA)
+        espacio = EspacioBusqueda(len(lista))
+        origen = lista[(lado // 2) * lado + lado // 2]
+        conTabla = calcularDistancias(origen, puertaAbierta)
+        conSellos = calcularDistancias(origen, puertaAbierta, None, espacio)
+        for sala in lista:
+            if conTabla.de(sala) != conSellos.de(sala):
+                raise AssertionError("Tabla y sellos dan distancias distintas en la sala %d" % sala.id)
+        repeticiones = 20 if lado < 71 else 5
+        t0 = time.perf_counter()
+        for _ in range(repeticiones):
+            calcularDistancias(origen, puertaAbierta)
+        tTabla = (time.perf_counter() - t0) / repeticiones * 1000
+        t0 = time.perf_counter()
+        for _ in range(repeticiones):
+            calcularDistancias(origen, puertaAbierta, None, espacio)
+        tSellos = (time.perf_counter() - t0) / repeticiones * 1000
+        print("  %-7d | %12.3f | %12.3f | %.1fx" % (lado * lado, tTabla, tSellos, tTabla / tSellos))
 
 
 # --------------------------------------------------------------------- 3 y 4. modelo real
@@ -282,31 +317,33 @@ class _FuenteCazadores:
 
 
 class _Contador:
-    """Cuenta decisiones de cazador y búsquedas envolviendo las funciones que usa el modelo."""
+    """Cuenta decisiones de cazador (envolviendo la función que usa el motor) y búsquedas
+    (contador `recalculos` del componente de rutas del modelo)."""
 
-    def __init__(self):
+    def __init__(self, modelo):
+        self.modelo = modelo
         self.decisiones = 0
-        self.busquedas = 0
-        self._originales = None
+        self._original = None
+        self._recalculosIniciales = 0
+
+    @property
+    def busquedas(self):
+        return self.modelo.rutasCazador.recalculos - self._recalculosIniciales
 
     def __enter__(self):
-        self._originales = (moduloJuego.elegirPasoCazador, moduloJuego.dijkstraDesde)
-        decidir, buscar = self._originales
+        self._original = moduloJuego.elegirPasoCazador
+        decidir = self._original
 
         def decidirContando(*args, **kwargs):
             self.decisiones += 1
             return decidir(*args, **kwargs)
 
-        def buscarContando(*args, **kwargs):
-            self.busquedas += 1
-            return buscar(*args, **kwargs)
-
         moduloJuego.elegirPasoCazador = decidirContando
-        moduloJuego.dijkstraDesde = buscarContando
+        self._recalculosIniciales = self.modelo.rutasCazador.recalculos
         return self
 
     def __exit__(self, *exc):
-        moduloJuego.elegirPasoCazador, moduloJuego.dijkstraDesde = self._originales
+        moduloJuego.elegirPasoCazador = self._original
         return False
 
 
@@ -326,13 +363,28 @@ def _modeloConCazadores(lado, cantidad, rango, semilla):
 
 
 def _cambiarPuerta(modelo, puerta):
-    """Abre o cierra una puerta como lo haría un evento del juego y avisa al cálculo de rutas.
-
-    Mientras el modelo use la bandera gruesa, avisar = invalidar. Cuando exista el componente de
-    rutas del plan 005 (D5), este es el único lugar del bench que hay que adaptar.
-    """
+    """Abre o cierra una puerta como lo hacen los eventos del juego y avisa a las rutas."""
     modelo.asignar(puerta, "cerrada", not puerta.cerrada)
-    modelo._rutasCazadorValidas = False
+    modelo.rutasCazador.puertaCambio(puerta, not puerta.cerrada)
+
+
+def _aplicarEstrategia(modelo, estrategia):
+    """Configura el componente de rutas del modelo con una de las estrategias comparadas.
+
+    - «recalcular siempre»: cada decisión de cazador hace una búsqueda nueva.
+    - «bandera gruesa»: cualquier cambio de puerta invalida (como antes de la spec 005).
+    - «invalidación fina»: la del plan 005, D5 (la que usa el juego).
+    """
+    rutas = modelo.rutasCazador
+    if estrategia == "recalcular siempre":
+        original = rutas.distanciasPara
+
+        def siempre(*args):
+            rutas.invalidar()
+            return original(*args)
+        rutas.distanciasPara = siempre
+    elif estrategia == "bandera gruesa":
+        rutas.puertaCambio = lambda puerta, seAbrio: rutas.invalidar()
 
 
 def _puertasNoCriticas(modelo):
@@ -359,21 +411,18 @@ def _puertaEnCaminoMinimo(modelo):
     return None
 
 
-def _medirCiclos(modelo, ciclos, escenario, semilla, recalcularSiempre=False):
+def _medirCiclos(modelo, ciclos, escenario, semilla, estrategia="invalidación fina"):
     """Ejecuta `ciclos` decisiones de esperar del jugador. Devuelve (tiempos ms, traza, contador)."""
     azar = random.Random(semilla)
     puertas = _puertasNoCriticas(modelo)
     critica = _puertaEnCaminoMinimo(modelo) if escenario == "C" else None
-    if recalcularSiempre:
-        original = modelo._obtenerDistanciasCazador
-
-        def siempre():
-            modelo._rutasCazadorValidas = False
-            return original()
-        modelo._obtenerDistanciasCazador = siempre
+    _aplicarEstrategia(modelo, estrategia)
+    # Libera la basura de mediciones anteriores para que una pausa del recolector causada por
+    # otra sección no se cuente como costo de este ciclo.
+    gc.collect()
     tiempos = []
     traza = []
-    with _Contador() as contador:
+    with _Contador(modelo) as contador:
         contador.ciclosConDecisiones = 0
         for _ in range(ciclos):
             antes = contador.decisiones
@@ -403,19 +452,18 @@ def benchInvalidacion():
     print("  %-3s | %-18s | %-10s | %-10s | %-10s | %-10s | %s" % ("Esc", "Estrategia", "Media ms", "Peor ms", "Búsquedas", "Decisiones", "Ciclos c/ decisión"))
     for escenario in ("A", "B", "C"):
         trazas = []
-        for nombre, siempre in (("recalcular siempre", True), ("bandera gruesa", False)):
+        for nombre in ("recalcular siempre", "bandera gruesa", "invalidación fina"):
             modelo = _modeloConCazadores(30, 30, 10 ** 6, SEMILLA)
-            tiempos, traza, cont = _medirCiclos(modelo, 30, escenario, SEMILLA, recalcularSiempre=siempre)
+            tiempos, traza, cont = _medirCiclos(modelo, 30, escenario, SEMILLA, nombre)
             if cont.decisiones == 0:
                 raise AssertionError("Escenario %s: no ocurrió ninguna decisión de cazador" % escenario)
             trazas.append(traza)
             print("  %-3s | %-18s | %10.3f | %10.3f | %10d | %10d | %d de %d" %
                   (escenario, nombre, sum(tiempos) / len(tiempos), max(tiempos), cont.busquedas, cont.decisiones,
                    cont.ciclosConDecisiones, len(tiempos)))
-        if trazas[0] != trazas[1]:
+        if trazas[0] != trazas[1] or trazas[0] != trazas[2]:
             raise AssertionError("Escenario %s: las estrategias produjeron partidas distintas" % escenario)
-    print("  Verificación: en cada escenario, todas las estrategias producen la misma partida.")
-    print("  (La invalidación fina del plan 005, D5, se agrega aquí cuando exista.)")
+    print("  Verificación: en cada escenario, las tres estrategias producen la misma partida.")
 
 
 def benchCicloEventos():
@@ -437,6 +485,7 @@ def main():
     benchRangoPequenoVsGrande()
     benchInvalidacion()
     benchCicloEventos()
+    benchTablaVsSellos()
 
 
 if __name__ == "__main__":
