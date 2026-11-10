@@ -1,39 +1,40 @@
-Línea base (código antes de los cambios de 005). Rama 005-rutas-e-invalidacion, commit c6e751a.
-Fecha: 2026-11-09 01:34. Comando: python -c "import bench.BenchCazador as b; b.main()"
+Línea base: código antes de los cambios de 005 (commit 8c80884, medido con git worktree).
+Entorno: Windows, Python del .venv del proyecto, 2026-11-10. Las dos versiones se midieron seguidas en la misma máquina.
+Comando: python -c "import bench.BenchCazador as b; b.main()"
 
 --- 1. Uno frente a muchos: cálculo compartido frente a individual (§5.1, PR-012) ---
   Cripta: cuadrícula de 400 salas, costos 10 a 200, rango 600
   Cazadores   | Compartido (ms)    | Individual (ms)    | Decisiones iguales
-  1           |              5.139 |              1.072 | sí (1 de 1)
-  10          |              5.387 |             17.819 | sí (10 de 10)
-  30          |              5.293 |             51.686 | sí (30 de 30)
-  60          |              5.178 |            128.706 | sí (60 de 60)
+  1           |              5.904 |              1.710 | sí (1 de 1)
+  10          |              7.018 |             19.911 | sí (10 de 10)
+  30          |              4.318 |             46.558 | sí (30 de 30)
+  60          |              4.348 |             97.540 | sí (60 de 60)
 
 --- 2. Rango pequeño frente a grande, criptas de tamaño creciente (§5.1, PR-010) ---
   Compara la búsqueda completa (actual) contra la búsqueda acotada al rango.
   Salas   | Rango  | Completa ms (salas)    | Acotada ms (salas)    
-  100     | 150    |      0.950 (    100)   |      0.024 (      8)
-  100     | 2000   |      0.955 (    100)   |      1.001 (    100)
-  1024    | 150    |     14.596 (   1024)   |      0.220 (     35)
-  1024    | 2000   |     13.934 (   1024)   |     14.968 (   1018)
-  5041    | 150    |     81.574 (   5041)   |      0.137 (     23)
-  5041    | 2000   |     86.122 (   5041)   |     33.205 (   2064)
+  100     | 150    |      0.825 (    100)   |      0.021 (      8)
+  100     | 2000   |      0.819 (    100)   |      0.831 (    100)
+  1024    | 150    |     11.413 (   1024)   |      0.206 (     35)
+  1024    | 2000   |     11.600 (   1024)   |     11.409 (   1018)
+  5041    | 150    |     65.080 (   5041)   |      0.125 (     23)
+  5041    | 2000   |     66.086 (   5041)   |     25.546 (   2064)
   (salas) = salas con distancia registrada en la búsqueda.
 
 --- 3. Reutilización frente a recálculo, puertas estables e inestables (§5.2, PR-012) ---
   Modelo real, 30 cazadores activos, cuadrícula de 900 salas, 30 ciclos.
   A: puertas estables | B: una puerta al azar cambia cada ciclo | C: cambia una puerta de un camino mínimo
   Esc | Estrategia         | Media ms   | Peor ms    | Búsquedas  | Decisiones | Ciclos c/ decisión
-  A   | recalcular siempre |    399.944 |    690.127 |        918 |        918 | 30 de 30
-  A   | bandera gruesa     |      2.060 |     17.577 |          1 |        918 | 30 de 30
-  B   | recalcular siempre |    388.120 |    704.865 |        918 |        918 | 30 de 30
-  B   | bandera gruesa     |     13.742 |     22.410 |         30 |        918 | 30 de 30
-  C   | recalcular siempre |    396.106 |    748.991 |        924 |        924 | 30 de 30
-  C   | bandera gruesa     |     15.157 |     48.286 |         30 |        924 | 30 de 30
+  A   | recalcular siempre |    333.253 |    573.879 |        918 |        918 | 30 de 30
+  A   | bandera gruesa     |      1.381 |     16.760 |          1 |        918 | 30 de 30
+  B   | recalcular siempre |    348.076 |    704.301 |        918 |        918 | 30 de 30
+  B   | bandera gruesa     |     11.896 |     20.115 |         30 |        918 | 30 de 30
+  C   | recalcular siempre |    340.923 |    689.830 |        924 |        924 | 30 de 30
+  C   | bandera gruesa     |     13.060 |     19.468 |         30 |        924 | 30 de 30
   Verificación: en cada escenario, todas las estrategias producen la misma partida.
   (La invalidación fina del plan 005, D5, se agrega aquí cuando exista.)
 
 --- 4. Ciclo de eventos con decenas de cazadores activos (§6.1, PR-009, límite 20 ms) ---
-  30 cazadores | ciclos con decisiones: 30 de 40 | decisiones: 918 | mediana 12.671 ms | p95 17.207 ms | peor 43.302 ms | NO CUMPLE
-  60 cazadores | ciclos con decisiones: 34 de 40 | decisiones: 1843 | mediana 13.471 ms | p95 25.324 ms | peor 44.157 ms | NO CUMPLE
+  30 cazadores | ciclos con decisiones: 30 de 40 | decisiones: 918 | mediana 11.566 ms | p95 14.883 ms | peor 19.011 ms | cumple
+  60 cazadores | ciclos con decisiones: 34 de 40 | decisiones: 1843 | mediana 12.600 ms | p95 20.942 ms | peor 92.827 ms | NO CUMPLE
   Cuadrícula de 900 salas, escenario B (una puerta cambia cada ciclo). El peor caso incluye los puntos de control de la línea de tiempo.

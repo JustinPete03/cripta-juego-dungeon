@@ -1297,14 +1297,14 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 
 ---
 
-### Entrada 2026-11-08 / Claude (Anthropic) 
+### Entrada 2026-11-08 / Claude (Anthropic)
 * **Fecha**: 2026-11-08
 * **Herramienta**: Claude (Anthropic), en conversación con acceso a la carpeta del repositorio
 * **Comando / Prompt**:
-  Revisión de la Parte II con el enunciado, el reparto y el repositorio adjuntos: «Tengo que hacer este proyecto, el cual es una continuación del primero. Debo trabajar según la división de trabajo, yo soy Keilor.», seguido de «Y revisión en general de todas las partes?», «Dame un pdf con las correcciones exactas y cómo resolverlas exactamente.» (redactar el borrador de la especificación 005).
+  Revisión de la Parte II con el enunciado, el reparto y el repositorio adjuntos: «Tengo que hacer este proyecto, el cual es una continuación del primero. Debo trabajar según la división de trabajo [...]», seguido de «Y revisión en general de todas las partes?», «Dame un pdf con las correcciones exactas y cómo resolverlas exactamente.» (redactar el borrador de la especificación 005).
 * **Uso de la respuesta**:
-  Informe de revisión con hallazgos por capacidad (K-01 a K-07 para rutas e invalidación). Creación de la rama `005-rutas-e-invalidacion` y del borrador `specs/005-rutas-e-invalidacion/spec.md` (FR-039 a FR-047, PR-009 y PR-010), que queda pendiente de revisión propia y de `/speckit.clarify`. Este borrador no se generó con `/speckit.specify` porque spec-kit todavía no está instalado en el repositorio (hallazgo P-01).
-  Ajuste posterior (mismo día): con el acuerdo del grupo, se asignó a 005 la equivalencia observable ante cambios del mapa (incluido el caso del Apéndice B de la puerta que se cierra entre turnos), se decidió compartir la búsqueda de rutas entre el cazador e «ir a», y se registraron las clarificaciones Q1 a Q5.
+  Informe de revisión con hallazgos por capacidad (K-01 a K-07 para rutas e invalidación). Creación de la rama `005-rutas-e-invalidacion` y del borrador `specs/005-rutas-e-invalidacion/spec.md`, que queda pendiente de revisión propia y de `/speckit.clarify`. Este borrador no se generó con `/speckit.specify` porque spec-kit todavía no está instalado en el repositorio (hallazgo P-01).
+  Ajuste posterior (mismo día): con el acuerdo del grupo, se asignó a 005 la equivalencia observable ante cambios del mapa (incluido el caso del Apéndice B de la puerta que se cierra entre turnos), se decidió compartir la búsqueda de rutas entre el cazador e «ir a», se registraron las clarificaciones Q1 a Q5 y los requisitos quedaron como FR-039 a FR-044 y PR-009 a PR-013.
 
 ---
 
@@ -1313,7 +1313,7 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 * **Herramienta**: Claude (Anthropic), en conversación con acceso a la carpeta del repositorio
 * **Comando / Prompt**:
   «Sigamos. Qué debo hacer ahora. Explícame y guíame.» (tareas T006 a T008 de la especificación 005).
-* **Uso de la respuesta**: 
+* **Uso de la respuesta**:
   Explicación del núcleo de búsqueda común y su implementación en `model/Dijkstra.py`: `Distancias` (con `Tabla` hasta T005), `calcularDistancias` con regla `puedeUsar` y cota, `elegirPrimerPaso` con el desempate de §3.2 y la decisión Q4, y `puertaAbierta`. Once pruebas nuevas en `tests/test_rutas_invalidacion.py`. Ajuste de la firma en el contrato de `plan.md` y del estado de T005 a T008 en `tasks.md`.
 
 ---

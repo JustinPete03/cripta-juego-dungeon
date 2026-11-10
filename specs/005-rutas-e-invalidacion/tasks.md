@@ -54,10 +54,10 @@ Convenciones:
 
 - [x] **T021** [PR-012] En `BenchCazador`, agregar la estrategia «invalidación fina» a la sección 3 y adaptar `_cambiarPuerta` y `_Contador` a `RutasCazador`. **Depende de** T015.
 - [x] **T022** [PR-010] Sección nueva: `Tabla` frente a arreglo con sellos sobre el mismo escenario de la sección 2 (plan D3). Si el arreglo no mejora de forma medible, volver a `Tabla` y documentarlo. **Depende de** T006.
-- [ ] **T023** [PR-009, PR-010, PR-012] Medir en Windows (Python del `.venv`, sin otros programas abiertos) la versión de antes (commit `8c80884`) y la final; guardar `mediciones-antes.txt` y `mediciones-despues.txt`. El entorno Linux de la máquina dio resultados demasiado variables entre corridas. **Depende de** T021, T022.
+- [x] **T023** [PR-009, PR-010, PR-012] Medir en Windows (Python del `.venv`, sin otros programas abiertos) la versión de antes (commit `8c80884`) y la final; guardar `mediciones-antes.txt` y `mediciones-despues.txt`. El entorno Linux de la máquina dio resultados demasiado variables entre corridas. **Depende de** T021, T022.
 
 ## Fase 8: Documentación
 
 - [x] **T024** [FR-043] Prueba de simetría sobre las criptas de demostración: toda salida tiene su inversa con la misma puerta y el mismo costo (supuesto de la spec). Encontró conexiones con direcciones no opuestas que no compartían puerta; corregido en `_construirSalas` (plan D7).
-- [ ] **T025** Reescribir DECISIONES 5.1 y 5.2 con los números de `mediciones-antes.txt` y `mediciones-despues.txt`; indicar qué cambió respecto al plan original de 001 y qué medición lo motivó; incluir la demostración de las reglas de D5. **Depende de** T023.
+- [x] **T025** Reescribir DECISIONES 5.1 y 5.2 con los números de `mediciones-antes.txt` y `mediciones-despues.txt`; indicar qué cambió respecto al plan original de 001 y qué medición lo motivó; incluir la demostración de las reglas de D5. **Depende de** T023.
 - [x] **T026** Si la implementación se apartó del plan, corregir primero `plan.md` y `tasks.md` (commit aparte) y luego DECISIONES.
