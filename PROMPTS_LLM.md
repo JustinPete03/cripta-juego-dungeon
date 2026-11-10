@@ -1317,3 +1317,24 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   Explicación del núcleo de búsqueda común y su implementación en `model/Dijkstra.py`: `Distancias` (con `Tabla` hasta T005), `calcularDistancias` con regla `puedeUsar` y cota, `elegirPrimerPaso` con el desempate de §3.2 y la decisión Q4, y `puertaAbierta`. Once pruebas nuevas en `tests/test_rutas_invalidacion.py`. Ajuste de la firma en el contrato de `plan.md` y del estado de T005 a T008 en `tasks.md`.
 
 ---
+
+---
+
+### Entrada 2026-11-10 / Antigravity CLI (Google)
+* **Fecha**: 2026-11-10
+* **Herramienta**: Antigravity CLI (`agy` 1.4.12) con Spec-Kit 1.2.3 (integración `agy`)
+* **Comando / Prompt**:
+  `/speckit-clarify specs/005-rutas-e-invalidacion`
+* **Uso de la respuesta**:
+  El agente no encontró ambigüedades que requieran nuevas preguntas: la sesión de clarificación del 2026-11-08 (Q1 a Q5) ya cubre alcance, dominio, rendimiento, casos borde y restricciones. No se modificó `spec.md`.
+
+---
+
+### Entrada 2026-11-10 / Antigravity CLI (Google)
+* **Fecha**: 2026-11-10
+* **Herramienta**: Antigravity CLI (`agy` 1.4.12) con Spec-Kit 1.2.3 (integración `agy`)
+* **Comando / Prompt**:
+  `/speckit-analyze specs/005-rutas-e-invalidacion`
+* **Uso de la respuesta**:
+  Reporte de consistencia entre spec, plan y tasks: 11 de 11 requisitos con tareas, 0 ambigüedades, 0 duplicados, 0 problemas críticos, altos o medios, y sin conflictos con la constitución. Se corrigieron los tres hallazgos de nivel bajo: I1 (dependencia de T005 respecto de T006 en `tasks.md`), I2 (tamaños de cripta 100, 1024 y 5041 salas en `spec.md` y `plan.md`) y C1 (etiquetas de requisitos en T025 y T026).
+

@@ -74,7 +74,7 @@ Como diseñador, quiero que muchos cazadores puedan perseguir al jugador sin que
 
 **Escenarios de aceptación**:
 
-1. **Misma región, criptas de distinto tamaño.** Un cazador de rango pequeño, cerca del jugador, en criptas de 100, 1000 y 5000 salas. El tiempo de su decisión y la cantidad de salas examinadas son aproximadamente iguales en las tres. [PR-010]
+1. **Misma región, criptas de distinto tamaño.** Un cazador de rango pequeño, cerca del jugador, en criptas de unas 100, 1000 y 5000 salas (en el bench, cuadrículas de 10×10, 32×32 y 71×71: 100, 1024 y 5041 salas). El tiempo de su decisión y la cantidad de salas examinadas son aproximadamente iguales en las tres. [PR-010]
 2. **Ruta más cara que el rango.** El cazador espera con costo 100, y decidirlo no requiere examinar salas fuera de la región del mayor rango activo. [PR-010]
 3. **Decenas de cazadores.** Con 30 y con 60 cazadores activos persiguiendo al mismo jugador, ningún ciclo entre dos decisiones del jugador supera 20 ms. [PR-009]
 

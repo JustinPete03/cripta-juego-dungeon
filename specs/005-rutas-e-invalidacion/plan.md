@@ -177,7 +177,7 @@ model/RutasCazador.py
 Todas con criptas sintéticas deterministas por semilla. Se guardan los números **antes** (código actual) y **después** para DECISIONES.
 
 1. **Uno frente a muchos / compartido frente a individual** (PR-012): 1, 10, 30 y 60 cazadores; el individual (D2, alternativa) se verifica **antes** de medir: misma decisión que el compartido para cada cazador (PR-013).
-2. **Rango pequeño frente a grande** (PR-010): rangos 150 y 2000 en criptas de 100, 1000 y 5000 salas; se reportan el tiempo y `salasExaminadas`.
+2. **Rango pequeño frente a grande** (PR-010): rangos 150 y 2000 en cuadrículas de 10×10, 32×32 y 71×71 (100, 1024 y 5041 salas); se reportan el tiempo y `salasExaminadas`.
 3. **Invalidación** (PR-012): escenario A, puertas estables; B, una puerta al azar cambia en cada ciclo; C, cambia una puerta que está en caminos mínimos. Se comparan recalcular siempre, bandera gruesa e invalidación fina; se reportan ms por ciclo y la cantidad de recálculos.
 4. **Ciclo de eventos** (PR-009): modelo real con 30 y 60 cazadores activados en el bench; se reportan la mediana, el p95 y el peor caso, y el número de decisiones de cazador por ciclo. Si son 0, la medición falla (PR-013).
 5. **Tabla frente a arreglo con sellos** (D3): el mismo escenario 2 con ambas estructuras.

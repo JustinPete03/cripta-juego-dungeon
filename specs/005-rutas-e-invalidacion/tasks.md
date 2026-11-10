@@ -24,7 +24,7 @@ Convenciones:
 
 ## Fase 3: Núcleo de búsqueda (`model/Dijkstra.py`)
 
-- [x] **T005** [PR-010] `EspacioBusqueda` con arreglos de distancia, sello y sala, creados una vez por su dueño; `calcularDistancias(..., espacio)` los usa; `de(sala)` devuelve `None` si el sello no es el de la búsqueda o si supera la cota, y lanza error si las distancias quedaron obsoletas. Sin espacio se usa `Tabla`. **Depende de** T004.
+- [x] **T005** [PR-010] `EspacioBusqueda` con arreglos de distancia, sello y sala, creados una vez por su dueño; `calcularDistancias(..., espacio)` los usa; `de(sala)` devuelve `None` si el sello no es el de la búsqueda o si supera la cota, y lanza error si las distancias quedaron obsoletas. Sin espacio se usa `Tabla`. **Depende de** T004 y T006 (optimiza el almacenamiento del núcleo que crea T006).
 - [x] **T006** [FR-043, PR-010] `calcularDistancias(origen, puedeUsar, cota=None, espacio=None)`: Dijkstra con `MinHeapDijkstra` y eliminación perezosa; recorre con `salida.destino`; se detiene al extraer una distancia mayor que la cota. **Depende de**: nada; usa `Distancias` con `Tabla` y T005 la optimiza después.
 - [x] **T007** [FR-042, FR-044] `elegirPrimerPaso(sala, distancias, puedeUsar)`: vecina de menor id que cumple `costo + dist(v) = d`; hacia ella, la salida más barata, y si empatan, la primera en orden N, S, E, O (spec Q4). **Depende de** T006.
 - [x] **T008** [FR-042, FR-043] Pruebas del núcleo en `tests/test_rutas_invalidacion.py`: grafo con pesos; cuadrícula con todas las rutas de igual costo (US-1 escenario 10); dos salidas hacia la misma vecina (Q4); corte por cota sin cambiar decisiones dentro de ella. **Depende de** T007.
@@ -59,5 +59,5 @@ Convenciones:
 ## Fase 8: Documentación
 
 - [x] **T024** [FR-043] Prueba de simetría sobre las criptas de demostración: toda salida tiene su inversa con la misma puerta y el mismo costo (supuesto de la spec). Encontró conexiones con direcciones no opuestas que no compartían puerta; corregido en `_construirSalas` (plan D7).
-- [x] **T025** Reescribir DECISIONES 5.1 y 5.2 con los números de `mediciones-antes.txt` y `mediciones-despues.txt`; indicar qué cambió respecto al plan original de 001 y qué medición lo motivó; incluir la demostración de las reglas de D5. **Depende de** T023.
-- [x] **T026** Si la implementación se apartó del plan, corregir primero `plan.md` y `tasks.md` (commit aparte) y luego DECISIONES.
+- [x] **T025** [PR-009, PR-010, PR-011, PR-012] Reescribir DECISIONES 5.1 y 5.2 con los números de `mediciones-antes.txt` y `mediciones-despues.txt`; indicar qué cambió respecto al plan original de 001 y qué medición lo motivó; incluir la demostración de las reglas de D5. **Depende de** T023.
+- [x] **T026** [FR-039 a FR-044, PR-009 a PR-013] Si la implementación se apartó del plan, corregir primero `plan.md` y `tasks.md` (commit aparte) y luego DECISIONES.

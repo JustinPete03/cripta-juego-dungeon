@@ -336,14 +336,6 @@ def dijkstraSubgrafoConocido(salaDestino, salasIndice, mapaConocido):
 
 
 def elegirPasoViajeAutomatico(salaActual, salaDestino, salasIndice, mapaConocido):
-    """Calcula el siguiente paso para el comando 'ir a' (§3.4).
-
-    Usa el núcleo común (spec 005, plan D6): búsqueda desde el destino sobre el conocimiento del
-    jugador, sin cota ni caché, y el mismo desempate que el cazador (elegirPrimerPaso).
-    Devuelve (salidaElegida, costoSalida).
-    Si ya está en destino, devuelve (None, 0).
-    Si no hay ruta conocida abierta hacia el destino, devuelve (None, None).
-    """
     if salaActual.id == salaDestino.id:
         return (None, 0)
     if not mapaConocido.estaExplorada(salaDestino.id):
