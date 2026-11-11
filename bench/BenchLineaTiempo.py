@@ -52,7 +52,7 @@ def benchComparacionValoresK():
     valoresK = [5, 20, 50, 100000]  # 100000 representa sin puntos de control intermedios
 
     for k in valoresK:
-        nombreK = "K = %d" % k if k < 10000 else "Sin checkpoints (K = ∞)"
+        nombreK = "K = %d" % k if k < 10000 else "Sin checkpoints (K = inf)"
         modelo = _crearPartidaSimulada(nAcciones=nAcciones, checkpointCada=k)
         lt = modelo.lineaTiempo
 
