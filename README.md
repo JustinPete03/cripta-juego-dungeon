@@ -119,7 +119,7 @@ El modo texto se abre con `--consola`; sin esa bandera `python main.py` lanza la
 ### Cómo ejecutar las pruebas de aceptación
 
 ```bash
-# Ejecutar la suite completa (214 pruebas automatizadas)
+# Ejecutar la suite completa (235 pruebas automatizadas al 100% de éxito)
 python -m pytest
 
 # Ejecutar pruebas por capacidad específica de la Parte II:
@@ -127,6 +127,7 @@ python -m pytest tests/test_terreno_cazador.py   # Capacidad 1: Terreno y Cazado
 python -m pytest tests/test_niebla_viaje.py     # Capacidad 2: Niebla y Viaje 'ir a' (FR-011 a FR-020)
 python -m pytest tests/test_resolubilidad.py    # Capacidad 3: Verificación de Resolubilidad (FR-021 a FR-028)
 python -m pytest tests/test_linea_tiempo.py     # Capacidad 4: Línea de Tiempo y Checkpoints (FR-029 a FR-038)
+python -m pytest tests/test_pruebas_ampliadas_rubrica.py # Suite ampliada: bordes LRU, robustez red, guardado binario
 ```
 
 `recoger` y `atacar` reciben el **número** que aparece en pantalla, no el nombre.
@@ -249,15 +250,16 @@ Estos archivos están en `.gitignore`.
 ## Pruebas
 
 ```bash
-python -m pytest          # recoge también TestMotor.py, PruebaRetroceso.py, pruebaEfectos.py...
+python -m pytest          # recoge la suite completa de 235 pruebas
 ```
 
 `pytest.ini` declara los patrones de nombre del proyecto (`Test*.py`, `Prueba*.py`,
 `prueba*.py`, `Diario*.py` y `test_*.py`); sin él, pytest ignora en silencio la mitad de las
-pruebas porque no siguen la convención `test_*.py`. La suite son 173 pruebas.
+pruebas porque no siguen la convención `test_*.py`. La suite completa son **235 pruebas automatizadas**.
 
-Dos de los archivos pinan las reglas que más fácil se rompen:
+Archivos de prueba destacados:
 
+- `tests/test_pruebas_ampliadas_rubrica.py` — pruebas de robustez añadidas en respuesta a la rúbrica: casos límite de caché LRU (capacidad unitaria, saturación con fichas en uso), resiliencia de red HTTP (timeouts, DNS, reintentos 429), rechazo de archivos binarios incompatibles y truncamiento exacto de la línea de tiempo.
 - `tests/test_cache_catalogo.py` — la caché viva: las cubetas crecen con `--cache-size`, se
   desaloja la menos usada, una ficha en uso **no** se desaloja (ni por un acierto en disco), la
   persistencia relee sin red y `asegurarCatalogo` deduplica, ordena y corta los lotes en 10.
@@ -301,15 +303,15 @@ model/                   Reglas del juego y estructuras de datos (sin red, disco
   cache/                 Alternativa descartada (recorre la lista doble, O(n)); ver sección 4.4
 controller/              ControladorJuego.py: traduce texto a acciones y coordina el flujo
 view/                    Dos vistas del mismo estado, intercambiables
-  Consola.py             Vista de consola
+  Consola.py             Vista de consola mejorada con cajas Unicode, barras de vida y costos
   Grafica.py             Vista pygame estilo Pokémon (--gui): escenas, menús, animaciones
   presentacion.py        Instantáneas del modelo para dibujar (no importa pygame)
   sprites.py             Hoja de sprites pixel art (rectángulos sobre una cuadrícula 16x16)
 adapters/                Red y disco detrás de interfaces
   clienteCripta.py       Interfaz del cliente (incluye cuentaComoRed para el presupuesto)
-  clienteHttp.py         Cliente HTTP (encabezado X-Cripta-Client-Id, manejo de 429)
+  clienteHttp.py         Cliente HTTP robusto con jerarquía de excepciones y logging estructurado
   clienteOffline.py      Cliente que lee desde disco (no gasta presupuesto)
-  estrategiaRed.py       Presupuesto, precarga por lotes y reporte de red
+  estrategiaRed.py       Presupuesto, adyacencia indexada O(1), precarga por lotes y reporte
   ProveedorRed.py        Une cliente + caché para el modelo
   proveedor_demo.py      Fuente local para la GUI sin red
   bitacoraReplay.py      Bitácora de partida y validación de versiones
