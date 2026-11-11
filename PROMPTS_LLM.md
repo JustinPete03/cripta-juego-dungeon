@@ -1338,3 +1338,24 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 * **Uso de la respuesta**:
   Reporte de consistencia entre spec, plan y tasks: 11 de 11 requisitos con tareas, 0 ambigüedades, 0 duplicados, 0 problemas críticos, altos o medios, y sin conflictos con la constitución. Se corrigieron los tres hallazgos de nivel bajo: I1 (dependencia de T005 respecto de T006 en `tasks.md`), I2 (tamaños de cripta 100, 1024 y 5041 salas en `spec.md` y `plan.md`) y C1 (etiquetas de requisitos en T025 y T026).
 
+
+
+---
+
+### Entrada 2026-11-11 / Antigravity CLI (Google)
+* **Fecha**: 2026-11-11
+* **Herramienta**: Antigravity CLI (`agy` 1.4.12) con Spec-Kit 1.2.3 (integración `agy`)
+* **Comando / Prompt**:
+  `/speckit-clarify specs/001-terreno-y-cazador`
+* **Uso de la respuesta**:
+  Revisión y validación de ambigüedades en la especificación de Terreno y Cazador: las clarificaciones Q1 a Q8 cubren completamente el costo bidireccional de salidas, el costo por defecto de 100, la afectación del intervalo en errantes y rastreadores, las condiciones de espera y rango del cazador, el desempate determinista por menor id y la equivalencia observable. No se requirieron enmiendas a `spec.md`.
+
+---
+
+### Entrada 2026-11-11 / Antigravity CLI (Google)
+* **Fecha**: 2026-11-11
+* **Herramienta**: Antigravity CLI (`agy` 1.4.12) con Spec-Kit 1.2.3 (integración `agy`)
+* **Comando / Prompt**:
+  `/speckit-analyze specs/001-terreno-y-cazador`
+* **Uso de la respuesta**:
+  Análisis cruzado de consistencia y trazabilidad entre `spec.md`, `plan.md` y `tasks.md`: 10 de 10 requisitos funcionales (FR-001 a FR-010) y 2 de rendimiento (PR-001, PR-002) cuentan con tareas asignadas y pruebas automatizadas (T001-T018). Se constató la concordancia con la Constitución técnica (estructuras de datos propias sin `heapq`/`dict`/`set`, determinismo en desempates y preservación del modelo MVC). Se documentó la integración armónica con la optimización de rutas acotadas de la especificación 005.
