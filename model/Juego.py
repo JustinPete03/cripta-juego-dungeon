@@ -22,7 +22,7 @@ from model.Entidades import (Sala, Salida, Puerta, Jugador, Enemigo, ObjetoInsta
                               ordenarEnemigosPorInstancia)
 from model.Interfaces import Resultado, DiarioNulo, EfectosBase, SinDatos
 from model.Rastro import elegirDestinoRastreador
-from model.Dijkstra import dijkstraDesde
+from model.RutasCazador import RutasCazador
 from model.Cazador import elegirPasoCazador
 from model.MapaConocido import MapaConocido
 from model import estado
@@ -69,17 +69,25 @@ class Modelo:
         self.llaveSalida = None
         self.siguienteSerieObjeto = 0
         self._grabando = False
-        self._rutasCazadorValidas = False
-        self._distanciasCazador = None
+        # Rutas del cazador: una búsqueda compartida, acotada y con invalidación fina (spec 005).
+        # _construirSalas la reemplaza por una del tamaño de la cripta.
+        self.rutasCazador = RutasCazador()
         self.mapaConocido = MapaConocido(self._registrar)
         from model.LineaTiempo import LineaTiempo
         self.lineaTiempo = LineaTiempo(k=getattr(self, "kCheckpoint", 20))
 
-    def _obtenerDistanciasCazador(self):
-        if not self._rutasCazadorValidas or self._distanciasCazador is None:
-            self._distanciasCazador = dijkstraDesde(self.jugador.sala, self.salas)
-            self._rutasCazadorValidas = True
-        return self._distanciasCazador
+    def _obtenerDistanciasCazador(self, cazador):
+        return self.rutasCazador.distanciasPara(self.jugador.sala, cazador.rango,
+                                                self._mayorRangoCazadorActivo)
+
+    def _mayorRangoCazadorActivo(self):
+        # Cota de la búsqueda compartida (spec 005, Q2): el mayor rango entre los cazadores
+        # activos. Solo se calcula cuando hay que recalcular las rutas.
+        mayor = 0
+        for enemigo in self.enemigosVivos:
+            if enemigo.activo and enemigo.comportamiento == "cazador" and enemigo.rango > mayor:
+                mayor = enemigo.rango
+        return mayor
 
     def reiniciar(self):
         # El cargado descarta la partida en curso antes de reconstruir el mundo desde el archivo.
@@ -226,6 +234,15 @@ class Modelo:
             sala = self.salas.enPosicion(i)
             for salida in sala.salidas:
                 inversa = salida.destino.salida(direccionOpuesta(salida.direccion))
+                if inversa is None or inversa.destino is not sala:
+                    # Algunas criptas conectan dos salas por direcciones que no son opuestas
+                    # (35 sale por N hacia 36 y 36 vuelve por O). Siguen siendo una sola
+                    # conexión: se toma la salida del destino que vuelve a esta sala (§3.1).
+                    inversa = None
+                    for candidata in salida.destino.salidas:
+                        if candidata.destino is sala:
+                            inversa = candidata
+                            break
                 if inversa is not None and inversa.destino is sala:
                     if inversa.puerta is not salida.puerta:
                         a = salida.puerta
@@ -240,6 +257,19 @@ class Modelo:
                         inversa.costo = salida.costo
                     elif inversa.costo != 100 and salida.costo == 100:
                         salida.costo = inversa.costo
+
+        # Spec 005 (T003, T004): cada sala conoce su posición en el índice y cada puerta, las dos
+        # salas que conecta y su costo. El cálculo de rutas del cazador usa ambos datos.
+        for i in range(cantidad):
+            sala = self.salas.enPosicion(i)
+            sala.indice = i
+            for salida in sala.salidas:
+                puerta = salida.puerta
+                if puerta.salaA is None:
+                    puerta.salaA = sala
+                    puerta.salaB = salida.destino
+                    puerta.costo = salida.costo
+        self.rutasCazador = RutasCazador(cantidad)
 
     def _asegurarContenido(self, sala):
         #Incorpora el contenido al modelo (sin activar enemigos). Puede bloquear en red;
@@ -366,7 +396,7 @@ class Modelo:
 
     def _retroceder(self):
         self._grabando = False
-        self._rutasCazadorValidas = False
+        self.rutasCazador.invalidar()      # el diario revierte puertas sin avisar a las rutas
         resultado = self.diario.retroceder(self)
         if resultado.ok:
             if getattr(self, "lineaTiempo", None) is not None:
@@ -503,7 +533,7 @@ class Modelo:
         destino = origen.salida(direccion).destino
         self.asignar(self.jugador, "sala", destino)
         self.asignar(destino, "rastro", self.reloj)
-        self._rutasCazadorValidas = False
+        # Las rutas del cazador detectan solas el cambio de sala del jugador (spec 005, D5)
         self.mapaConocido.explorarSala(destino)
         if hasattr(self.efectos, "antorchaEncendida") and self.efectos.antorchaEncendida(self.jugador):
             for salida in destino.salidas:
@@ -522,7 +552,7 @@ class Modelo:
         salida = origen.salida(direccion)
         puerta = salida.puerta
         self.asignar(puerta, "cerrada", False)
-        self._rutasCazadorValidas = False
+        self.rutasCazador.puertaCambio(puerta, True)
         self.mapaConocido.actualizarPuertasObservadas(origen)
         self.mensaje("Abres la puerta hacia %s." % direccion)
         if puerta.cierreAutomatico:
@@ -655,7 +685,7 @@ class Modelo:
                 return salida.costo if salida is not None else COSTO_ACCION_ENEMIGO
             return COSTO_ACCION_ENEMIGO
         elif comportamiento == "cazador":
-            distancias = self._obtenerDistanciasCazador()
+            distancias = self._obtenerDistanciasCazador(enemigo)
             salida, costo = elegirPasoCazador(enemigo, self.jugador.sala, distancias)
             if salida is not None:
                 self._moverEnemigo(enemigo, salida.destino)
@@ -696,7 +726,7 @@ class Modelo:
         puerta = evento.propietario
         self.asignar(puerta, "cerrada", True)    # quien está al otro lado permanece allí
         self.asignar(puerta, "eventoCierre", None)
-        self._rutasCazadorValidas = False
+        self.rutasCazador.puertaCambio(puerta, False)
         if self.jugador is not None and self.jugador.sala is not None:
             for salida in self.jugador.sala.salidas:
                 if salida.puerta is puerta:
@@ -731,3 +761,4 @@ class Modelo:
 
     def restaurarEstado(self, datos):
         estado.restaurar(self, datos)
+        self.rutasCazador.invalidar()      # puertas y sala del jugador cambian sin pasar por eventos

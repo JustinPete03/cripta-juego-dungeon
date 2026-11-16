@@ -113,7 +113,8 @@ El modo texto se abre con `--consola`; sin esa bandera `python main.py` lanza la
 ## Metodología y Desarrollo Parte II (SDD / Spec-Kit)
 
 - **Metodología**: Specification-Driven Development (SDD) con GitHub Spec-Kit (`.specify/memory/constitution.md` y `specs/<NNN-capacidad>/`).
-- **Agente LLM utilizado**: Antigravity (Google DeepMind).
+- **Agente LLM utilizado**: Antigravity (Google DeepMind), también desde la terminal con Antigravity CLI (`agy`).
+- **Versión de Spec-Kit**: 1.2.3, inicializado con `specify init --here --integration agy` (scripts en Python). Las skills del agente están en `.agents/skills/` y las plantillas y scripts en `.specify/`.
 - **Trazabilidad**: Cada capacidad cuenta con su `spec.md` (requisitos funcionales `FR-xxx`, historias de usuario y escenarios de aceptación del Apéndice B), `plan.md` (estructuras de datos propias, análisis de complejidad y módulos) y `tasks.md` (tareas verificables).
 
 ### Cómo ejecutar las pruebas de aceptación
