@@ -44,6 +44,14 @@ def ejecutarBenchmarks():
     _bench("Bench de Motor (Agenda, Rastro, Bitácora) (sección 4.1, sección 4.7, sección 4.8)",
            lambda: _modulo("bench.BenchMotor").correr(_imprimirBench))
     _bench("Bench de Retroceso e Inventario (sección 4.5, sección 4.6)", _benchRetroceso)
+    _bench("Bench de Terreno y Cazador (Parte II §5.1, §5.2)",
+           lambda: _modulo("bench.BenchCazador").main())
+    _bench("Bench de Niebla de Guerra y Viaje 'ir a' (Parte II §5.3)",
+           lambda: _modulo("bench.BenchNiebla").main())
+    _bench("Bench de Verificación de Resolubilidad (Parte II §5.4)",
+           lambda: _modulo("bench.BenchResolubilidad").main())
+    _bench("Bench de Línea de Tiempo y Puntos de Control (Parte II §5.5)",
+           lambda: _modulo("bench.BenchLineaTiempo").main())
 
 
 def crearCliente(args):
@@ -69,14 +77,14 @@ def elegirCripta(cliente):
             return criptas[int(texto) - 1]["id"]
 
 
-def armarModelo(proveedor, semilla):
+def armarModelo(proveedor, semilla, checkpointCada=20):
     from model.Juego import Modelo
     from model.Inventario import Inventario
     from model.Diario import Diario
     from model.efectosTrampa import efectosTrampa
 
     efectos = efectosTrampa()
-    modelo = Modelo(proveedor, semilla, Inventario(proveedor), Diario(), efectos)
+    modelo = Modelo(proveedor, semilla, Inventario(proveedor), Diario(), efectos, kCheckpoint=checkpointCada)
     efectos.registrarEn(modelo)
     return modelo
 
@@ -87,11 +95,11 @@ def armarGuardado(idCripta, versionCripta, versionCatalogo):
     return guardadoPartida(idCripta, versionCripta, versionCatalogo)
 
 
-def construirModelo(cliente, idCripta, semilla, cacheSize):
+def construirModelo(cliente, idCripta, semilla, cacheSize, checkpointCada=20):
     from adapters.ProveedorRed import ProveedorRed
 
     proveedor = ProveedorRed(cliente, idCripta, cacheSize)
-    return proveedor, armarModelo(proveedor, semilla)
+    return proveedor, armarModelo(proveedor, semilla, checkpointCada)
 
 
 def jugar(args, cliente):
@@ -104,8 +112,21 @@ def jugar(args, cliente):
     semilla = args.semilla if args.semilla is not None else int.from_bytes(os.urandom(4), "big")
     nombre = args.nombre if args.nombre else (input("Nombre del jugador: ").strip() or "Jugador")
 
-    proveedor, modelo = construirModelo(cliente, idCripta, semilla, args.cacheSize)
+    checkpointCada = getattr(args, "checkpointCada", 20)
+    proveedor, modelo = construirModelo(cliente, idCripta, semilla, args.cacheSize, checkpointCada)
     versionCripta = proveedor.datos["version"]
+
+    # Verificación de resolubilidad (§3.5, FR-027)
+    from model.Resolubilidad import verificarResolubilidad
+    llaves = proveedor.obtenerLlaves().get("llaves", [])
+    resResolubilidad = verificarResolubilidad(proveedor.datosGenerales(), proveedor.esqueleto(), llaves)
+    if not resResolubilidad.resoluble:
+        print(resResolubilidad.reporte())
+        if not getattr(args, "forzar", False):
+            print("\nPartida cancelada: la cripta no es resoluble. Usa --forzar para jugarla de todos modos.")
+            raise SystemExit(1)
+        else:
+            print("\nADVERTENCIA: Iniciando partida forzada sobre cripta no resoluble.\n")
 
     registro = GestorBitacoraReplay(args.log)
     registro.iniciarNuevaBitacora(idCripta, versionCripta, proveedor.cache.versionCatalogo, semilla)
@@ -133,9 +154,20 @@ def reproducir(args, cliente):
     meta, acciones = registro.cargarYValidarReplay(cliente)
     idCripta = meta.get("idCripta", meta.get("id_cripta"))
     semilla = meta.get("semilla")
-    proveedor, modelo = construirModelo(cliente, idCripta, semilla, args.cacheSize)
+    checkpointCada = getattr(args, "checkpointCada", 20)
+    proveedor, modelo = construirModelo(cliente, idCripta, semilla, args.cacheSize, checkpointCada)
     modelo.iniciarPartida()
     controlador = Controlador(modelo)          # sin vista: --replay no la usa (sección 6)
+
+    hastaReloj = getattr(args, "hasta", None)
+    if hastaReloj is not None:
+        ok, motivo = controlador.reproducirHasta(acciones, hastaReloj)
+        if not ok:
+            print("ERROR: %s" % motivo)
+            raise SystemExit(1)
+        print(proveedor.reporte())
+        return
+
     ok, motivo = controlador.reproducir(acciones)
     resultado = modelo.resultadoPartida()
     print("Replay %s. Estado=%d reloj=%d acciones=%d derrotados=%d"
@@ -187,7 +219,20 @@ def lanzarInterfaz(args):
             idCripta = parametros["id"]
             versionCatalogo = proveedor.cache.versionCatalogo
             reporte = proveedor.reporte       # la demo no hace solicitudes: no tiene nada que reportar
-        modelo = armarModelo(proveedor, semilla)
+
+        # Verificación de resolubilidad (§3.5, FR-027)
+        from model.Resolubilidad import verificarResolubilidad
+        llaves = proveedor.obtenerLlaves().get("llaves", [])
+        resResolubilidad = verificarResolubilidad(datos, proveedor.esqueleto(), llaves)
+        if not resResolubilidad.resoluble:
+            print(resResolubilidad.reporte())
+            if not getattr(args, "forzar", False):
+                raise RuntimeError("La cripta no es resoluble. Usa --forzar para jugarla de todos modos.")
+            else:
+                print("\nADVERTENCIA: Iniciando partida forzada sobre cripta no resoluble.\n")
+
+        checkpointCada = getattr(args, "checkpointCada", 20)
+        modelo = armarModelo(proveedor, semilla, checkpointCada)
         registro.iniciarNuevaBitacora(idCripta, datos["version"], versionCatalogo, semilla)
         modelo.iniciarPartida()
         controlador = Controlador(modelo, vista, registro, puntajes,
@@ -224,7 +269,30 @@ def main():
                         help="abre la interfaz grafica estilo Pokemon (es la opcion por defecto)")
     parser.add_argument("--consola", action="store_true",
                         help="juega en la terminal en lugar de abrir la interfaz grafica")
+    parser.add_argument("--verificar", nargs="?", const="",
+                        help="verifica la resolubilidad de la cripta y sale (sección 3.5)")
+    parser.add_argument("--forzar", action="store_true",
+                        help="fuerza el inicio de partida aunque la cripta no sea resoluble")
+    parser.add_argument("--checkpoint-cada", dest="checkpointCada", type=int, default=20,
+                        help="intervalo de acciones entre puntos de control (def. 20) (§3.6, §5.5)")
+    parser.add_argument("--hasta", type=int,
+                        help="reproduce la bitácora hasta el instante t (§3.6)")
     args = parser.parse_args()
+
+    if args.verificar is not None:
+        cliente = crearCliente(args)
+        idCripta = args.verificar if args.verificar != "" else (args.cripta if args.cripta else elegirCripta(cliente))
+        from adapters.ProveedorRed import ProveedorRed
+        from model.Resolubilidad import verificarResolubilidad
+        proveedor = ProveedorRed(cliente, idCripta, args.cacheSize)
+        datos = proveedor.datosGenerales()
+        esqueleto = proveedor.esqueleto()
+        llaves = proveedor.obtenerLlaves().get("llaves", [])
+        resultado = verificarResolubilidad(datos, esqueleto, llaves)
+        print(resultado.reporte())
+        if not resultado.resoluble:
+            raise SystemExit(1)
+        return
 
     if args.bench:
         ejecutarBenchmarks()

@@ -126,6 +126,17 @@ class Agenda:
             return evento
         return None
 
+    def mirar(self):
+        """Devuelve el próximo evento válido sin sacarlo del heap, o None."""
+        while len(self._heap) > 0:
+            entrada = self._heap[0]
+            evento = entrada[-1]
+            if evento.cancelado:
+                self._sacarRaiz()
+                continue
+            return evento
+        return None
+
     def secuencia(self):
         return self._siguienteSeq
 

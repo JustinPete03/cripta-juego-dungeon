@@ -24,9 +24,12 @@ class IndiceOrdenado:
         self._valores.insert(pos, valor)
 
     def buscar(self, clave):
-        pos = self._posicion(clave)
-        if pos < len(self._claves) and self._claves[pos] == clave:
-            return self._valores[pos]
+        try:
+            pos = self._posicion(clave)
+            if pos < len(self._claves) and self._claves[pos] == clave:
+                return self._valores[pos]
+        except TypeError:
+            return None
         return None
 
     def cantidad(self):

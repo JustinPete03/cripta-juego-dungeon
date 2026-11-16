@@ -35,6 +35,7 @@ SPRITES_POR_COMPORTAMIENTO = (
     ("guardián", "esqueleto"),
     ("errante", "murcielago"),
     ("rastreador", "rata"),
+    ("cazador", "esqueleto"),
 )
 
 DESLICES = (("N", 0, -1), ("S", 0, 1), ("E", 1, 0), ("O", -1, 0))
@@ -76,7 +77,7 @@ class EnemigoVisual:
 
 class SalidaVisual:
     def __init__(self, direccion, destinoId, cerrada, necesitaLlave, tieneLlave, cierreAutomatico,
-                 esSalida):
+                 esSalida, costo=100):
         self.direccion = direccion
         self.destinoId = destinoId
         self.cerrada = cerrada
@@ -84,6 +85,7 @@ class SalidaVisual:
         self.tieneLlave = tieneLlave
         self.cierreAutomatico = cierreAutomatico
         self.esSalida = esSalida
+        self.costo = costo
 
     @property
     def transitable(self):
@@ -314,7 +316,7 @@ def instantaneaDeSalidas(modelo, sala):
                 tieneLlave = False
         salidas.append(SalidaVisual(salida.direccion, salida.destinoId, salida.puerta.cerrada,
                                     necesitaLlave, tieneLlave, salida.puerta.cierreAutomatico,
-                                    salida.destinoId == modelo.salaSalidaId))
+                                    salida.destinoId == modelo.salaSalidaId, salida.costo))
     return salidas
 
 
@@ -394,9 +396,12 @@ def celdasDelMapa(modelo):
     colocadas = []
     pendientes = [(0, 0, modelo.jugador.sala)]
     puestos = [(0, 0, modelo.jugador.sala.id)]
+    puestosIds = {modelo.jugador.sala.id}
     tope = modelo.salas.cantidad() * 4 + 16
-    while len(pendientes) > 0 and len(colocadas) < tope:
-        x, y, sala = pendientes.pop(0)
+    cabeza = 0
+    while cabeza < len(pendientes) and len(colocadas) < tope:
+        x, y, sala = pendientes[cabeza]
+        cabeza += 1
         colocadas.append((x, y, sala))
         for direccion, dx, dy in DESLICES:
             salida = sala.salida(direccion)
@@ -405,13 +410,9 @@ def celdasDelMapa(modelo):
             destino = salida.destino
             if destino is None:
                 continue
-            yaPuesto = False
-            for px, py, pid in puestos:
-                if pid == destino.id:
-                    yaPuesto = True
-                    break
-            if yaPuesto:
+            if destino.id in puestosIds:
                 continue
+            puestosIds.add(destino.id)
             puestos.append((x + dx, y + dy, destino.id))
             pendientes.append((x + dx, y + dy, destino))
     celdas = []
@@ -419,9 +420,15 @@ def celdasDelMapa(modelo):
     for x, y, sala in colocadas:
         cerrada = False
         for salida in sala.salidas:
-            if salida.puerta.cerrada:
+            if hasattr(modelo, "mapaConocido") and modelo.mapaConocido is not None:
+                if modelo.mapaConocido.puertaRecordadaCerrada(sala.id, salida.destinoId, salida.puerta):
+                    cerrada = True
+            elif salida.puerta.cerrada:
                 cerrada = True
-        celdas.append(CeldaVisual(x, y, sala.id, sala.nombre, sala.rastro >= 0,
+        visitada = (modelo.mapaConocido.estaExplorada(sala.id)
+                    if hasattr(modelo, "mapaConocido") and modelo.mapaConocido is not None
+                    else sala.rastro >= 0)
+        celdas.append(CeldaVisual(x, y, sala.id, sala.nombre, visitada,
                                   sala.id == actual, sala.id == modelo.salaSalidaId, cerrada))
     return celdas
 

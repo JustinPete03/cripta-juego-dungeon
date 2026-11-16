@@ -1,8 +1,12 @@
+import logging
 from adapters.clienteCripta import ClienteCripta
 from model.Interfaces import PresupuestoAgotado
-from model.Tabla import Conjunto
+from model.Tabla import Conjunto, Tabla
 from model.cache_estructuras import CacheCatalogo, RegistroSalas
 from model.ordenamiento.Selector import ordenar
+
+loggerPresupuesto = logging.getLogger("Cripta.Presupuesto")
+loggerPrecarga = logging.getLogger("Cripta.Precarga")
 
 
 class GestorRedPrecarga:
@@ -12,6 +16,8 @@ class GestorRedPrecarga:
         self.salasDescargadas = RegistroSalas()
         self.presupuestoMaximo = 0
         self.idCriptaActual = ""
+        # Índice O(1) de adyacencia del esqueleto para optimizar _obtenerSalasContiguas
+        self._mapaContiguas = Tabla()
 
     # Compatibilidad con atributos en snake_case
     @property
@@ -41,29 +47,67 @@ class GestorRedPrecarga:
 
     def _reservar(self, cuantas: int):
         restante = self.presupuestoRestante()
-        if restante is not None and cuantas > restante:
-            raise PresupuestoAgotado("quedan %d de %d solicitudes y esta operación necesita %d"
-                                     % (restante, self.presupuestoMaximo, cuantas))
+        if restante is not None:
+            porcentaje = (restante / self.presupuestoMaximo) * 100.0 if self.presupuestoMaximo > 0 else 0
+            loggerPresupuesto.debug(
+                f"Reserva de {cuantas} solicitud(es). Restante: {restante}/{self.presupuestoMaximo} ({porcentaje:.1f}%)"
+            )
+            if cuantas > restante:
+                loggerPresupuesto.error(
+                    f"Presupuesto agotado para '{self.idCriptaActual}': solicitadas {cuantas}, "
+                    f"quedan {restante} de {self.presupuestoMaximo} permitidas."
+                )
+                raise PresupuestoAgotado(
+                    "quedan %d de %d solicitudes y esta operación necesita %d"
+                    % (restante, self.presupuestoMaximo, cuantas)
+                )
+            if restante <= 2 and restante > 0:
+                loggerPresupuesto.warning(
+                    f"¡Presupuesto crítico! Quedan solo {restante} solicitud(es) de {self.presupuestoMaximo} "
+                    f"para la cripta '{self.idCriptaActual}'."
+                )
 
     def _recortarPorPresupuesto(self, porDescargar):
         restante = self.presupuestoRestante()
         if restante is None or restante > 1:
             return porDescargar
         if restante <= 0:
+            loggerPrecarga.info(f"Presupuesto agotado (0 restantes). Precarga cancelada.")
             return []
         # Con una sola solicitud en la recámara se precarga nada más la sala del jugador: el lote
         # de catálogo que trae necesitaría viajes propios y excedería el máximo (sección 3.3).
+        loggerPrecarga.warning(
+            f"Presupuesto limitado a 1 solicitud: recortando precarga a solo la primera sala ({porDescargar[:1]})."
+        )
         return porDescargar[:1]
+
+    def _indexarAdyacenciaEsqueleto(self, esqueletoSalas: list):
+        """Indexa en tiempo O(V) la adyacencia del esqueleto sobre Tabla propia,
+
+        permitiendo consultas _obtenerSalasContiguas en O(1) tiempo constante durante el juego.
+        """
+        for s in esqueletoSalas:
+            idS = s.get("id")
+            if idS is None:
+                continue
+            salidas = s.get("salidas", {})
+            contiguas = []
+            for direccion in ["N", "S", "E", "O"]:
+                if direccion in salidas:
+                    contiguas.append(salidas[direccion]["sala"])
+            self._mapaContiguas.guardar(idS, contiguas)
 
     def inicializarCripta(self, idCripta: str) -> tuple:
         # Descarga datos generales, todo el esqueleto y precarga la sala inicial (sección 4.2 / sección 2.4)
         self.idCriptaActual = idCripta
+        self._mapaContiguas = Tabla()
         datosGen = self.cliente.obtenerDatosGenerales(idCripta)
         self.presupuestoMaximo = datosGen["presupuesto_solicitudes"]
+        loggerPresupuesto.info(
+            f"Inicializando cripta '{idCripta}'. Presupuesto máximo asignado: {self.presupuestoMaximo} solicitudes HTTP."
+        )
 
         # Descargar todas las páginas del esqueleto para tener la lista completa de salas y sus salidas.
-        # El mando lo tiene la respuesta: datosGen declara "paginas", pero si el servicio cambia el
-        # tamaño de página quedarnos con el primero dejaría salas sin descubrir.
         esqueletoSalas = []
         pagina = 1
         totalPaginas = 1
@@ -75,6 +119,13 @@ class GestorRedPrecarga:
             totalPaginas = max(totalPaginas, int(respPag.get("total_paginas", pagina)))
             pagina += 1
 
+        loggerPrecarga.info(
+            f"Esqueleto de '{idCripta}' descargado completamente: {len(esqueletoSalas)} salas en {totalPaginas} página(s)."
+        )
+
+        # Construir índice rápido O(1) para evitar búsquedas lineales
+        self._indexarAdyacenciaEsqueleto(esqueletoSalas)
+
         # Precargar sala inicial y sus salas contiguas antes del instante 0 (sección 2.4)
         salaInicial = datosGen["sala_inicial"]
         self.precargarVecindad(salaInicial, esqueletoSalas)
@@ -85,12 +136,12 @@ class GestorRedPrecarga:
         # Garantiza que la sala destino esté en memoria antes de entrar (sección 2.5 / sección 4.2)
         contenido = self.salasDescargadas.obtener(idSala)
         if contenido is None:
+            loggerPrecarga.debug(f"Sala {idSala} no presente en memoria. Disparando precarga de vecindad.")
             self.precargarVecindad(idSala, esqueletoSalas)
             contenido = self.salasDescargadas.obtener(idSala)
         if contenido is None:
             # La precarga se recorta con el presupuesto y la sala pudo quedarse fuera del lote.
-            # Entrar sin contenido no es una opción, así que se pide sola; si ni siquiera cabe una
-            # solicitud, PresupuestoAgotado sube al modelo y la acción se rechaza con mensaje.
+            loggerPrecarga.info(f"Sala {idSala} no incluida en lote previo. Descargando individualmente.")
             self._descargarLoteSalasYCatalogo([idSala])
             contenido = self.salasDescargadas.obtener(idSala)
         return contenido
@@ -111,7 +162,7 @@ class GestorRedPrecarga:
                 if len(porDescargar) == 10:
                     break
 
-            # Buscar las salidas contiguas en orden canónico (N, S, E, O)
+            # Buscar las salidas contiguas en O(1) usando el índice
             salasContiguas = self._obtenerSalasContiguas(salaActual, esqueletoSalas)
             for idContigua in salasContiguas:
                 if idContigua not in registradasEnCola:
@@ -122,12 +173,17 @@ class GestorRedPrecarga:
         if len(porDescargar) == 0:
             return
         try:
+            loggerPrecarga.debug(f"Iniciando descarga de lote para salas contiguas: {porDescargar}")
             self._descargarLoteSalasYCatalogo(porDescargar)
         except PresupuestoAgotado:
-            # Precargar es una cortesía: quedarse corto solo cuesta un viaje cuando el jugador entra.
-            pass
+            loggerPresupuesto.warning("Presupuesto agotado durante precarga de vecindad; continuando con lo disponible.")
 
     def _obtenerSalasContiguas(self, idSala: int, esqueletoSalas: list) -> list:
+        # Consulta O(1) en la tabla hash de adyacencia
+        if self._mapaContiguas.contiene(idSala):
+            return self._mapaContiguas.obtener(idSala)
+
+        # Respaldo O(V) si se llamara sin esqueleto preindexado
         contiguas = []
         for s in esqueletoSalas:
             if s["id"] == idSala:
@@ -136,6 +192,7 @@ class GestorRedPrecarga:
                     if direccion in salidas:
                         contiguas.append(salidas[direccion]["sala"])
                 break
+        self._mapaContiguas.guardar(idSala, contiguas)
         return contiguas
 
     def _descargarLoteSalasYCatalogo(self, loteSalas: list):
@@ -143,6 +200,7 @@ class GestorRedPrecarga:
         for i in range(0, len(loteSalas), 10):
             subLoteSalas = loteSalas[i : i + 10]
             self._reservar(1)
+            loggerPrecarga.info(f"Solicitando lote de contenido para salas: {subLoteSalas}")
             respuesta = self.cliente.obtenerContenidoLote(self.idCriptaActual, subLoteSalas)
             idsCatalogo = []
 
@@ -155,6 +213,11 @@ class GestorRedPrecarga:
                     idsCatalogo.append(trampa["tipo"])
 
             self.asegurarCatalogo(idsCatalogo)
+
+    def obtenerLlaves(self, idCripta: str) -> dict:
+        self._reservar(1)
+        loggerPresupuesto.info(f"Solicitando ubicación de llaves para cripta '{idCripta}'")
+        return self.cliente.obtenerLlaves(idCripta)
 
     def asegurarCatalogo(self, idsFichas: list):
         """Pide en lotes de 10 solo las fichas que faltan en RAM y en disco."""
@@ -173,8 +236,10 @@ class GestorRedPrecarga:
         # Es el ordenamiento del proyecto, no sorted(): misma sección 4.9 y su selector.
         pendientes = ordenar(pendientes)
         for i in range(0, len(pendientes), 10):
+            subLote = pendientes[i : i + 10]
             self._reservar(1)
-            respuesta = self.cliente.obtenerCatalogoLote(pendientes[i : i + 10])
+            loggerPrecarga.info(f"Solicitando lote de catálogo para fichas: {subLote}")
+            respuesta = self.cliente.obtenerCatalogoLote(subLote)
             for ficha in respuesta.get("entidades", []):
                 self.cacheCatalogo.insertar(ficha["id"], ficha)
 

@@ -32,6 +32,10 @@ class ClienteCripta(ABC):
         pass
 
     @abstractmethod
+    def obtenerLlaves(self, idCripta: str) -> dict:
+        pass
+
+    @abstractmethod
     def obtenerSolicitudesRealizadas(self) -> int:
         pass
 
@@ -48,4 +52,5 @@ class ClienteCripta(ABC):
     obtener_esqueleto = obtenerEsqueleto
     obtener_contenido_lote = obtenerContenidoLote
     obtener_catalogo_lote = obtenerCatalogoLote
+    obtener_llaves = obtenerLlaves
     obtener_solicitudes_realizadas = obtenerSolicitudesRealizadas

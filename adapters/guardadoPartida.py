@@ -21,14 +21,14 @@ import zlib
 from adapters.guardadoBinario import ENTRADA, buscarSala, escribirSalas
 
 MAGIC = b"CRPS"
-VERSION_FORMATO = 2
+VERSION_FORMATO = 3
 # magic, versión, cantidad de salas, posición del índice de salas, posición del índice de secciones
 ENCABEZADO = struct.Struct("<4sHIQQ")
 CANTIDAD = struct.Struct("<H")         # cantidad de secciones, al inicio del índice de secciones
 LARGO_NOMBRE = struct.Struct("<H")     # los nombres son ASCII, su longitud manda la lectura
 BLOQUE = struct.Struct("<QI")          # posición de la sección, longitud comprimida
 
-SECCIONES = ("cripta", "esqueleto", "estado")
+SECCIONES = ("cripta", "esqueleto", "estado", "linea_tiempo")
 
 
 def _aContenido(sala):
@@ -118,9 +118,11 @@ class guardadoPartida:
         return ruta
 
     def _secciones(self, modelo):
+        lineaTiempoDatos = modelo.lineaTiempo.capturar() if getattr(modelo, "lineaTiempo", None) is not None else {}
         return [("cripta", self.identidad(modelo)),
                 ("esqueleto", list(modelo.proveedor.esqueleto())),
-                ("estado", modelo.capturarEstado())]
+                ("estado", modelo.capturarEstado()),
+                ("linea_tiempo", lineaTiempoDatos)]
 
     def _salas(self, modelo):
         """Contenido de las salas ya incorporadas, ordenado por id (las salas ya lo están)."""
@@ -143,6 +145,9 @@ class guardadoPartida:
             # Restaurar con la fuente del archivo activa: las salas ya visitadas se leen de
             # aquí y no se vuelven a pedir a la red.
             modelo.restaurarEstado(_seccion(secciones, "estado"))
+            ltDatos = _seccion(secciones, "linea_tiempo")
+            if getattr(modelo, "lineaTiempo", None) is not None and ltDatos:
+                modelo.lineaTiempo.restaurar(ltDatos)
         finally:
             modelo.proveedor = real
         return ruta
@@ -182,6 +187,8 @@ class guardadoPartida:
         magic, version, cantidad, posicionSalas, posicionSecciones = ENCABEZADO.unpack(crudo)
         if magic != MAGIC:
             raise ValueError("El archivo no es una partida de CRIPTA.")
+        if version == 2:
+            raise ValueError("Formato incompatible: el archivo es de la versión 2 (Parte I) y no contiene la línea de tiempo requerida en la Parte II.")
         if version != VERSION_FORMATO:
             raise ValueError("Versión de formato incompatible: %d" % version)
         return version, cantidad, posicionSalas, posicionSecciones

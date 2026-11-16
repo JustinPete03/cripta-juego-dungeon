@@ -26,6 +26,11 @@ class GestorBitacoraReplay:
         with open(self.rutaLog, "a", encoding="utf-8") as archivo:
             archivo.write(f"ACCION|{comandoAccion}\n")
 
+    def registrarComentario(self, comentario: str):
+        # Agrega un comentario en modo append (§3.4)
+        with open(self.rutaLog, "a", encoding="utf-8") as archivo:
+            archivo.write(f"# {comentario}\n")
+
     registrar_accion = registrarAccion
 
     def cargarYValidarReplay(self, cliente: ClienteCripta) -> tuple:

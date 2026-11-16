@@ -1,7 +1,46 @@
+import json
+import logging
 import time
 import uuid
 import requests
 from adapters.clienteCripta import ClienteCripta
+
+logger = logging.getLogger("Cripta.Red")
+
+
+class ErrorRedCripta(RuntimeError):
+    """Excepción base para fallos de red en el cliente de la Cripta."""
+    pass
+
+
+class ErrorConexionServidor(ErrorRedCripta):
+    """Fallo de conectividad física, resolución DNS o conexión rechazada por el servidor."""
+    pass
+
+
+class ErrorTiempoEspera(ErrorRedCripta):
+    """Tiempo de espera (timeout) agotado al intentar comunicar con el servidor."""
+    pass
+
+
+class ErrorLimiteFrecuenciaExcedido(ErrorRedCripta):
+    """Se superó el número máximo de reintentos tras recibir HTTP 429 (Too Many Requests)."""
+    pass
+
+
+class ErrorRespuestaInvalida(ErrorRedCripta):
+    """El servidor devolvió una respuesta con código 200 pero contenido no decodificable como JSON."""
+    pass
+
+
+class ErrorHttp(ErrorRedCripta):
+    """Error HTTP con código de estado devuelto por el servidor (4xx o 5xx)."""
+
+    def __init__(self, codigo: int, ruta: str, detalle: str):
+        self.codigo = codigo
+        self.ruta = ruta
+        self.detalle = detalle
+        super().__init__(f"Error HTTP {codigo} en GET '{ruta}': {detalle}")
 
 
 class ClienteHTTP(ClienteCripta):
@@ -11,10 +50,15 @@ class ClienteHTTP(ClienteCripta):
         self.timeout = timeout
         # El UUID (Identificador único) se genera una sola vez por ejecución y se reutiliza (sección Encabezado obligatorio)
         self.clientId = str(uuid.uuid4())
-        self.headers = {"X-Cripta-Client-Id": self.clientId}
+        self.headers = {
+            "X-Cripta-Client-Id": self.clientId,
+            "Accept": "application/json",
+            "User-Agent": "CriptaClient/2.0-Python",
+        }
         # Toda solicitud HTTP cuenta para el presupuesto (incluyendo reintentos 429)
         self.solicitudesRealizadas = 0
         self._versionCatalogo = None
+        logger.info(f"ClienteHTTP inicializado hacia {self.baseUrl} con Client-Id: {self.clientId} (timeout={self.timeout}s)")
 
     # Compatibilidad con atributos previos
     @property
@@ -29,34 +73,50 @@ class ClienteHTTP(ClienteCripta):
     def solicitudes_realizadas(self):
         return self.solicitudesRealizadas
 
-    # Implementación de peticiones seguras con manejo de errores y reintentos 429
+    # Implementación de peticiones seguras con manejo robusto de errores, reintentos 429 y logging
     def _hacerPeticionSegura(self, ruta: str) -> dict:
         url = f"{self.baseUrl}{ruta}"
         maxReintentos429 = 5
         reintentosActuales = 0
 
         while True:
+            t0 = time.perf_counter()
+            self.solicitudesRealizadas += 1
+            numSolicitud = self.solicitudesRealizadas
+
+            logger.debug(f"[Req #{numSolicitud}] Enviando GET {url} | Headers: {self.headers}")
+
             try:
-                # Cada solicitud cuenta para el presupuesto de solicitudes (sección 5.1)
-                self.solicitudesRealizadas += 1
                 respuesta = requests.get(
                     url, headers=self.headers, timeout=self.timeout
                 )
+                duracionMs = (time.perf_counter() - t0) * 1000.0
 
                 if respuesta.status_code == 200:
-                    return respuesta.json()
+                    try:
+                        datos = respuesta.json()
+                        tamanoBytes = len(respuesta.content)
+                        logger.info(
+                            f"[Req #{numSolicitud}] 200 OK en GET '{ruta}' "
+                            f"({duracionMs:.1f}ms, {tamanoBytes} bytes)"
+                        )
+                        return datos
+                    except (json.JSONDecodeError, ValueError) as errJson:
+                        logger.error(
+                            f"[Req #{numSolicitud}] Fallo al decodificar JSON de '{url}': {errJson}. "
+                            f"Cuerpo recibido: {respuesta.text[:200]!r}"
+                        )
+                        raise ErrorRespuestaInvalida(
+                            f"Respuesta no válida del servidor en GET '{ruta}': no se pudo parsear como JSON. "
+                            f"Detalle: {errJson}"
+                        ) from errJson
 
                 elif respuesta.status_code == 429:  # Límite de frecuencia (Too Many Requests)
                     reintentosActuales += 1
-                    if reintentosActuales > maxReintentos429:
-                        raise RuntimeError(
-                            f"[Red] Se excedió el número máximo de reintentos ({maxReintentos429}) por HTTP 429 en '{ruta}'."
-                        )
-
                     tiempoEspera = 1
                     try:
                         datosError = respuesta.json()
-                        tiempoEspera = datosError.get("reintentar_en", 1)
+                        tiempoEspera = int(datosError.get("reintentar_en", 1))
                     except Exception:
                         if "Retry-After" in respuesta.headers:
                             try:
@@ -64,22 +124,93 @@ class ClienteHTTP(ClienteCripta):
                             except ValueError:
                                 tiempoEspera = 1
 
-                    print(f"[Red] HTTP 429 (Límite de frecuencia). Esperando {tiempoEspera}s...")
+                    tiempoEspera = max(1, tiempoEspera)
+
+                    if reintentosActuales > maxReintentos429:
+                        msg = (
+                            f"[Red] Se excedió el número máximo de reintentos ({maxReintentos429}) "
+                            f"por HTTP 429 en '{ruta}'."
+                        )
+                        logger.error(f"[Req #{numSolicitud}] {msg}")
+                        raise ErrorLimiteFrecuenciaExcedido(msg)
+
+                    logger.warning(
+                        f"[Req #{numSolicitud}] HTTP 429 (Límite de frecuencia) en '{ruta}'. "
+                        f"Reintento {reintentosActuales}/{maxReintentos429}. "
+                        f"Esperando {tiempoEspera}s antes de reintentar..."
+                    )
                     time.sleep(tiempoEspera)
                     continue
 
-                else:
-                    # Manejo de otros errores HTTP con contexto (sección 3.1)
-                    raise RuntimeError(
-                        f"Error HTTP {respuesta.status_code} en la operación GET '{ruta}'. "
-                        f"Detalle: {respuesta.text}"
+                elif respuesta.status_code == 404:
+                    logger.error(
+                        f"[Req #{numSolicitud}] HTTP 404 No Encontrado en '{ruta}'. "
+                        f"Verifique la existencia de la cripta o recurso solicitado."
                     )
-            # Manejo de errores de conexión y tiempo de espera
-            except requests.exceptions.RequestException as e:
-                raise RuntimeError(
-                    f"Fallo de conexión de red al consultar '{url}'. "
-                    f"Verifique su conexión. Detalle técnico: {e}"
+                    raise ErrorHttp(
+                        404, ruta,
+                        f"Recurso no encontrado: {respuesta.text.strip() or '404 Not Found'}"
+                    )
+
+                elif 400 <= respuesta.status_code < 500:
+                    logger.error(
+                        f"[Req #{numSolicitud}] Error de cliente HTTP {respuesta.status_code} en '{ruta}': "
+                        f"{respuesta.text[:250]}"
+                    )
+                    raise ErrorHttp(
+                        respuesta.status_code, ruta,
+                        f"Petición rechazada ({respuesta.status_code}): {respuesta.text.strip()}"
+                    )
+
+                elif respuesta.status_code >= 500:
+                    logger.error(
+                        f"[Req #{numSolicitud}] Error interno del servidor HTTP {respuesta.status_code} en '{ruta}': "
+                        f"{respuesta.text[:250]}"
+                    )
+                    raise ErrorHttp(
+                        respuesta.status_code, ruta,
+                        f"Fallo del servidor ({respuesta.status_code}): {respuesta.text.strip()}"
+                    )
+
+                else:
+                    logger.error(
+                        f"[Req #{numSolicitud}] Código HTTP inesperado {respuesta.status_code} en '{ruta}'."
+                    )
+                    raise ErrorHttp(
+                        respuesta.status_code, ruta,
+                        f"Código de respuesta HTTP inesperado: {respuesta.status_code}"
+                    )
+
+            except requests.exceptions.Timeout as eTimeout:
+                duracionMs = (time.perf_counter() - t0) * 1000.0
+                logger.error(
+                    f"[Req #{numSolicitud}] Timeout ({self.timeout}s) al consultar '{url}' "
+                    f"después de {duracionMs:.1f}ms: {eTimeout}"
                 )
+                raise ErrorTiempoEspera(
+                    f"Tiempo de espera agotado ({self.timeout}s) al conectar con '{url}'. "
+                    f"El servidor tardó demasiado en responder."
+                ) from eTimeout
+
+            except requests.exceptions.ConnectionError as eConn:
+                duracionMs = (time.perf_counter() - t0) * 1000.0
+                logger.error(
+                    f"[Req #{numSolicitud}] Fallo de conexión hacia '{url}' tras {duracionMs:.1f}ms: {eConn}"
+                )
+                raise ErrorConexionServidor(
+                    f"No se pudo establecer conexión con el servidor en '{url}'. "
+                    f"Compruebe que el servicio esté en línea y su conexión de red. Detalle: {eConn}"
+                ) from eConn
+
+            except requests.exceptions.RequestException as eReq:
+                duracionMs = (time.perf_counter() - t0) * 1000.0
+                logger.error(
+                    f"[Req #{numSolicitud}] Excepción de red genérica en '{url}' tras {duracionMs:.1f}ms: {eReq}"
+                )
+                raise ErrorRedCripta(
+                    f"Fallo de conexión de red al consultar '{url}'. "
+                    f"Verifique su conexión. Detalle técnico: {eReq}"
+                ) from eReq
 
     _hacer_peticion_segura = _hacerPeticionSegura
 
@@ -117,6 +248,9 @@ class ClienteHTTP(ClienteCripta):
         idsStr = ",".join(idsCatalogo)
         return self._hacerPeticionSegura(f"/catalogo?ids={idsStr}")
 
+    def obtenerLlaves(self, idCripta: str) -> dict:
+        return self._hacerPeticionSegura(f"/criptas/{idCripta}/llaves")
+
     def obtenerSolicitudesRealizadas(self) -> int:
         return self.solicitudesRealizadas
 
@@ -128,4 +262,5 @@ class ClienteHTTP(ClienteCripta):
     obtener_esqueleto = obtenerEsqueleto
     obtener_contenido_lote = obtenerContenidoLote
     obtener_catalogo_lote = obtenerCatalogoLote
+    obtener_llaves = obtenerLlaves
     obtener_solicitudes_realizadas = obtenerSolicitudesRealizadas
