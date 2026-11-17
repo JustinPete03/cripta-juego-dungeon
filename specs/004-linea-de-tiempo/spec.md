@@ -36,7 +36,7 @@
     - Fuera de los puntos de control, la memoria solo almacena la información necesaria para reconstruir los cambios. La memoria total debe crecer con la cantidad de cambios ocurridos y puntos de control cada $K$, nunca como el producto de acciones por el tamaño del estado completo.
     - Una consulta histórica no puede requerir aplicar o deshacer cambios de más de $K$ acciones del jugador.
 
-- **Q5: ¿Qué comportamiento tiene la bandera `--replay ... --hasta <t>` (§3.6)?**
+- **Q5: ¿Qué comportamiento tiene la bandera `--replay ... --hasta` (§3.6)?**
   - **Decisión**:
     - Reproduce la bitácora sin instanciar la vista interactiva hasta el instante $t$ e imprime el resumen del estado en ese instante.
     - Si $t$ es posterior al final de la partida, reproduce hasta el final, imprime el estado final e indica explícitamente que la partida concluyó antes del instante solicitado.

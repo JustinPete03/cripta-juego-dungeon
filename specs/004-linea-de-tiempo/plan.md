@@ -15,7 +15,7 @@
     - `numAccion`: Índice de la acción del jugador ($0, K, 2K, \dots$).
     - `reloj`: Tiempo del reloj virtual al registrar el punto de control.
     - `snapshot`: Copia serializada completa generada por `modelo.capturarEstado()`. Incluye el estado del generador pseudoaleatorio propio (`random.Random.getstate()`), la agenda de eventos, mapa conocido, inventario, etc.
-    - Implementación: Clase ligera con `__slots__ = ("numAccion", "reloj", "snapshot")` con acceso por atributo e indexación `__getitem__` / `__setitem__` sin diccionarios internos en memoria.
+    - Implementación: Clase ligera con `__slots__ = ("numAccion", "reloj", "snapshot")` con acceso por atributos sin diccionarios internos en memoria.
   - `self._acciones`: Lista ordenada de instancias de la clase `RegistroAccion`. Cada registro almacena:
     - `numAccion`: Número de secuencia de la acción realizada por el jugador.
     - `accion`: Instancia de `Accion` (tipo y argumento).
