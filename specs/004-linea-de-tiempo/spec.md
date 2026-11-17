@@ -46,6 +46,14 @@
     - Guardar y cargar la partida conserva la línea de tiempo completa.
     - Si se intenta cargar un archivo de guardado de la primera parte (formato binario anterior sin línea de tiempo), el programa detecta la incompatibilidad y la rechaza con un error explícito, sin cargarla en silencio.
 
+### Sesión 2026-11-16
+
+- **Q7: ¿Debe permitirse consultar `historia #k` para la acción en curso o pendiente ($k = \text{acciones realizadas} + 1$), mostrando el estado justo antes de tomar esa decisión?**
+  - **Decisión**: Sí, el rango válido es $1 \le k \le \text{acciones realizadas} + 1$. Cuando $k = \text{acciones realizadas} + 1$, la consulta muestra el estado actual justo antes de ejecutar la acción pendiente sin avanzar la simulación ni alterar el estado.
+
+- **Q8: ¿Cómo deben tratarse los valores negativos o cero en los comandos `historia <t>` y `historia #k`?**
+  - **Decisión**: Se rechazan estrictamente cualquier $t < 0$ y cualquier $k \le 0$ con un mensaje de error descriptivo indicando que el valor está fuera de rango. No se admite indexación negativa relativa.
+
 ---
 
 ## Historias de usuario
@@ -57,13 +65,13 @@ Como jugador o evaluador, quiero consultar el estado de la partida en cualquier 
 **Escenarios de aceptación**:
 
 1. **Consulta válida por tiempo (`historia <t>`)**:
-   - Dado un instante $t \le \text{reloj actual}$, ejecutar `historia <t>` muestra el reloj, la sala, las estadísticas del jugador, el inventario, los efectos activos, los enemigos de la sala y el mapa conocido correspondientes a ese instante.
+   - Dado un instante $0 \le t \le \text{reloj actual}$, ejecutar `historia <t>` muestra el reloj, la sala, las estadísticas del jugador, el inventario, los efectos activos, los enemigos de la sala y el mapa conocido correspondientes a ese instante.
 2. **Eventos simultáneos en $t$**:
    - Dados múltiples eventos ocurridos en el mismo instante $t$, `historia <t>` refleja el estado tras la ejecución de todos ellos.
 3. **Consulta por número de acción (`historia #k`)**:
-   - Dado $1 \le k \le \text{acciones realizadas}$, `historia #k` muestra el estado justo antes de que el jugador ejecutara la acción número $k$.
-4. **Rechazo de consulta futura**:
-   - Si se ejecuta `historia <t>` con $t > \text{reloj actual}$, o `historia #k` con $k > \text{acciones realizadas}$, el comando se rechaza con un mensaje de error y no modifica el estado.
+   - Dado $1 \le k \le \text{acciones realizadas} + 1$, `historia #k` muestra el estado justo antes de que el jugador ejecutara la acción número $k$ (o el estado actual justo antes de la acción pendiente si $k = \text{acciones realizadas} + 1$).
+4. **Rechazo de consulta futura o inválida**:
+   - Si se ejecuta `historia <t>` con $t > \text{reloj actual}$ o $t < 0$, o `historia #k` con $k > \text{acciones realizadas} + 1$ o $k \le 0$, el comando se rechaza con un mensaje de error descriptivo y no modifica el estado.
 5. **No interferencia con la partida**:
    - Ejecutar consultas históricas no añade entradas a `partida.log`, no gasta unidades de reloj virtual y no altera el diario de retroceso.
 
@@ -116,9 +124,9 @@ Como administrador del sistema, quiero que la memoria de la partida esté acotad
 
 - **FR-029**: El sistema implementa la línea de tiempo registrando los cambios ocurridos en cada acción del jugador.
 - **FR-030**: El comando interactivo `historia <t>` presenta el estado del juego tras procesar todos los eventos hasta el instante $t$.
-- **FR-031**: El comando interactivo `historia #k` presenta el estado del juego justo antes de ejecutar la acción número $k$ del jugador.
+- **FR-031**: El comando interactivo `historia #k` presenta el estado del juego justo antes de ejecutar la acción número $k$ del jugador (válido para $1 \le k \le \text{acciones realizadas} + 1$).
 - **FR-032**: Las consultas históricas no consumen tiempo virtual, no se escriben en `partida.log` y no afectan el diario de retroceso.
-- **FR-033**: Las consultas a instantes posteriores al reloj actual o a números de acción superiores a los ejecutados se rechazan con un mensaje descriptivo.
+- **FR-033**: Las consultas a instantes futuros ($t > \text{reloj actual}$), tiempos negativos ($t < 0$), números de acción futuros ($k > \text{acciones realizadas} + 1$) o índices no positivos ($k \le 0$) se rechazan con un mensaje descriptivo sin alterar la partida.
 - **FR-034**: El pergamino de retroceso recorta la línea de tiempo eliminando las acciones anuladas sin recorrer toda la historia previa.
 - **FR-035**: La bandera CLI `--replay <log> --hasta <t>` reproduce la partida hasta el instante $t$ y emite el resumen del estado sin instanciar la vista interactiva. Si $t$ supera el final de la partida, emite el estado final informando la terminación anticipada.
 - **FR-036**: El sistema almacena puntos de control completos como máximo una vez cada $K$ acciones del jugador, configurable mediante la bandera CLI `--checkpoint-cada K`.
