@@ -25,12 +25,6 @@ class PuntoControl:
         self.reloj = reloj
         self.snapshot = snapshot
 
-    def __getitem__(self, item):
-        return getattr(self, item)
-
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
-
 
 class RegistroAccion:
     __slots__ = ("numAccion", "accion", "reloj")
@@ -39,9 +33,6 @@ class RegistroAccion:
         self.numAccion = numAccion
         self.accion = accion
         self.reloj = reloj
-
-    def __getitem__(self, item):
-        return getattr(self, item)
 
 
 def formatearResumenHistoria(modelo, numAccion=None, reloj=None):
@@ -118,13 +109,14 @@ class LineaTiempo:
         self._acciones = []       # lista de objetos RegistroAccion
 
     def registrarPuntoControl(self, numAccion, reloj, snapshot):
-        """Registra un punto de control con el estado completo del modelo."""
-        # Si ya existe un punto de control para este número de acción, se reemplaza
-        for p in self._puntosControl:
-            if p.numAccion == numAccion:
-                p.reloj = reloj
-                p.snapshot = snapshot
-                return
+        """Registra un punto de control con el estado completo del modelo.
+        Aprovecha el invariante de orden creciente para verificar únicamente el último punto en O(1).
+        """
+        if self._puntosControl and self._puntosControl[-1].numAccion == numAccion:
+            ultimo = self._puntosControl[-1]
+            ultimo.reloj = reloj
+            ultimo.snapshot = snapshot
+            return
         self._puntosControl.append(PuntoControl(numAccion, reloj, snapshot))
 
     def debeCrearPuntoControl(self, numAccion):
@@ -136,8 +128,11 @@ class LineaTiempo:
         self._acciones.append(RegistroAccion(numAccion, accion, relojDecision))
 
     def recortar(self, nuevoTotalAcciones):
-        """Descarta las acciones y puntos de control revertidos con pergamino (§3.6, §5.5)."""
-        # Elimina en el lugar el rango final sin copiar la lista remanente (O(1) amortizado)
+        """Descarta las acciones y puntos de control revertidos con pergamino (§3.6, §5.5).
+        El costo real es proporcional a la cantidad de acciones descartadas O(Δ) con Δ <= 5,
+        ya que el pergamino de retroceso revierte como máximo 5 acciones del jugador.
+        """
+        # Elimina en el lugar el rango final sin copiar la lista remanente (costo O(Δ))
         if nuevoTotalAcciones < len(self._acciones):
             del self._acciones[nuevoTotalAcciones:]
 
@@ -196,12 +191,12 @@ class LineaTiempo:
 
         # Ubicar punto de control anterior
         cp = self.buscarPuntoControlMasCercanoAccion(k)
-        modeloAux = _crearModeloAuxiliar(modeloBase.proveedor, modeloBase.semilla, cp["snapshot"])
+        modeloAux = _crearModeloAuxiliar(modeloBase.proveedor, modeloBase.semilla, cp.snapshot)
 
-        # Re-simular hacia adelante desde cp["numAccion"] hasta k - 1
-        accionesAEjecutar = self._acciones[cp["numAccion"] : k - 1]
+        # Re-simular hacia adelante desde cp.numAccion hasta k - 1
+        accionesAEjecutar = self._acciones[cp.numAccion : k - 1]
         for item in accionesAEjecutar:
-            modeloAux.ejecutar(item["accion"])
+            modeloAux.ejecutar(item.accion)
 
         return formatearResumenHistoria(modeloAux, numAccion=k, reloj=modeloAux.reloj)
 
@@ -219,16 +214,16 @@ class LineaTiempo:
 
         # Ubicar punto de control más cercano anterior o igual a t
         cp = self.buscarPuntoControlMasCercanoTiempo(t)
-        modeloAux = _crearModeloAuxiliar(modeloBase.proveedor, modeloBase.semilla, cp["snapshot"])
+        modeloAux = _crearModeloAuxiliar(modeloBase.proveedor, modeloBase.semilla, cp.snapshot)
 
         # Re-simular acciones
         # Buscamos cuáles acciones ocurrieron antes o en t
-        idx = cp["numAccion"]
+        idx = cp.numAccion
         total = len(self._acciones)
 
         while idx < total:
             item = self._acciones[idx]
-            relojAccion = item["reloj"]
+            relojAccion = item.reloj
 
             if relojAccion > t:
                 # La acción ocurre en el futuro respecto a t: no se ejecuta la acción del jugador,
@@ -241,12 +236,12 @@ class LineaTiempo:
                 break
             else:
                 # relojAccion < t: verificamos si la SIGUIENTE acción también ocurre <= t
-                sigReloj = self._acciones[idx + 1]["reloj"] if idx + 1 < total else None
+                sigReloj = self._acciones[idx + 1].reloj if idx + 1 < total else None
                 if sigReloj is not None and sigReloj <= t:
-                    modeloAux.ejecutar(item["accion"])
+                    modeloAux.ejecutar(item.accion)
                 else:
                     # Esta es la última acción del jugador antes de t
-                    modeloAux.ejecutarHasta(item["accion"], t)
+                    modeloAux.ejecutarHasta(item.accion, t)
                     break
             idx += 1
 
