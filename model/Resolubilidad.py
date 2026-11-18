@@ -51,9 +51,9 @@ def verificarResolubilidad(datosGenerales, esqueleto, listaLlaves):
     
     Algoritmo incremental O(V + E + K) utilizando Tabla propia.
     """
-    salaInicialId = datosGenerales["sala_inicial"]
-    salaSalidaId = datosGenerales["sala_salida"]
-    llaveSalida = datosGenerales["llave_salida"]
+    salaInicialId = datosGenerales.get("sala_inicial")
+    salaSalidaId = datosGenerales.get("sala_salida")
+    llaveSalida = datosGenerales.get("llave_salida")
 
     # 1. Indexar esqueleto por ID de sala
     salasIndice = IndiceOrdenado()
@@ -172,7 +172,7 @@ def verificarResolubilidad(datosGenerales, esqueleto, listaLlaves):
 
     # 4. Comprobar resolubilidad (§3.5, FR-028)
     # Debe poder obtener llave_salida y llegar a sala_salida
-    tieneLlaveSalida = llavesObtenidas.contiene(llaveSalida)
+    tieneLlaveSalida = True if llaveSalida is None else llavesObtenidas.contiene(llaveSalida)
     llegaASalida = alcanzadas.contiene(salaSalidaId)
 
     # Verificar si la puerta hacia salaSalidaId requiere llave_salida (FR-028)
@@ -180,7 +180,7 @@ def verificarResolubilidad(datosGenerales, esqueleto, listaLlaves):
     infoSalida = salasIndice.buscar(salaSalidaId)
     if infoSalida:
         salidasSalida = infoSalida["salidas"]
-        hayPuertasConLlave = any(s.get("llave") == llaveSalida for s in salidasSalida)
+        hayPuertasConLlave = any(s.get("llave") == llaveSalida for s in salidasSalida) if llaveSalida else False
         if hayPuertasConLlave:
             # Al menos un acceso con llaveSalida debe haber sido desbloqueado
             for s in salidasSalida:
@@ -204,7 +204,7 @@ def verificarResolubilidad(datosGenerales, esqueleto, listaLlaves):
     for kId in todasLasLlaves:
         if not llavesObtenidas.contiene(kId):
             llavesInalcanzables.append(kId)
-    if not llavesObtenidas.contiene(llaveSalida) and llaveSalida not in llavesInalcanzables:
+    if llaveSalida is not None and not llavesObtenidas.contiene(llaveSalida) and llaveSalida not in llavesInalcanzables:
         llavesInalcanzables.append(llaveSalida)
 
     fronteraBloqueada = []
@@ -225,73 +225,123 @@ def verificarResolubilidad(datosGenerales, esqueleto, listaLlaves):
                 "ubicacion": ub
             })
 
-    # 6. Detección determinista de ciclos de dependencias
-    # Mapeo de dependencias directas: kId -> list of keys that block access to kId
+    # 6. Detección determinista de dependencias mediante pasada multifuente (§5.4, R-02)
+    # Una sola pasada BFS sobre la región no alcanzada, encolando todas las salas
+    # inmediatamente detrás de la frontera bloqueada, cada una con su llave bloqueadora.
+    # Desempate determinista: encolar entradas ordenadas por ID de sala destino y llave.
     prerrequisitos = Tabla()
+    visitadosSub = Tabla()
 
+    # Encolar las entradas de la frontera en orden determinista
+    entradasFrontera = []
     for item in fronteraBloqueada:
-        kReq = item["llave"]
-        destInicial = item["destino"]
+        entradasFrontera.append((item["destino"], item["llave"]))
+    entradasFrontera = ordenar(entradasFrontera, clave=lambda x: (str(x[0]), str(x[1])))
 
-        visitadosSub = Tabla()
-        colaSub = [(destInicial, kReq)]
-        cabezaSub = 0
+    colaSub = []
+    entradasVistas = Tabla()
+    for destId, kReq in entradasFrontera:
+        claveEntrada = "%s::%s" % (destId, kReq)
+        if not entradasVistas.contiene(claveEntrada):
+            entradasVistas.guardar(claveEntrada, True)
+            colaSub.append((destId, kReq))
 
-        while cabezaSub < len(colaSub):
-            currId, gatingKey = colaSub[cabezaSub]
-            cabezaSub += 1
+    cabezaSub = 0
+    while cabezaSub < len(colaSub):
+        currId, gatingKey = colaSub[cabezaSub]
+        cabezaSub += 1
 
-            if visitadosSub.contiene(currId) or alcanzadas.contiene(currId):
+        if visitadosSub.contiene(currId) or alcanzadas.contiene(currId):
+            continue
+        visitadosSub.guardar(currId, True)
+
+        # Las llaves en currId dependen directamente de gatingKey
+        for reg in llavesPorSala.obtener(currId, []):
+            kDest = reg["id"]
+            if not llavesObtenidas.contiene(kDest):
+                listaP = prerrequisitos.obtener(kDest, [])
+                if gatingKey not in listaP:
+                    listaP.append(gatingKey)
+                prerrequisitos.guardar(kDest, listaP)
+
+        # Seguir explorando salidas en la región no alcanzada
+        infoCurr = salasIndice.buscar(currId)
+        if not infoCurr:
+            continue
+
+        for sal in infoCurr["salidas"]:
+            sigId = sal["destinoId"]
+            if alcanzadas.contiene(sigId) or visitadosSub.contiene(sigId):
                 continue
-            visitadosSub.guardar(currId, True)
-
-            # Las llaves en currId dependen directamente de gatingKey
-            for reg in llavesPorSala.obtener(currId, []):
-                kDest = reg["id"]
-                if not llavesObtenidas.contiene(kDest):
-                    listaP = prerrequisitos.obtener(kDest, [])
-                    if gatingKey not in listaP:
-                        listaP.append(gatingKey)
-                    prerrequisitos.guardar(kDest, listaP)
-
-            # Seguir explorando salidas en la región no alcanzada
-            infoCurr = salasIndice.buscar(currId)
-            if not infoCurr:
-                continue
-
-            for sal in infoCurr["salidas"]:
-                sigId = sal["destinoId"]
-                if alcanzadas.contiene(sigId) or visitadosSub.contiene(sigId):
-                    continue
-                if sal["cerrada"]:
-                    req = sal["llave"]
-                    if req and not llavesObtenidas.contiene(req):
-                        colaSub.append((sigId, req))
-                    elif not sal["cerrada"] or (req and llavesObtenidas.contiene(req)):
-                        colaSub.append((sigId, gatingKey))
-                else:
+            if sal["cerrada"]:
+                req = sal["llave"]
+                if req and not llavesObtenidas.contiene(req):
+                    # Cruce de otra puerta cerrada cuya llave no se tiene:
+                    # la nueva etiqueta de dependencia pasa a ser esa llave (R-02)
+                    colaSub.append((sigId, req))
+                elif req and llavesObtenidas.contiene(req):
+                    # Llave ya en posesión: puerta transitable, mantiene gatingKey (R-05 limpio)
                     colaSub.append((sigId, gatingKey))
+            else:
+                # Salida abierta: mantiene la etiqueta gatingKey
+                colaSub.append((sigId, gatingKey))
 
-    # Buscar ciclos en el grafo de prerrequisitos
+    # 7. Detección determinista de ciclos de dependencias con DFS iterativa (§5.4, R-01)
+    # Evita recursión (elimina RecursionError en cadenas largas) usando pila explícita
+    # y marcas de tres estados: 0=no visitado, 1=en pila (gris), 2=terminado (negro).
     cicloDetectado = None
+    estados = Tabla()  # kId -> 0 (no visitado), 1 (en pila), 2 (terminado)
+    padre = Tabla()
 
-    def _buscarCiclo(actual, camino):
-        prereqs = prerrequisitos.obtener(actual, [])
-        for p in prereqs:
-            if p == actual:
-                return [actual, actual]
-            if p in camino:
-                idx = camino.index(p)
-                return camino[idx:] + [p]
-            res = _buscarCiclo(p, camino + [p])
-            if res:
-                return res
-        return None
+    # Recorrer llaves inalcanzables en orden determinista de ID
+    llavesOrdenadas = ordenar(llavesInalcanzables, clave=lambda k: str(k))
 
-    for kId in llavesInalcanzables:
-        ciclo = _buscarCiclo(kId, [kId])
-        if ciclo:
-            cicloDetectado = ciclo
+    for kInicio in llavesOrdenadas:
+        if estados.obtener(kInicio, 0) != 0:
+            continue
+
+        # Pila explícita: cada entrada es [nodo, indicePrerrequisito]
+        pila = [[kInicio, 0]]
+        estados.guardar(kInicio, 1)
+
+        while len(pila) > 0 and cicloDetectado is None:
+            top = pila[-1]
+            u, idx = top[0], top[1]
+
+            # Prerrequisitos de u ordenados determinísticamente
+            prereqs = prerrequisitos.obtener(u, [])
+            prereqsOrdenados = ordenar(prereqs, clave=lambda p: str(p))
+
+            if idx < len(prereqsOrdenados):
+                p = prereqsOrdenados[idx]
+                top[1] += 1  # avanzar índice para la próxima iteración de u
+
+                estadoP = estados.obtener(p, 0)
+                if estadoP == 1:
+                    # Ciclo detectado: p está actualmente en la pila
+                    # Reconstruir ciclo desde p hasta u y cerrar en p
+                    ciclo = []
+                    encontrado = False
+                    for itemPila in pila:
+                        nodo = itemPila[0]
+                        if nodo == p:
+                            encontrado = True
+                        if encontrado:
+                            ciclo.append(nodo)
+                    ciclo.append(p)
+                    cicloDetectado = ciclo
+                    break
+                elif estadoP == 0:
+                    # No visitado: apilar y marcar como en pila
+                    estados.guardar(p, 1)
+                    padre.guardar(p, u)
+                    pila.append([p, 0])
+            else:
+                # Todos los prerrequisitos de u fueron explorados sin hallar ciclos
+                pila.pop()
+                estados.guardar(u, 2)
+
+        if cicloDetectado is not None:
             break
 
     return ResultadoResolubilidad(
