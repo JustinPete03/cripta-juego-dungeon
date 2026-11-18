@@ -225,105 +225,73 @@ def verificarResolubilidad(datosGenerales, esqueleto, listaLlaves):
                 "ubicacion": ub
             })
 
-    # 6. Detección determinista de dependencias y ciclos (§5.4, R-01, R-02, R-05)
+    # 6. Detección determinista de ciclos de dependencias
     # Mapeo de dependencias directas: kId -> list of keys that block access to kId
     prerrequisitos = Tabla()
 
-    # Multifuente determinista sobre la región no alcanzada (R-02)
-    # Encolar deterministamente todas las salas adyacentes a la frontera bloqueada
-    fronteraOrdenada = ordenar(fronteraBloqueada, clave=lambda it: (it["llave"], it["origen"], it["destino"]))
-    colaSub = []
-    for item in fronteraOrdenada:
-        colaSub.append((item["destino"], item["llave"]))
+    for item in fronteraBloqueada:
+        kReq = item["llave"]
+        destInicial = item["destino"]
 
-    visitadosSub = Tabla()
-    cabezaSub = 0
+        visitadosSub = Tabla()
+        colaSub = [(destInicial, kReq)]
+        cabezaSub = 0
 
-    while cabezaSub < len(colaSub):
-        currId, gatingKey = colaSub[cabezaSub]
-        cabezaSub += 1
+        while cabezaSub < len(colaSub):
+            currId, gatingKey = colaSub[cabezaSub]
+            cabezaSub += 1
 
-        if alcanzadas.contiene(currId) or visitadosSub.contiene(currId):
-            continue
-        visitadosSub.guardar(currId, gatingKey)
-
-        # Las llaves en currId dependen directamente de gatingKey
-        for reg in llavesPorSala.obtener(currId, []):
-            kDest = reg["id"]
-            if not llavesObtenidas.contiene(kDest):
-                listaP = prerrequisitos.obtener(kDest, [])
-                if gatingKey not in listaP:
-                    listaP.append(gatingKey)
-                prerrequisitos.guardar(kDest, listaP)
-
-        # Seguir explorando salidas en la región no alcanzada
-        infoCurr = salasIndice.buscar(currId)
-        if not infoCurr:
-            continue
-
-        for sal in infoCurr["salidas"]:
-            sigId = sal["destinoId"]
-            if alcanzadas.contiene(sigId) or visitadosSub.contiene(sigId):
+            if visitadosSub.contiene(currId) or alcanzadas.contiene(currId):
                 continue
-            if sal["cerrada"]:
-                req = sal["llave"]
-                if req and not llavesObtenidas.contiene(req):
-                    colaSub.append((sigId, req))
-                elif req and llavesObtenidas.contiene(req):
+            visitadosSub.guardar(currId, True)
+
+            # Las llaves en currId dependen directamente de gatingKey
+            for reg in llavesPorSala.obtener(currId, []):
+                kDest = reg["id"]
+                if not llavesObtenidas.contiene(kDest):
+                    listaP = prerrequisitos.obtener(kDest, [])
+                    if gatingKey not in listaP:
+                        listaP.append(gatingKey)
+                    prerrequisitos.guardar(kDest, listaP)
+
+            # Seguir explorando salidas en la región no alcanzada
+            infoCurr = salasIndice.buscar(currId)
+            if not infoCurr:
+                continue
+
+            for sal in infoCurr["salidas"]:
+                sigId = sal["destinoId"]
+                if alcanzadas.contiene(sigId) or visitadosSub.contiene(sigId):
+                    continue
+                if sal["cerrada"]:
+                    req = sal["llave"]
+                    if req and not llavesObtenidas.contiene(req):
+                        colaSub.append((sigId, req))
+                    elif not sal["cerrada"] or (req and llavesObtenidas.contiene(req)):
+                        colaSub.append((sigId, gatingKey))
+                else:
                     colaSub.append((sigId, gatingKey))
-            else:
-                colaSub.append((sigId, gatingKey))
 
-    # Buscar ciclos en el grafo de prerrequisitos usando DFS iterativo (R-01)
+    # Buscar ciclos en el grafo de prerrequisitos
     cicloDetectado = None
-    estadoDFS = Tabla()  # kId -> 0: sin visitar, 1: en la pila, 2: terminado
-    padreDFS = Tabla()
 
-    # Orden determinista para recorrer llaves
-    llavesInalcanzablesOrdenadas = ordenar(llavesInalcanzables)
+    def _buscarCiclo(actual, camino):
+        prereqs = prerrequisitos.obtener(actual, [])
+        for p in prereqs:
+            if p == actual:
+                return [actual, actual]
+            if p in camino:
+                idx = camino.index(p)
+                return camino[idx:] + [p]
+            res = _buscarCiclo(p, camino + [p])
+            if res:
+                return res
+        return None
 
-    for kInicio in llavesInalcanzablesOrdenadas:
-        if estadoDFS.obtener(kInicio, 0) != 0:
-            continue
-
-        pila = [[kInicio, 0]]
-        estadoDFS.guardar(kInicio, 1)
-
-        while len(pila) > 0 and cicloDetectado is None:
-            marco = pila[-1]
-            u = marco[0]
-            prereqs = prerrequisitos.obtener(u, [])
-            if not isinstance(prereqs, tuple):
-                prereqs = ordenar(prereqs)
-                prerrequisitos.guardar(u, tuple(prereqs))
-
-            idx = marco[1]
-            if idx < len(prereqs):
-                v = prereqs[idx]
-                marco[1] += 1
-
-                estadoV = estadoDFS.obtener(v, 0)
-                if estadoV == 1:
-                    # Ciclo detectado: reconstruir camino desde v hasta v
-                    ciclo = []
-                    encontrado = False
-                    for m in pila:
-                        if m[0] == v:
-                            encontrado = True
-                        if encontrado:
-                            ciclo.append(m[0])
-                    ciclo.append(v)
-                    cicloDetectado = ciclo
-                    break
-                elif estadoV == 0:
-                    estadoDFS.guardar(v, 1)
-                    padreDFS.guardar(v, u)
-                    pila.append([v, 0])
-            else:
-                estadoDFS.guardar(u, 2)
-                pila.pop()
-
-        if cicloDetectado is not None:
+    for kId in llavesInalcanzables:
+        ciclo = _buscarCiclo(kId, [kId])
+        if ciclo:
+            cicloDetectado = ciclo
             break
 
     return ResultadoResolubilidad(

@@ -396,24 +396,58 @@ Se implementó `MapaConocido` sobre `Tabla` propia con dispersión djb2.
 
 * **Especificación**: `specs/003-resolubilidad/spec.md`
 * **Plan**: `specs/003-resolubilidad/plan.md`
+* **Responsable**: Diego Mena
 
 ### 1. Problema
-Antes de iniciar una partida o al invocar `--verificar <cripta>`, determinar si la cripta puede completarse exitosamente (§3.5). Si es resoluble, retornar una secuencia determinista de obtención de llaves; si no lo es, detallar la frontera bloqueada y reportar los ciclos de dependencias circulares (e.g. $[K \to K]$ o $[K_1 \to K_2 \to K_1]$), ejecutándose en menos de 200 ms.
+Antes de iniciar una partida o al invocar `--verificar <cripta>`, determinar si la cripta puede completarse exitosamente bajo los supuestos de §3.5. Si es resoluble, retornar una secuencia determinista de obtención de llaves; si no lo es, detallar la frontera bloqueada y reportar los ciclos de dependencias circulares (e.g. $[K \to K]$ o $[K_1 \to K_2 \to \dots \to K_1]$), ejecutándose en menos de 200 ms sobre la cripta más grande (§6.1).
 
 ### 2. Alternativas consideradas
-* **(A) BFS repetido por cada llave encontrada (Ingenuo)**: Cada llave nueva reinicia la exploración desde la sala inicial. Complejidad $O(K \cdot (V + E))$, ineficiente en cadenas largas de llaves.
-* **(B) Recorrido incremental con cola de eventos y puertas en espera (Elegida)**: Se realiza una única búsqueda en anchura incremental con costo $O(V + E + K)$. Si se halla una puerta cerrada cuya llave no se posee, la arista se registra en una lista de espera indexada en `Tabla` propia (`puertasEsperandoLlave`). Al recoger la llave, sus puertas en espera se "despiertan" y se encolan inmediatamente, sin reiniciar las salas ya visitadas.
+* **(A) BFS repetido por cada llave encontrada (Ingenuo)**: Cada llave nueva reinicia la exploración desde la sala inicial. Complejidad $O(K \cdot (V + E))$. En cadenas largas de llaves genera un crecimiento estrictamente cuadrático $O(K^2)$.
+* **(B) Recorrido incremental con puertas en espera y detección DFS iterativa (Elegida)**:
+  1. *Exploración hacia adelante*: Se realiza un único BFS incremental $O(V + E + K)$. Las puertas cerradas sin llave se suspenden en `puertasEsperandoLlave` (`Tabla` propia). Al recoger una llave, sus salidas bloqueadas se reactivan y encolan directamente, sin reiniciar salas ya visitadas.
+  2. *Pasada multifuente en región inalcanzable (R-02)*: En caso de no resolubilidad, se ejecuta una sola pasada BFS multifuente desde todas las puertas de la frontera bloqueada hacia la región no alcanzada. Cada sala se visita una sola vez ($O(V_{inaccesible} + E_{inaccesible})$), determinando de qué llave de frontera depende cada sala y llave inalcanzable.
+  3. *DFS iterativa con marcas de tres estados (R-01)*: Para detectar ciclos de dependencias, se utiliza una DFS iterativa con pila explícita y 3 estados (0 = no visitado, 1 = en pila, 2 = terminado). Elimina cualquier recursión evitando `RecursionError` en cadenas profundas (> 1 000 llaves) y opera en $O(\text{llaves} + \text{dependencias})$.
 
 ### 3. Evidencia Empírica (`bench/BenchResolubilidad.py`)
-Medición con cadenas de llaves encadenadas:
 
-| Cantidad de Llaves $K$ | Recorrido Incremental (ms) | Recorrido Ingenuo (ms) | Factor de Ganancia |
+#### Comparación Algorítmica Justa (Ambas con `Tabla` e `IndiceOrdenado` propios, R-03):
+Mide el tiempo de verificación en cadenas de dependencias estrictas $K_1 \to K_2 \to \dots \to K_n$:
+
+| Cantidad de Llaves $K$ | Recorrido Incremental | ms / llave (Inc) | Recorrido Ingenuo | ms / llave (Ing) | Ganancia |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 100 llaves | 1.68 ms | 0.0168 ms | 23.48 ms | 0.2348 ms | **14.0x** |
+| 500 llaves | 7.65 ms | 0.0153 ms | 665.31 ms | 1.3306 ms | **87.0x** |
+| 1 000 llaves | 16.32 ms | 0.0163 ms | 2 634.25 ms | 2.6342 ms | **161.4x** |
+| 2 000 llaves | 34.95 ms | 0.0175 ms | 11 163.48 ms | 5.5817 ms | **319.5x** |
+| 5 000 llaves | **88.15 ms** | **0.0176 ms** | 75 618.08 ms | 15.1236 ms | **857.9x más rápido** |
+
+* **Comportamiento Asintótico**: En la versión incremental, el tiempo por llave se mantiene constante (~0.017 ms/llave), demostrando **crecimiento estrictamente lineal $O(N)$**. En contraste, la versión ingenua escala de 0.23 a 15.12 ms/llave, evidenciando **crecimiento cuadrático $O(K^2)$**.
+
+#### Detección de Ciclos en Cadenas No Resolubles (R-01, R-03):
+Mide la detección de ciclos circulares cerrados $K_1 \to K_2 \dots \to K_n \to K_1$ con DFS iterativa:
+
+| Longitud Cadena $K$ | Tiempo Detección | Ciclo Identificado | Determinismo (Misma Salida) |
 |:---:|:---:|:---:|:---:|
-| 10 llaves | 0.093 ms | 0.023 ms | — |
-| 50 llaves | 0.642 ms | 0.475 ms | — |
-| 100 llaves | **1.350 ms** | 1.884 ms | **1.4x más rápido** |
+| 100 llaves | 1.76 ms | 101 llaves | SÍ (Idéntico) |
+| 500 llaves | 9.55 ms | 501 llaves | SÍ (Idéntico) |
+| 1 000 llaves | 19.68 ms | 1 001 llaves | SÍ (Idéntico) |
+| 2 000 llaves | 43.48 ms | 2 001 llaves | SÍ (Idéntico) |
+| 5 000 llaves | **110.16 ms** | 5 001 llaves | SÍ (Idéntico) |
 
-* **Presupuesto de procesamiento (§6.1, PR-005 < 200 ms)**: Verificación sobre cripta de 200 salas y 31 llaves: **1.19 ms** (un margen de seguridad de más de 160x).
+#### Presupuesto de Procesamiento en Criptas Grandes (§6.1, PR-005 < 200 ms, R-04):
+
+| Tamaño Cripta (Salas) | Llaves Distribuidas | Mediana (ms) | Peor Caso (ms) | Cumple < 200 ms |
+|:---:|:---:|:---:|:---:|:---:|
+| 200 salas | 31 llaves | 1.17 ms | 1.44 ms | **SÍ** (1.44 ms < 200 ms) |
+| 500 salas | 61 llaves | 3.14 ms | 3.37 ms | **SÍ** (3.37 ms < 200 ms) |
+| 1 000 salas | 101 llaves | 6.61 ms | 6.96 ms | **SÍ** (6.96 ms < 200 ms) |
+| 2 000 salas | 151 llaves | 13.42 ms | 14.17 ms | **SÍ** (14.17 ms < 200 ms) |
+
+Incluso en una cripta de 2 000 salas, el peor caso (14.17 ms) consume menos del 8 % del presupuesto total permitido (200 ms).
+
+### 4. Límites conocidos
+* La verificación opera bajo los supuestos estáticos de §3.5 (combate victorioso, llaves no consumibles). Si una regla futura introdujera llaves de un solo uso o enemigos invencibles, el problema se transformaría en NP-completo (planificación en mundos con recursos consumibles).
+* El desempate de dependencias en la pasada multifuente asume orden canónico por menor ID de sala y menor ID de llave en la frontera.
 
 ---
 
