@@ -86,6 +86,23 @@ def benchConsultaPartidaLarga5000Acciones():
     # 20 consultas en puntos aleatorios a lo largo de toda la historia
     puntosConsulta = [azar.randint(10, nAcciones) for _ in range(20)]
 
+    tiempos = []
+    for numAcc in puntosConsulta:
+        t0 = time.perf_counter()
+        _ = lt.consultarAccion(modelo, numAcc)
+        tiempos.append(time.perf_counter() - t0)
+
+    tiempos.sort()
+    medianaMs = tiempos[len(tiempos) // 2] * 1000
+    peorMs = max(tiempos) * 1000
+    promedioMs = (sum(tiempos) / len(tiempos)) * 1000
+
+    print("  Resultados para 20 consultas arbitrarias (1 a %d):" % nAcciones)
+    print("    Tiempo promedio : %.2f ms" % promedioMs)
+    print("    Tiempo mediana  : %.2f ms" % medianaMs)
+    print("    Peor caso       : %.2f ms" % peorMs)
+    print("  ¿Cumple requisito PR-007 (< 50 ms)?: %s" %
+          ("SÍ (peor caso %.2f ms < 50 ms)" % peorMs if peorMs < 50 else "NO (peor caso %.2f ms >= 50 ms)" % peorMs))
     cuadriculas = [(10, 10, 100), (32, 32, 1024), (71, 71, 5041)]
 
     print("  %-16s | %-12s | %-13s | %-14s | %s" %

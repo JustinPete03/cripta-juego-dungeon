@@ -218,6 +218,7 @@ class VistaGrafica:
         self.salto = None
         self.transicion = 0.0
         self.combate = False
+        self.mostrarAyuda = False
         # Superficies recicladas: las cajas, el escenario y las luces se dibujan una sola vez.
         self.cajas = {}
         self.escenarios = {}
@@ -926,6 +927,18 @@ class VistaGrafica:
             elif entrada.dato == "ayuda":
                 self.controlador.procesar("ayuda")
                 self._refrescarCaptura()
+            elif entrada.dato[:5] == "ir_a:":
+                destId = int(entrada.dato[5:])
+                if self.captura is not None and destId == self.captura.sala.id:
+                    self.flotantes.append(["¡Ya estás en la Sala %d!" % destId, ANCHO - 260, 160, 0.9])
+                else:
+                    self.controlador.procesar("ir a %d" % destId)
+                    self._refrescarCaptura()
+                    self.flotantes.append(["Viaje a Sala %d" % destId, ANCHO - 260, 160, 1.0])
+            elif entrada.dato == "abrir_ayuda":
+                self.mostrarAyuda = True
+            elif entrada.dato == "cerrar_ayuda":
+                self.mostrarAyuda = False
             return
         self._enviar(entrada.accion, entrada.dato, entrada.accion == ACC_ATACAR)
         self.submenu = None
@@ -1048,6 +1061,9 @@ class VistaGrafica:
             return
         if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
             self.posRaton = evento.pos
+            if self.mostrarAyuda:
+                self.mostrarAyuda = False
+                return
             if self.escena == "portada":
                 self.transicion = 0.35
                 self.escena = "titulo"
@@ -1070,6 +1086,13 @@ class VistaGrafica:
         if evento.type != pygame.KEYDOWN:
             return
         tecla = evento.key
+        if tecla in (pygame.K_h, pygame.K_F1):
+            self.mostrarAyuda = not self.mostrarAyuda
+            return
+        if self.mostrarAyuda:
+            if tecla in (pygame.K_ESCAPE, pygame.K_z, pygame.K_RETURN, pygame.K_SPACE, pygame.K_x):
+                self.mostrarAyuda = False
+            return
         if self.escena == "portada":
             if tecla in (pygame.K_RETURN, pygame.K_z, pygame.K_SPACE, pygame.K_x, pygame.K_ESCAPE):
                 self.transicion = 0.35
@@ -1480,7 +1503,20 @@ class VistaGrafica:
         # La viñeta sólo oscurece el escenario: las cajas de la interfaz mantienen su contraste.
         zona = ESCENARIO.inflate(10, 10)
         self.pantalla.blit(self._vineta(zona.width, zona.height), zona.topleft)
+        # Advertencia visual de vida baja (viñeta pulsante roja)
+        if self.captura is not None and self.captura.jugador is not None:
+            jugador = self.captura.jugador
+            if 0 < jugador.vida <= int(jugador.vidaMax * 0.25):
+                pulso = int(45 + 35 * math.sin(pygame.time.get_ticks() / 110.0))
+                sPeligro = pygame.Surface((ESCENARIO.width, ESCENARIO.height), pygame.SRCALPHA)
+                for g in range(1, 8):
+                    alfa = int(pulso * (1.0 - g / 8.0))
+                    pygame.draw.rect(sPeligro, (220, 20, 20, alfa),
+                                     sPeligro.get_rect().inflate(-g * 2, -g * 2), 2, border_radius=10)
+                self.pantalla.blit(sPeligro, ESCENARIO.topleft)
         self._dibujarFlotantes()
+        if self.mostrarAyuda:
+            self._dibujarAyudaModal()
         self._dibujarTransicion()
 
     def _dibujarSala(self):
@@ -1562,13 +1598,19 @@ class VistaGrafica:
                       (base.left + 22, rect.centery) if salida.direccion == "O" else
                       (base.right - 22, rect.centery))
             costoTexto = " (%d)" % salida.costo if salida.costo != 100 else ""
-            chipRect = self._chip(pasado, "%s %s%s" % (salida.direccion, texto, costoTexto), tono,
+            autoTexto = " [AUTO %d]" % salida.cierreAutomatico if getattr(salida, "cierreAutomatico", None) is not None else ""
+            chipRect = self._chip(pasado, "%s %s%s%s" % (salida.direccion, texto, costoTexto, autoTexto), tono,
                                   base.inflate(-4, -4))
             esHover = rect.collidepoint(self.posRaton) or (chipRect and chipRect.collidepoint(self.posRaton))
             if esHover:
-                pygame.draw.rect(self.pantalla, BLANCO, rect.inflate(8, 8), 2, border_radius=6)
+                pulsoH = int(180 + 75 * math.sin(pygame.time.get_ticks() / 120.0))
+                pygame.draw.rect(self.pantalla, (pulsoH, pulsoH, 255), rect.inflate(8, 8), 2, border_radius=6)
+                if chipRect:
+                    pygame.draw.rect(self.pantalla, BLANCO, chipRect.inflate(4, 4), 1, border_radius=5)
             self.zona(rect.inflate(14, 14), UI_SUBMENU,
                       "abrir" if salida.cerrada else "mover")
+            if chipRect:
+                self.zona(chipRect, ACC_ABRIR if salida.cerrada else ACC_MOVER, salida.direccion)
 
     def _arena(self, ancho, alto):
         """Fondo de combate: marco biselado, dos plataformas ovaladas y la misma luz cálida."""
@@ -1629,6 +1671,12 @@ class VistaGrafica:
                            enemigo.vidaMax, "", True)
             areaEnemigo = rect.inflate(14, 22)
             hover = areaEnemigo.collidepoint(self.posRaton)
+            if i < 4:
+                hkRect = pygame.Rect(rect.centerx - 14, max(base.y + 4, rect.top - 18), 28, 16)
+                pygame.draw.rect(self.pantalla, TINTA, hkRect, border_radius=4)
+                pygame.draw.rect(self.pantalla, ROJO if hover else BORDE_ACERO, hkRect, 1, border_radius=4)
+                self.texto(hkRect.centerx, hkRect.centery, "[%d]" % (i + 1), 13,
+                           AMARILLO if hover else BLANCO, centrado=True)
             if (self.submenu is not None and self.submenu == "objetivo" and
                     self.cursorSub == i) or hover:
                 self._dibujarBlanco(rect)

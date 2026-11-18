@@ -2,7 +2,7 @@
 # Trazabilidad con requisitos FR-001 a FR-010.
 
 import unittest
-from model.Constantes import ACC_MOVER, ACC_ESPERAR
+from model.Constantes import ACC_MOVER, ACC_ESPERAR, ACC_ABRIR, EV_CIERRE_PUERTA
 from model.Acciones import Accion
 from model.Entidades import Sala, Salida, Puerta, Jugador, Enemigo
 from model.Salas import IndiceOrdenado
@@ -308,6 +308,98 @@ class TestTerrenoYCazador(unittest.TestCase):
         cazadorActivo = modelo.jugador.sala.enemigos[0]
         self.assertTrue(cazadorActivo.activo)
         self.assertEqual(cazadorActivo.rango, 600)
+
+    def test_j01_puerta_cierra_entre_turnos_cazador(self):
+        """[J-01, FR-007, US-2 Escenario 7] Una puerta de la ruta del cazador se cierra automáticamente
+        entre dos turnos: la invalidación actualiza la ruta y el cazador toma alternativa o espera."""
+        esqueleto = [
+            {"id": 1, "nombre": "Sala 1", "salidas": {
+                "E": {"sala": 2, "cerrada": True, "cierre_automatico": 80, "costo": 50},
+                "S": {"sala": 4, "costo": 300}
+            }},
+            {"id": 2, "nombre": "Sala 2", "salidas": {
+                "O": {"sala": 1, "cerrada": True, "cierre_automatico": 80, "costo": 50},
+                "S": {"sala": 3, "costo": 50}
+            }},
+            {"id": 3, "nombre": "Sala 3", "salidas": {
+                "N": {"sala": 2, "costo": 50},
+                "O": {"sala": 4, "costo": 50}
+            }},
+            {"id": 4, "nombre": "Sala 4", "salidas": {
+                "N": {"sala": 1, "costo": 300},
+                "E": {"sala": 3, "costo": 50}
+            }},
+            {"id": 99, "nombre": "Salida", "salidas": {}}
+        ]
+        contenidos = [
+            {"sala": 1, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 2, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 3, "enemigos": [{"instancia": "c-1", "tipo": "ent_cazador", "vida": 20}],
+             "objetos": [], "trampas": []},
+            {"sala": 4, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 99, "enemigos": [], "objetos": [], "trampas": []}
+        ]
+        fichas = [
+            {"id": "ent_cazador", "clase": "enemigo", "nombre": "Cazador",
+             "vida_max": 20, "ataque": 5, "defensa": 2, "velocidad": 100,
+             "comportamiento": "cazador", "rango": 600, "suelta": []}
+        ]
+        prov = ProveedorSintetico(esqueleto, contenidos, fichas)
+        modelo = Modelo(prov, semilla=42, inventario=Inventario(prov), diario=Diario())
+        modelo.iniciarPartida()
+
+        # Incorporar contenido de las salas
+        sala3 = modelo.salas.buscar(3)
+        modelo._asegurarContenido(sala3)
+        modelo._asegurarContenido(modelo.salas.buscar(2))
+        modelo._asegurarContenido(modelo.salas.buscar(4))
+
+        # Activar manualmente al cazador en sala 3 para que participe en la agenda
+        cazador = sala3.enemigos[0]
+        cazador.activo = True
+        modelo.agenda.programar(50, 1, cazador)  # 1 = EV_ENEMIGO
+
+        # Jugador en t=0 abre puerta E hacia Sala 2 (costo abrir = 50 -> t=50)
+        res = modelo.ejecutar(Accion(ACC_ABRIR, "E"))
+        self.assertTrue(res.ok)
+
+        # Jugador en t=50 espera (costo esperar = 100 -> reloj llega a t=150).
+        # En t=50: el cazador actúa y se mueve de 3 a 2 (hacia 1 porque puerta 1-2 está abierta).
+        # En t=80: la agenda ejecuta EV_CIERRE_PUERTA y puerta 1-2 se cierra automáticamente.
+        # En t=100: el cazador en sala 2 actúa de nuevo. Como puerta 1-2 está cerrada,
+        #           la ruta se invalidó y no puede entrar a 1 directamente.
+        resEsp = modelo.ejecutar(Accion(ACC_ESPERAR))
+        self.assertTrue(resEsp.ok)
+
+        # La puerta 1-2 ahora está cerrada por la agenda automática
+        puerta12 = modelo.salas.buscar(1).salida("E").puerta
+        self.assertTrue(puerta12.cerrada)
+
+        # El cazador no pudo entrar a sala 1
+        self.assertNotEqual(cazador.sala.id, 1)
+
+    def test_j03_puerta_conoce_sus_salas(self):
+        """[J-03, §5.2] Cada puerta construida conoce sus dos salas conectadas y su costo."""
+        esqueleto = [
+            {"id": 1, "nombre": "Entrada", "salidas": {"E": {"sala": 2, "costo": 150}}},
+            {"id": 2, "nombre": "Salida", "salidas": {"O": {"sala": 1, "costo": 150}}}
+        ]
+        prov = ProveedorSintetico(esqueleto, [], [], datosGen={
+            "sala_inicial": 1, "sala_salida": 2, "llave_salida": "k", "inventario_max": 10,
+            "jugador": {"vida_max": 50, "ataque": 10, "defensa": 5, "velocidad": 100}
+        })
+        modelo = Modelo(prov, semilla=1, inventario=Inventario(prov), diario=Diario())
+        modelo.iniciarPartida()
+
+        s1 = modelo.salas.buscar(1)
+        salidaE = s1.salida("E")
+        puerta = salidaE.puerta
+
+        self.assertIsNotNone(puerta.salaA)
+        self.assertIsNotNone(puerta.salaB)
+        self.assertEqual(puerta.costo, 150)
+        ids = {puerta.salaA.id, puerta.salaB.id}
+        self.assertEqual(ids, {1, 2})
 
 
 if __name__ == "__main__":

@@ -1014,6 +1014,26 @@ Defensa / Que pasa si el profesor cambia la cripta por una con 50 veces más sal
 
 Identificar los límites conocidos de mi motor y diseñar una forma de comprobar el determinismo del replay
 
+31
+
+15-18 nov. 2026
+
+Antigravity (Google DeepMind)
+
+/speckit-clarify specs/001-terreno-y-cazador
+
+Clarificar requisitos de la capacidad 001 (§2.2): unificación de puertas compartidas en salas conectadas por direcciones no opuestas, contrato de salas y costo en Puerta (J-03), y manejo de cierres automáticos entre turnos del cazador (J-01).
+
+32
+
+15-18 nov. 2026
+
+Antigravity (Google DeepMind)
+
+/speckit-analyze specs/001-terreno-y-cazador
+
+Analizar trazabilidad de spec 001 (§2.2) contra el código implementado en Entidades.py, Juego.py, test_terreno_cazador.py y bench/BenchCazador.py, verificando cumplimiento de los contratos de invalidación fina y resolución determinista.
+
 Jurnier — Efectos y guardado binario
 
 #
