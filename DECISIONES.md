@@ -423,7 +423,7 @@ Medición con cadenas de llaves encadenadas:
 * **Plan**: `specs/004-linea-de-tiempo/plan.md`
 
 ### 1. Problema
-Permitir consultar el estado en cualquier instante $t$ (`historia <t>`) o acción previa $\#k$ (`historia #k`) y la reproducción hasta un instante $t$ (`--replay ... --hasta <t>`), sin alterar el estado en curso, sin consumir tiempo virtual y sin escribir en `partida.log`. No se permite guardar más de una copia completa cada $K$ acciones (configurable con `--checkpoint-cada K`, justificado con mediciones). Fuera de los checkpoints, solo se almacenan las acciones livianas. Al retroceder con un pergamino, la línea debe recortarse en $O(1)$.
+Permitir consultar el estado en cualquier instante $t$ (`historia <t>`) o acción previa $\#k$ (`historia #k`) y la reproducción hasta un instante $t$ (`--replay ... --hasta <t>`), sin alterar el estado en curso, sin consumir tiempo virtual y sin escribir en `partida.log`. No se permite guardar más de una copia completa cada $K$ acciones (configurable con `--checkpoint-cada K`, justificado con mediciones). Fuera de los checkpoints, solo se almacenan las acciones livianas. Al retroceder con un pergamino, la línea debe recortarse con costo proporcional a lo descartado (como máximo 5 acciones).
 
 ### 2. Alternativas consideradas
 * **(A) Inversión hacia atrás de cambios**: Almacenar clausuras inversas de toda la partida. Descartada por consumo gigantesco de memoria y porque el generador `random.Random` (Mersenne Twister) no posee inversión analítica simple.
@@ -431,7 +431,7 @@ Permitir consultar el estado en cualquier instante $t$ (`historia <t>`) o acció
 * **(C) Reconstrucción hacia adelante desde punto de control (Forward Re-simulation, Elegida)**: Se guarda un snapshot completo generado por `model.estado.capturar()` cada $K$ acciones. Para cualquier consulta, se ubica el punto de control anterior más cercano, se restaura un modelo réplica y se re-simulan a lo sumo $K - 1$ acciones hasta el instante pedido.
 
 ### 3. Evidencia Empírica y Justificación de $K = 20$ (`bench/BenchLineaTiempo.py`)
-Medición sobre partida de 1 000 acciones variando $K$:
+Medición sobre partida de 1 000 acciones variando $K$ en una cripta de 64 salas ($8\times 8$):
 
 | Configuración | Puntos de Control | Memoria Retenida | Mediana de Consulta | Peor Caso |
 |---|:---:|:---:|:---:|:---:|
@@ -441,7 +441,41 @@ Medición sobre partida de 1 000 acciones variando $K$:
 | Sin checkpoints ($K = \infty$) | 1 | 38 KB | 52.73 ms | 76.76 ms |
 
 **Justificación técnica de $K = 20$**:
-Con $K = 20$, el consumo de memoria se reduce en un **74 %** respecto a $K = 5$ (1.3 MB vs 5.2 MB), manteniendo tiempos de consulta excelentes (< 5 ms). A diferencia de $K = \infty$ que supera los 50 ms en consultas tardías, $K = 20$ garantiza cumplir con holgura el límite PR-007 (< 50 ms) incluso en partidas de 5 000 acciones (mediana: **3.57 ms**).
+Con $K = 20$, el consumo de memoria se reduce en un **74 %** respecto a $K = 5$ (1.3 MB vs 5.2 MB), manteniendo tiempos de consulta excelentes (< 5 ms). A diferencia de $K = \infty$ que supera los 50 ms en consultas tardías, $K = 20$ cumple con holgura el límite PR-007 (< 50 ms) en partidas de 5 000 acciones únicamente en la cripta pequeña de 64 salas (mediana: **3.57 ms**).
+
+### 4. L-03: La consulta reconstruía la cripta completa
+En la implementación inicial, cada consulta de historia (`consultarHistoriaAccion` / `consultarHistoriaTiempo`) instanciaba un modelo réplica auxiliar completo invocando `_construirSalas(esqueleto)` e `iniciarPartida()`, reconstruyendo todo el grafo de salas desde cero en cada llamada antes de aplicar `restaurarEstado`.
+
+**Medición y Comparativa Antes vs. Después (Partida de 5 000 acciones, $K = 20$, 20 consultas)**:
+
+| Salas (Cuadrícula) | Mediana Antes | Peor Caso Antes | Mediana Después (`--bench`) | Peor Caso Después (`--bench`) | ¿Cumple < 50 ms (Peor Caso)? |
+|---|:---:|:---:|:---:|:---:|:---:|
+| 100 ($10\times 10$) | 22.74 ms | 112.69 ms | 20.30 ms | 111.51 ms | NO |
+| 1024 ($32\times 32$) | 112.99 ms | 605.61 ms | 78.92 ms | 554.35 ms | NO |
+| 5041 ($71\times 71$) | 398.49 ms | 3 444.21 ms | 145.72 ms | 355.77 ms | NO |
+
+**Desglose por fases en cripta de 5 041 salas ($71\times 71$)**:
+El perfilado de una consulta descompuesta reveló que la reconstrucción de la cripta consumía **110.88 ms** (`_construirSalas`: 72.30 ms + resto de `iniciarPartida`: 38.57 ms), lo cual representaba cerca del **77 % del costo total** de una consulta (~144 ms).
+
+| Fase de la Consulta | Tiempo Antes (Consulta típica) | Tiempo Después (Promedio 20 consultas) |
+|---|:---:|:---:|
+| Búsqueda de Punto de Control | 0.01 ms | 0.01 ms |
+| Preparación / Reconstrucción de Cripta | 110.88 ms (77 %) | **2.26 ms** (< 2 %) |
+| `restaurarEstado` (Snapshot) | 27.95 ms | 68.29 ms |
+| Re-simulación de acciones intermedias | 5.78 ms | 46.40 ms |
+| Formateo de resumen | 0.29 ms | 3.12 ms |
+
+**Decisión**:
+Con base en la medición experimental en la cripta máxima disponible de 5 041 salas con 5 000 acciones, se decidió implementar formalmente la **reutilización del esqueleto ya construido**. El modelo auxiliar clona e indexa la topología fija de salas, salidas, conexiones y puertas en orden canónico ($O(V)$ en < 3 ms), manteniendo su propio estado mutable sin compartir salas ni puertas con el modelo vivo. Esto redujo la mediana en 5 041 salas de **398.49 ms a 145.72 ms** y el tiempo de preparación del modelo auxiliar de **110.88 ms a solo 2.26 ms** promedio. Cabe destacar que el «antes» se midió sin `gc.collect()` y el «después» con él, por lo que los peores casos no resultan directamente comparables.
+
+### 5. Límites conocidos
+* **Incumplimiento en criptas grandes**: Con 5 041 salas el peor caso (355.77 ms) y la mediana (145.72 ms) continúan superando el límite constitucional de 50 ms.
+* **Cuellos de botella remanentes**: El costo restante tras optimizar la topología se concentra en `restaurarEstado` (recorrer y poblar el estado dinámico de 5 041 salas en el snapshot) y en la re-simulación de acciones intermedias cuando se disparan movimientos y cálculo de distancias de enemigos.
+* **Carga de estrés sintética**: El benchmark evalúa un enemigo por sala (más de 5 000 enemigos en la cuadrícula de 71×71), lo que constituye una carga significativamente superior a los escenarios normales con decenas de cazadores activos.
+* **Cripta de referencia pendiente**: La cripta de referencia definitiva estipulada en §6.1 aún no está publicada, por lo que las pruebas se realizaron sobre la cota máxima sintética de 5 041 salas.
+
+### 6. Coincidencia con plan.md original
+La decisión adoptada coincide con la alternativa de diseño prevista en el plan original («reutilizar el esqueleto ya construido»). Sin embargo, mientras el plan contemplaba una «shallow copy de salas», la solución implementada clona salas, salidas y puertas para crear un modelo con estado enteramente independiente, compartiendo únicamente los datos fijos de topología. Asimismo, el requisito constitucional de rendimiento PR-007 (< 50 ms en el peor caso) no se logra satisfacer en criptas grandes (1 024 y 5 041 salas).
 
 ---
 
