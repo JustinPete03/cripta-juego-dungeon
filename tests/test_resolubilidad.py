@@ -278,3 +278,122 @@ def test_inicio_partida_no_resoluble_con_forzar(monkeypatch, capsys):
     main.jugar(ArgsMock(), None)
     out, _ = capsys.readouterr()
     assert "ADVERTENCIA: Iniciando partida forzada sobre cripta no resoluble" in out
+
+
+def test_ciclos_cadenas_largas_500_y_5000_determinista():
+    """R-01: Verificación de ciclos en cadenas de 2, 500 y 5000 llaves sin desbordar pila."""
+    def _crearCadenaCiclo(n):
+        esqueleto = []
+        salidas1 = {"E": {"sala": 2, "cerrada": True, "llave": "k_1"}}
+        esqueleto.append({"id": 1, "nombre": "S1", "salidas": salidas1})
+        listaLlaves = []
+
+        for i in range(2, n + 2):
+            salidas = {"O": {"sala": i - 1, "cerrada": True, "llave": f"k_{i-1}"}}
+            if i <= n:
+                salidas["E"] = {"sala": i + 1, "cerrada": True, "llave": f"k_{i}"}
+                listaLlaves.append({"id": f"k_{i}", "sala": i})
+            else:
+                listaLlaves.append({"id": "k_1", "sala": i})
+            esqueleto.append({"id": i, "nombre": f"S{i}", "salidas": salidas})
+
+        datos = {"id": f"c-ciclo-{n}", "sala_inicial": 1, "sala_salida": n + 1, "llave_salida": "k_salida"}
+        listaLlaves.append({"id": "k_salida", "sala": n + 1})
+        return datos, esqueleto, listaLlaves
+
+    for n in (2, 500, 5000):
+        datos, esqueleto, llaves = _crearCadenaCiclo(n)
+        res1 = verificarResolubilidad(datos, esqueleto, llaves)
+        res2 = verificarResolubilidad(datos, esqueleto, llaves)
+
+        assert res1.resoluble is False
+        assert res1.ciclo is not None
+        assert len(res1.ciclo) == n + 1
+        assert res1.ciclo[0] == res1.ciclo[-1]
+        # Determinismo estricto entre ejecuciones
+        assert res1.ciclo == res2.ciclo
+
+
+def test_multifuente_frontera_ancha_lineal():
+    """R-02: Recorrido multifuente único sobre frontera con múltiples puertas bloqueadas."""
+    # Estructura: Sala 1 conecta al Norte con Sala 2 (cerrada con K1),
+    # al Sur con Sala 3 (cerrada con K2), al Este con Sala 4 (cerrada con K3),
+    # y al Oeste con Sala 5 (cerrada con K4).
+    # Detrás de cada una hay una cadena de salas con llaves dependientes.
+    esqueleto = []
+    salidas1 = {
+        "N": {"sala": 2, "cerrada": True, "llave": "K1"},
+        "S": {"sala": 3, "cerrada": True, "llave": "K2"},
+        "E": {"sala": 4, "cerrada": True, "llave": "K3"},
+        "O": {"sala": 5, "cerrada": True, "llave": "K4"},
+    }
+    esqueleto.append({"id": 1, "nombre": "S1", "salidas": salidas1})
+
+    # Salas 2, 3, 4, 5
+    esqueleto.append({"id": 2, "nombre": "S2", "salidas": {"S": {"sala": 1, "cerrada": True, "llave": "K1"}, "N": {"sala": 6}}})
+    esqueleto.append({"id": 3, "nombre": "S3", "salidas": {"N": {"sala": 1, "cerrada": True, "llave": "K2"}, "S": {"sala": 7}}})
+    esqueleto.append({"id": 4, "nombre": "S4", "salidas": {"O": {"sala": 1, "cerrada": True, "llave": "K3"}, "E": {"sala": 8}}})
+    esqueleto.append({"id": 5, "nombre": "S5", "salidas": {"E": {"sala": 1, "cerrada": True, "llave": "K4"}, "O": {"sala": 9}}})
+
+    # Salas 6, 7, 8, 9
+    esqueleto.append({"id": 6, "nombre": "S6", "salidas": {"S": {"sala": 2}}})
+    esqueleto.append({"id": 7, "nombre": "S7", "salidas": {"N": {"sala": 3}}})
+    esqueleto.append({"id": 8, "nombre": "S8", "salidas": {"O": {"sala": 4}}})
+    esqueleto.append({"id": 9, "nombre": "S9", "salidas": {"E": {"sala": 5}}})
+
+    # Llaves en salas profundas formando dependencias
+    listaLlaves = [
+        {"id": "K1", "sala": 7},  # K1 está detrás de K2
+        {"id": "K2", "sala": 8},  # K2 está detrás de K3
+        {"id": "K3", "sala": 9},  # K3 está detrás de K4
+        {"id": "K4", "sala": 6},  # K4 está detrás de K1 -> Ciclo K1-K2-K3-K4-K1!
+        {"id": "llave_salida", "sala": 6}
+    ]
+
+    datos = {"id": "c-frontera-4", "sala_inicial": 1, "sala_salida": 6, "llave_salida": "llave_salida"}
+
+    res = verificarResolubilidad(datos, esqueleto, listaLlaves)
+    assert res.resoluble is False
+    assert len(res.fronteraBloqueada) == 4
+    assert res.ciclo is not None
+    assert len(res.ciclo) == 5  # 4 llaves en el ciclo + cierre
+    assert res.ciclo[0] == res.ciclo[-1]
+
+
+def test_cli_verificar_resoluble(monkeypatch, capsys):
+    """FR-026 / US-1 Escenario 6: python main.py --verificar con cripta resoluble sale con 0 sin interfaz."""
+    import sys
+    import main
+    from tests.FuentePrueba import FuentePrueba
+
+    fuente = FuentePrueba(ancho=2, alto=2)
+    monkeypatch.setattr(main, "crearCliente", lambda args: None)
+    monkeypatch.setattr("adapters.ProveedorRed.ProveedorRed", lambda *a, **kw: fuente)
+
+    monkeypatch.setattr(sys, "argv", ["main.py", "--verificar", "cripta-prueba"])
+    main.main()
+
+    out, _ = capsys.readouterr()
+    assert "=== REPORTE DE RESOLUBILIDAD: RESOLUBLE ===" in out
+
+
+def test_cli_verificar_no_resoluble(monkeypatch, capsys):
+    """FR-026 / US-1 Escenario 6: python main.py --verificar con cripta no resoluble sale con código 1."""
+    import sys
+    import main
+    from tests.FuentePrueba import FuentePrueba
+
+    fuente = FuentePrueba(ancho=2, alto=2)
+    fuente.salas[0]["salidas"]["E"]["cerrada"] = True
+    fuente.salas[0]["salidas"]["E"]["llave"] = "llave_fantasma"
+    monkeypatch.setattr(main, "crearCliente", lambda args: None)
+    monkeypatch.setattr("adapters.ProveedorRed.ProveedorRed", lambda *a, **kw: fuente)
+    monkeypatch.setattr(fuente, "obtenerLlaves", lambda: {"llaves": []})
+
+    monkeypatch.setattr(sys, "argv", ["main.py", "--verificar", "cripta-bloqueada"])
+    with pytest.raises(SystemExit) as exc:
+        main.main()
+
+    assert exc.value.code == 1
+    out, _ = capsys.readouterr()
+    assert "=== REPORTE DE RESOLUBILIDAD: NO RESOLUBLE ===" in out

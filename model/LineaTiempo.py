@@ -1,10 +1,21 @@
 # Línea de tiempo y puntos de control (§3.6, §5.5 Parte II).
 # Cumple con el Principio I de la Constitución y gestiona puntos de control cada K acciones.
+# L-05: sin dict como tabla de búsqueda; registros con clases con __slots__.
 
 from model.Acciones import Accion
 from model.Constantes import (EN_CURSO, EV_JUGADOR)
 
 
+# L-05: función en vez de dict para nombres de efecto (Principio I).
+def nombreEfecto(clase):
+    """Devuelve el nombre legible de un efecto dado su código numérico."""
+    if clase == 0:
+        return "Veneno"
+    if clase == 1:
+        return "Regeneración"
+    if clase == 2:
+        return "Antorcha"
+    if clase == 3:
 def nombreEfecto(clase):
     if clase == 0:
         return "Veneno"
@@ -17,6 +28,9 @@ def nombreEfecto(clase):
     return "Efecto-%s" % clase
 
 
+# L-05: registros con __slots__ en vez de dict para puntos de control y acciones.
+class PuntoControl:
+    """Punto de control: snapshot del modelo en un momento dado."""
 class PuntoControl:
     __slots__ = ("numAccion", "reloj", "snapshot")
 
@@ -25,12 +39,15 @@ class PuntoControl:
         self.reloj = reloj
         self.snapshot = snapshot
 
-    def __getitem__(self, item):
-        return getattr(self, item)
+    def __getitem__(self, clave):
+        return getattr(self, clave)
 
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
+    def __setitem__(self, clave, valor):
+        setattr(self, clave, valor)
 
+
+class RegistroAccion:
+    """Registro de una acción realizada por el jugador."""
 
 class RegistroAccion:
     __slots__ = ("numAccion", "accion", "reloj")
@@ -40,8 +57,8 @@ class RegistroAccion:
         self.accion = accion
         self.reloj = reloj
 
-    def __getitem__(self, item):
-        return getattr(self, item)
+    def __getitem__(self, clave):
+        return getattr(self, clave)
 
 
 def formatearResumenHistoria(modelo, numAccion=None, reloj=None):
@@ -94,19 +111,73 @@ def formatearResumenHistoria(modelo, numAccion=None, reloj=None):
     return "\n".join(lineas)
 
 
-def _crearModeloAuxiliar(proveedor, semilla, snapshot):
-    """Instancia y restaura un modelo réplica para re-simulación sin tocar la partida en curso."""
+def _crearModeloAuxiliarCompleto(proveedor, semilla, snapshot):
+    """Instancia y restaura un modelo réplica completo mediante iniciarPartida() (reconstrucción completa)."""
     from model.Inventario import Inventario
-    from model.Diario import Diario
+    from model.Interfaces import DiarioNulo
     from model.efectosTrampa import efectosTrampa
     from model.Juego import Modelo
 
     efectos = efectosTrampa()
-    modeloAux = Modelo(proveedor, semilla, Inventario(proveedor), Diario(), efectos)
+    modeloAux = Modelo(proveedor, semilla, Inventario(proveedor), DiarioNulo(), efectos)
+    modeloAux.lineaTiempo = None
     efectos.registrarEn(modeloAux)
     modeloAux.iniciarPartida()
+    modeloAux.lineaTiempo = None
     modeloAux.restaurarEstado(snapshot)
     return modeloAux
+
+
+def _crearModeloAuxiliar(proveedor, semilla, snapshot, modeloBase=None):
+    """Instancia y restaura un modelo réplica para re-simulación sin tocar la partida en curso."""
+    if modeloBase is not None and getattr(modeloBase, "lineaTiempo", None) is not None:
+        modeloAux = modeloBase.lineaTiempo._obtenerModeloAuxiliar(modeloBase)
+        modeloAux.restaurarEstado(snapshot)
+        return modeloAux
+    return _crearModeloAuxiliarCompleto(proveedor, semilla, snapshot)
+
+
+def _consultarAccionCompleta(modeloBase, k):
+    """Reconstruye historia #k usando reconstrucción completa (método de referencia para pruebas cruzadas)."""
+    lt = modeloBase.lineaTiempo
+    total = len(lt._acciones)
+    if k == total + 1:
+        return formatearResumenHistoria(modeloBase, numAccion=k, reloj=modeloBase.reloj)
+    cp = lt.buscarPuntoControlMasCercanoAccion(k)
+    modeloAux = _crearModeloAuxiliarCompleto(modeloBase.proveedor, modeloBase.semilla, cp.snapshot)
+    for item in lt._acciones[cp.numAccion : k - 1]:
+        modeloAux.ejecutar(item.accion)
+    return formatearResumenHistoria(modeloAux, numAccion=k, reloj=modeloAux.reloj)
+
+
+def _consultarTiempoCompleto(modeloBase, t):
+    """Reconstruye historia t usando reconstrucción completa (método de referencia para pruebas cruzadas)."""
+    lt = modeloBase.lineaTiempo
+    if t == modeloBase.reloj:
+        return formatearResumenHistoria(modeloBase, reloj=t)
+    cp = lt.buscarPuntoControlMasCercanoTiempo(t)
+    modeloAux = _crearModeloAuxiliarCompleto(modeloBase.proveedor, modeloBase.semilla, cp.snapshot)
+    idx = cp.numAccion
+    total = len(lt._acciones)
+    while idx < total:
+        item = lt._acciones[idx]
+        relojAccion = item.reloj
+        if relojAccion > t:
+            modeloAux._correrEventosHasta(t)
+            break
+        elif relojAccion == t:
+            break
+        else:
+            sigReloj = lt._acciones[idx + 1].reloj if idx + 1 < total else None
+            if sigReloj is not None and sigReloj <= t:
+                modeloAux.ejecutar(item.accion)
+            else:
+                modeloAux.ejecutarHasta(item.accion, t)
+                break
+        idx += 1
+    if idx >= total and modeloAux.reloj < t:
+        modeloAux._correrEventosHasta(t)
+    return formatearResumenHistoria(modeloAux, reloj=t)
 
 
 class LineaTiempo:
@@ -114,8 +185,8 @@ class LineaTiempo:
 
     def __init__(self, k=20):
         self.k = max(1, k)
-        self._puntosControl = []  # lista de objetos PuntoControl
-        self._acciones = []       # lista de objetos RegistroAccion
+        self._puntosControl = []  # lista de PuntoControl
+        self._acciones = []       # lista de RegistroAccion
 
     def registrarPuntoControl(self, numAccion, reloj, snapshot):
         """Registra un punto de control con el estado completo del modelo."""
@@ -125,6 +196,113 @@ class LineaTiempo:
                 p.reloj = reloj
                 p.snapshot = snapshot
                 return
+        self._puntosControl = []  # lista de objetos PuntoControl
+        self._acciones = []       # lista de objetos RegistroAccion
+        self._modeloAux = None
+        self._salasAux = None
+        self._puertasAux = None
+
+    def prepararModeloAuxiliar(self, modeloBase):
+        """Construye un modelo réplica que comparte la topología fija de modeloBase
+        (salas, conexiones, salidas y costos) creando estado mutable propio e independiente (FR-032).
+        """
+        from model.Entidades import Sala, Salida, Puerta, Jugador
+        from model.Salas import IndiceOrdenado
+        from model.Inventario import Inventario
+        from model.Diario import Diario
+        from model.efectosTrampa import efectosTrampa
+        from model.Juego import Modelo
+        from model.estado import _listaPuertas
+
+        salasBase = modeloBase.salas
+        cant = salasBase.cantidad()
+        if cant == 0:
+            return
+
+        # 1. Indexar y clonar puertas únicas
+        puertas = _listaPuertas(modeloBase)
+        for idx, p in enumerate(puertas):
+            p._idxP = idx
+
+        puertasAux = []
+        for p in puertas:
+            np = Puerta(p.cerrada, p.llave, p.cierreAutomatico)
+            np.costo = p.costo
+            np.salaA = p.salaA
+            np.salaB = p.salaB
+            np._cerradaInicial = p.cerrada
+            puertasAux.append(np)
+
+        # 2. Clonar salas con la misma topología e índice
+        salasAux = []
+        for i in range(cant):
+            sOrig = salasBase.enPosicion(i)
+            sn = Sala(sOrig.id, sOrig.nombre)
+            sn.indice = sOrig.indice
+            salasAux.append(sn)
+
+        # 3. Conectar salidas apuntando a las nuevas salas y puertas
+        for i in range(cant):
+            sOrig = salasBase.enPosicion(i)
+            sn = salasAux[i]
+            salidasClon = []
+            for sal in sOrig.salidas:
+                pclon = puertasAux[sal.puerta._idxP]
+                sc = Salida(sal.direccion, sn, sal.destinoId, pclon, sal.costo)
+                sc.destino = salasAux[sal.destino.indice]
+                salidasClon.append(sc)
+            sn.salidas = salidasClon
+
+        # 4. Instanciar el modelo réplica con su propio estado
+        efectos = efectosTrampa()
+        modeloAux = Modelo(modeloBase.proveedor, modeloBase.semilla,
+                           Inventario(modeloBase.proveedor), Diario(), efectos)
+        efectos.registrarEn(modeloAux)
+
+        indiceAux = IndiceOrdenado()
+        indiceAux._claves = list(salasBase._claves)
+        indiceAux._valores = salasAux
+        modeloAux.salas = indiceAux
+        modeloAux.salaInicialId = modeloBase.salaInicialId
+        modeloAux.salaSalidaId = modeloBase.salaSalidaId
+        modeloAux.llaveSalida = modeloBase.llaveSalida
+        modeloAux.rutasCazador = modeloBase.rutasCazador.__class__(cant)
+        modeloAux.inventario.configurar(modeloBase.inventario.capacidad)
+        modeloAux.jugador = Jugador(modeloBase.jugador.vidaMax, modeloBase.jugador.ataque,
+                                    modeloBase.jugador.defensa, modeloBase.jugador.velocidad)
+
+        self._modeloAux = modeloAux
+        self._salasAux = salasAux
+        self._puertasAux = puertasAux
+
+    def _obtenerModeloAuxiliar(self, modeloBase):
+        """Retorna el modelo auxiliar con su estado dinámico limpio listo para restaurarEstado."""
+        if self._modeloAux is None:
+            self.prepararModeloAuxiliar(modeloBase)
+
+        if self._modeloAux is not None:
+            for s in self._salasAux:
+                s.rastro = -1
+                s.contenidoIncorporado = False
+                s.enemigos = []
+                s.objetos = []
+                s.trampas = []
+            for p in self._puertasAux:
+                p.cerrada = p._cerradaInicial
+                p.eventoCierre = None
+            return self._modeloAux
+
+        return _crearModeloAuxiliarCompleto(modeloBase.proveedor, modeloBase.semilla, None)
+
+    def registrarPuntoControl(self, numAccion, reloj, snapshot):
+        """Registra un punto de control con el estado completo del modelo.
+        Aprovecha el invariante de orden creciente para verificar únicamente el último punto en O(1).
+        """
+        if self._puntosControl and self._puntosControl[-1].numAccion == numAccion:
+            ultimo = self._puntosControl[-1]
+            ultimo.reloj = reloj
+            ultimo.snapshot = snapshot
+            return
         self._puntosControl.append(PuntoControl(numAccion, reloj, snapshot))
 
     def debeCrearPuntoControl(self, numAccion):
@@ -136,8 +314,13 @@ class LineaTiempo:
         self._acciones.append(RegistroAccion(numAccion, accion, relojDecision))
 
     def recortar(self, nuevoTotalAcciones):
-        """Descarta las acciones y puntos de control revertidos con pergamino (§3.6, §5.5)."""
-        # Elimina en el lugar el rango final sin copiar la lista remanente (O(1) amortizado)
+        """Descarta las acciones y puntos de control revertidos con pergamino (§3.6, §5.5, L-01)."""
+        # Recorta la lista de acciones a nuevoTotalAcciones in-place en O(eliminados)
+        """Descarta las acciones y puntos de control revertidos con pergamino (§3.6, §5.5).
+        El costo real es proporcional a la cantidad de acciones descartadas O(Δ) con Δ <= 5,
+        ya que el pergamino de retroceso revierte como máximo 5 acciones del jugador.
+        """
+        # Elimina en el lugar el rango final sin copiar la lista remanente (costo O(Δ))
         if nuevoTotalAcciones < len(self._acciones):
             del self._acciones[nuevoTotalAcciones:]
 
@@ -154,6 +337,34 @@ class LineaTiempo:
         return len(self._acciones)
 
     def buscarPuntoControlMasCercanoAccion(self, k):
+        """Encuentra el último punto de control con numAccion <= k - 1 en O(log P) (§5.5, L-02)."""
+        pts = self._puntosControl
+        bajo = 0
+        alto = len(pts) - 1
+        mejor = pts[0]
+        while bajo <= alto:
+            medio = (bajo + alto) // 2
+            if pts[medio].numAccion <= k - 1:
+                mejor = pts[medio]
+                bajo = medio + 1
+            else:
+                alto = medio - 1
+        return mejor
+
+    def buscarPuntoControlMasCercanoTiempo(self, t):
+        """Encuentra el último punto de control con reloj <= t en O(log P) (§5.5, L-02)."""
+        pts = self._puntosControl
+        bajo = 0
+        alto = len(pts) - 1
+        mejor = pts[0]
+        while bajo <= alto:
+            medio = (bajo + alto) // 2
+            if pts[medio].reloj <= t:
+                mejor = pts[medio]
+                bajo = medio + 1
+            else:
+                alto = medio - 1
+        return mejor
         """Encuentra el punto de control anterior más cercano a la acción k usando búsqueda binaria propia O(log P)."""
         target = k - 1
         low = 0
@@ -196,12 +407,13 @@ class LineaTiempo:
 
         # Ubicar punto de control anterior
         cp = self.buscarPuntoControlMasCercanoAccion(k)
-        modeloAux = _crearModeloAuxiliar(modeloBase.proveedor, modeloBase.semilla, cp["snapshot"])
+        modeloAux = self._obtenerModeloAuxiliar(modeloBase)
+        modeloAux.restaurarEstado(cp.snapshot)
 
-        # Re-simular hacia adelante desde cp["numAccion"] hasta k - 1
-        accionesAEjecutar = self._acciones[cp["numAccion"] : k - 1]
+        # Re-simular hacia adelante desde cp.numAccion hasta k - 1
+        accionesAEjecutar = self._acciones[cp.numAccion : k - 1]
         for item in accionesAEjecutar:
-            modeloAux.ejecutar(item["accion"])
+            modeloAux.ejecutar(item.accion)
 
         return formatearResumenHistoria(modeloAux, numAccion=k, reloj=modeloAux.reloj)
 
@@ -219,16 +431,17 @@ class LineaTiempo:
 
         # Ubicar punto de control más cercano anterior o igual a t
         cp = self.buscarPuntoControlMasCercanoTiempo(t)
-        modeloAux = _crearModeloAuxiliar(modeloBase.proveedor, modeloBase.semilla, cp["snapshot"])
+        modeloAux = self._obtenerModeloAuxiliar(modeloBase)
+        modeloAux.restaurarEstado(cp.snapshot)
 
         # Re-simular acciones
         # Buscamos cuáles acciones ocurrieron antes o en t
-        idx = cp["numAccion"]
+        idx = cp.numAccion
         total = len(self._acciones)
 
         while idx < total:
             item = self._acciones[idx]
-            relojAccion = item["reloj"]
+            relojAccion = item.reloj
 
             if relojAccion > t:
                 # La acción ocurre en el futuro respecto a t: no se ejecuta la acción del jugador,
@@ -241,12 +454,12 @@ class LineaTiempo:
                 break
             else:
                 # relojAccion < t: verificamos si la SIGUIENTE acción también ocurre <= t
-                sigReloj = self._acciones[idx + 1]["reloj"] if idx + 1 < total else None
+                sigReloj = self._acciones[idx + 1].reloj if idx + 1 < total else None
                 if sigReloj is not None and sigReloj <= t:
-                    modeloAux.ejecutar(item["accion"])
+                    modeloAux.ejecutar(item.accion)
                 else:
                     # Esta es la última acción del jugador antes de t
-                    modeloAux.ejecutarHasta(item["accion"], t)
+                    modeloAux.ejecutarHasta(item.accion, t)
                     break
             idx += 1
 
@@ -270,6 +483,18 @@ class LineaTiempo:
             acc = item.accion
             accionesSerializadas.append([item.numAccion, acc.tipo, acc.argumento, item.reloj])
 
+        ptsSerializados = []
+        for p in self._puntosControl:
+            ptsSerializados.append({
+                "numAccion": p.numAccion,
+                "reloj": p.reloj,
+                "snapshot": p.snapshot
+            })
+
+        return {
+            "k": self.k,
+            "puntosControl": ptsSerializados,
+
         return {
             "k": self.k,
             "puntosControl": puntosSerializados,
@@ -280,6 +505,7 @@ class LineaTiempo:
         self.k = datos.get("k", 20)
         self._puntosControl = []
         for p in datos.get("puntosControl", []):
+            self._puntosControl.append(PuntoControl(p["numAccion"], p["reloj"], p["snapshot"]))
             if isinstance(p, PuntoControl):
                 self._puntosControl.append(p)
             else:

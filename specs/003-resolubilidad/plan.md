@@ -35,9 +35,9 @@ Nuestro diseño **incremental** mantiene una lista de puertas dormidas indexadas
 
 Si la cripta no es resoluble:
 1. Se recopilan las llaves inalcanzables y sus salas correspondientes.
-2. Para cada llave inalcanzable $K_A$, se trazan las puertas bloqueadas que impiden llegar a su sala desde la región alcanzada. Si una puerta bloqueada requiere la llave $K_B$, existe una arista de dependencia $K_A \leftarrow K_B$ ($K_A$ necesita $K_B$ para ser obtenida).
-3. Se detecta el ciclo determinista mediante búsqueda en profundidad (DFS) propia sobre el grafo de dependencias de llaves.
-4. Si una llave requiere abrir una puerta que solo ella misma abre, se reporta el ciclo directo `[K -> K]`. Para cadenas indirectas, se reporta la secuencia cíclica `[K1 -> K2 -> ... -> K1]`.
+2. Para cada llave inalcanzable $K_A$, se trazan las puertas bloqueadas que impiden llegar a su sala desde la región alcanzada. Se realiza una **travesía multi-fuente BFS única** sobre la región no alcanzada inicializada con todas las puertas frontera ordenadas canónicamente por `(destino, idLlave)` (R-02 / R-05), evitando $F$ exploraciones redundantes independientes. Si una puerta bloqueada requiere la llave $K_B$, existe una arista de dependencia $K_A \leftarrow K_B$ ($K_A$ necesita $K_B$ para ser obtenida).
+3. Se detecta el ciclo determinista mediante **búsqueda en profundidad (DFS) iterativa** sobre el grafo de dependencias con pila explícita y 3 estados por nodo (`0: sin visitar`, `1: en pila`, `2: procesado`), garantizando invulnerabilidad ante `RecursionError` en cadenas de $K \ge 5000$ llaves (R-01).
+4. Si una llave requiere abrir una puerta que solo ella misma abre, se reporta el ciclo directo `[K -> K]`. Para cadenas indirectas, se reporta la secuencia cíclica canónica `[K1 -> K2 -> ... -> K1]`.
 
 ---
 
@@ -48,13 +48,13 @@ Si la cripta no es resoluble:
 | `adapters/clienteCripta.py` | Agregar método abstracto `obtenerLlaves(idCripta)` |
 | `adapters/clienteHttp.py` | Implementar `GET /criptas/{id}/llaves` |
 | `adapters/clienteOffline.py` | Implementar lectura de llaves desde disco / sintetización |
-| `model/Resolubilidad.py` | Clase `ResultadoResolubilidad` y función `verificarResolubilidad(...)` |
+| `model/Resolubilidad.py` | Clase `ResultadoResolubilidad` y función `verificarResolubilidad(...)` (multi-fuente BFS + DFS iterativo) |
 | `main.py` | Banderas `--verificar <idCripta>` y `--forzar` |
-| `bench/BenchResolubilidad.py` | Benchmark comparando recorrido incremental vs repetido por llave |
+| `bench/BenchResolubilidad.py` | Benchmark comparando recorrido incremental vs repetido ingenuo sobre estructuras propias (`Tabla`) con $K \in [100..5000]$ y criptas grandes hasta 2000 salas |
 
 ---
 
 ## Mediciones planificadas (`--bench`)
 
-1. **Recorrido incremental frente a repetido por llave**: Criptas sintéticas encadenadas con 10, 30, 50 y 100 llaves en serie.
-2. **Tiempo de verificación en cripta grande**: Medición para asegurar cumplimiento del límite de 200 ms (§6.1).
+1. **Recorrido incremental frente a repetido por llave**: Criptas sintéticas encadenadas con $K \in [100, 500, 1000, 2000, 5000]$ llaves en serie implementadas con `Tabla` propia (comparación equitativa, R-03), y medición de tiempo de detección de ciclo no resoluble.
+2. **Tiempo de verificación en cripta grande**: Medición con criptas de 200 a 2000 salas para asegurar cumplimiento estricto del límite de 200 ms (§6.1, R-04).

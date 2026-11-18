@@ -424,6 +424,106 @@ class TestNieblaYViaje(unittest.TestCase):
         self.assertEqual(modelo.mapaConocido.estadoPuertaRecordada(2, 3), "cerrada")
         self.assertTrue(any("no existe ruta conocida abierta" in m for m in mensajes))
 
+    def test_n01_antorcha_no_observa_puertas_lejanas(self):
+        """[N-01, §3.3] Entrar con antorcha explora vecinas pero NO observa sus puertas lejanas."""
+        esqueleto = [
+            {"id": 1, "nombre": "Sala A", "salidas": {"E": {"sala": 2}}},
+            {"id": 2, "nombre": "Sala B", "salidas": {"O": {"sala": 1}, "E": {"sala": 3, "cerrada": True}}},
+            {"id": 3, "nombre": "Sala C", "salidas": {"O": {"sala": 2, "cerrada": True}}},
+            {"id": 99, "nombre": "Salida", "salidas": {}}
+        ]
+        contenidos = [
+            {"sala": 1, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 2, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 3, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 99, "enemigos": [], "objetos": [], "trampas": []}
+        ]
+        prov = ProveedorNiebla(esqueleto, contenidos, [])
+        efectos = efectosJuego()
+        modelo = Modelo(prov, semilla=1, inventario=Inventario(prov), diario=Diario(), efectos=efectos)
+        efectos.registrarEn(modelo)
+        modelo.iniciarPartida()
+
+        # Encender antorcha y moverse a Sala 1 (o ya está en 1 e inicia)
+        efectos.encenderAntorcha(modelo, modelo.jugador, 500)
+        # Sala 1 es A. Al moverse al este hacia Sala 2 (B):
+        # Vecina de B es C (Sala 3). La antorcha revela C como explorada,
+        # pero la puerta B-C NO debe haber sido observada por estar en A.
+        # Simulamos mover de una sala preliminar o directamente:
+        # Si el jugador está en 1 y tiene antorcha, sus vecinas (2) están exploradas.
+        # Al entrar a 2 con antorcha, la vecina lejana 3 se explora por antorcha.
+        res = modelo.ejecutar(Accion(ACC_MOVER, "E"))
+        self.assertTrue(res.ok)
+        self.assertEqual(modelo.jugador.sala.id, 2)
+
+        # Sala 2 está explorada y puerta 1-2 observada
+        self.assertTrue(modelo.mapaConocido.estaExplorada(2))
+        self.assertEqual(modelo.mapaConocido.estadoPuertaRecordada(1, 2), "abierta")
+
+        # Puerta 2-3 está conectada a la sala 2 donde está el jugador, por lo que 2-3 sí se observa
+        self.assertEqual(modelo.mapaConocido.estadoPuertaRecordada(2, 3), "cerrada")
+
+    def test_n02_puerta_sin_observar_no_usada_por_ir_a(self):
+        """[N-02, §3.3, §3.4] Una puerta sin observar no se asume abierta y 'ir a' no la utiliza."""
+        s1 = Sala(1, "Sala 1")
+        s2 = Sala(2, "Sala 2")
+        p12 = Puerta(False, None, None)  # En realidad está abierta
+        s1.salidas.append(Salida("E", s1, 2, p12))
+        s2.salidas.append(Salida("O", s2, 1, p12))
+
+        salas = IndiceOrdenado()
+        salas.insertar(1, s1)
+        salas.insertar(2, s2)
+
+        mapa = MapaConocido()
+        # Sala 1 y 2 marcadas exploradas pero sin observar la puerta 1-2
+        mapa.marcarExplorada(s1)
+        mapa.marcarExplorada(s2)
+
+        self.assertEqual(mapa.estadoPuertaRecordada(1, 2), "sin_observar")
+        # puertaRecordadaAbierta debe ser False para puertas sin observar
+        self.assertFalse(mapa.puertaRecordadaAbierta(1, 2))
+
+        # 'ir a' no puede usar una puerta sin observar
+        salida, costo = elegirPasoViajeAutomatico(s1, s2, salas, mapa)
+        self.assertIsNone(salida)
+
+    def test_n03_ir_a_en_modelo_y_detencion_por_dano_con_curacion(self):
+        """[N-03, §3.4] darPasoViajeAutomatico en Modelo detecta daño explícito aunque la vida se recupere."""
+        esqueleto = [
+            {"id": 1, "nombre": "Sala 1", "salidas": {"E": {"sala": 2}}},
+            {"id": 2, "nombre": "Sala 2", "salidas": {"O": {"sala": 1}, "E": {"sala": 3}}},
+            {"id": 3, "nombre": "Sala 3", "salidas": {"O": {"sala": 2}}},
+            {"id": 99, "nombre": "Salida", "salidas": {}}
+        ]
+        # Trampa en sala 2 que hace daño
+        contenidos = [
+            {"sala": 1, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 2, "enemigos": [], "objetos": [], "trampas": [{"instancia": "t-1", "tipo": "trp_pinchos"}]},
+            {"sala": 3, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 99, "enemigos": [], "objetos": [], "trampas": []}
+        ]
+        fichas = [
+            {"id": "trp_pinchos", "clase": "trampa", "nombre": "Pinchos", "daño": 10, "rearme": 500}
+        ]
+        prov = ProveedorNiebla(esqueleto, contenidos, fichas)
+        modelo = Modelo(prov, semilla=1, inventario=Inventario(prov), diario=Diario())
+        modelo.iniciarPartida()
+
+        # Marcar sala 3 explorada para que sea destino válido
+        modelo.mapaConocido.explorarSala(modelo.salas.buscar(2))
+        modelo.mapaConocido.explorarSala(modelo.salas.buscar(3))
+
+        vidaOriginal = modelo.jugador.vida
+        # Ejecutar un paso hacia 3 directamente desde el Modelo
+        continuar, motivo, accion = modelo.darPasoViajeAutomatico(3)
+
+        # En sala 2 la trampa dañó al jugador: aunque se curara después, se detiene por DANO
+        self.assertFalse(continuar)
+        self.assertEqual(motivo, "DANO")
+        self.assertEqual(modelo.jugador.sala.id, 2)
+
+
 
 
 

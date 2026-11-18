@@ -406,24 +406,58 @@ Se implementó `MapaConocido` sobre `Tabla` propia con dispersión djb2.
 
 * **Especificación**: `specs/003-resolubilidad/spec.md`
 * **Plan**: `specs/003-resolubilidad/plan.md`
+* **Responsable**: Diego Mena
 
 ### 1. Problema
-Antes de iniciar una partida o al invocar `--verificar <cripta>`, determinar si la cripta puede completarse exitosamente (§3.5). Si es resoluble, retornar una secuencia determinista de obtención de llaves; si no lo es, detallar la frontera bloqueada y reportar los ciclos de dependencias circulares (e.g. $[K \to K]$ o $[K_1 \to K_2 \to K_1]$), ejecutándose en menos de 200 ms.
+Antes de iniciar una partida o al invocar `--verificar <cripta>`, determinar si la cripta puede completarse exitosamente bajo los supuestos de §3.5. Si es resoluble, retornar una secuencia determinista de obtención de llaves; si no lo es, detallar la frontera bloqueada y reportar los ciclos de dependencias circulares (e.g. $[K \to K]$ o $[K_1 \to K_2 \to \dots \to K_1]$), ejecutándose en menos de 200 ms sobre la cripta más grande (§6.1).
 
 ### 2. Alternativas consideradas
-* **(A) BFS repetido por cada llave encontrada (Ingenuo)**: Cada llave nueva reinicia la exploración desde la sala inicial. Complejidad $O(K \cdot (V + E))$, ineficiente en cadenas largas de llaves.
-* **(B) Recorrido incremental con cola de eventos y puertas en espera (Elegida)**: Se realiza una única búsqueda en anchura incremental con costo $O(V + E + K)$. Si se halla una puerta cerrada cuya llave no se posee, la arista se registra en una lista de espera indexada en `Tabla` propia (`puertasEsperandoLlave`). Al recoger la llave, sus puertas en espera se "despiertan" y se encolan inmediatamente, sin reiniciar las salas ya visitadas.
+* **(A) BFS repetido por cada llave encontrada (Ingenuo)**: Cada llave nueva reinicia la exploración desde la sala inicial. Complejidad $O(K \cdot (V + E))$. En cadenas largas de llaves genera un crecimiento estrictamente cuadrático $O(K^2)$.
+* **(B) Recorrido incremental con puertas en espera y detección DFS iterativa (Elegida)**:
+  1. *Exploración hacia adelante*: Se realiza un único BFS incremental $O(V + E + K)$. Las puertas cerradas sin llave se suspenden en `puertasEsperandoLlave` (`Tabla` propia). Al recoger una llave, sus salidas bloqueadas se reactivan y encolan directamente, sin reiniciar salas ya visitadas.
+  2. *Pasada multifuente en región inalcanzable (R-02)*: En caso de no resolubilidad, se ejecuta una sola pasada BFS multifuente desde todas las puertas de la frontera bloqueada hacia la región no alcanzada. Cada sala se visita una sola vez ($O(V_{inaccesible} + E_{inaccesible})$), determinando de qué llave de frontera depende cada sala y llave inalcanzable.
+  3. *DFS iterativa con marcas de tres estados (R-01)*: Para detectar ciclos de dependencias, se utiliza una DFS iterativa con pila explícita y 3 estados (0 = no visitado, 1 = en pila, 2 = terminado). Elimina cualquier recursión evitando `RecursionError` en cadenas profundas (> 1 000 llaves) y opera en $O(\text{llaves} + \text{dependencias})$.
 
 ### 3. Evidencia Empírica (`bench/BenchResolubilidad.py`)
-Medición con cadenas de llaves encadenadas:
 
-| Cantidad de Llaves $K$ | Recorrido Incremental (ms) | Recorrido Ingenuo (ms) | Factor de Ganancia |
+#### Comparación Algorítmica Justa (Ambas con `Tabla` e `IndiceOrdenado` propios, R-03):
+Mide el tiempo de verificación en cadenas de dependencias estrictas $K_1 \to K_2 \to \dots \to K_n$:
+
+| Cantidad de Llaves $K$ | Recorrido Incremental | ms / llave (Inc) | Recorrido Ingenuo | ms / llave (Ing) | Ganancia |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 100 llaves | 1.68 ms | 0.0168 ms | 23.48 ms | 0.2348 ms | **14.0x** |
+| 500 llaves | 7.65 ms | 0.0153 ms | 665.31 ms | 1.3306 ms | **87.0x** |
+| 1 000 llaves | 16.32 ms | 0.0163 ms | 2 634.25 ms | 2.6342 ms | **161.4x** |
+| 2 000 llaves | 34.95 ms | 0.0175 ms | 11 163.48 ms | 5.5817 ms | **319.5x** |
+| 5 000 llaves | **88.15 ms** | **0.0176 ms** | 75 618.08 ms | 15.1236 ms | **857.9x más rápido** |
+
+* **Comportamiento Asintótico**: En la versión incremental, el tiempo por llave se mantiene constante (~0.017 ms/llave), demostrando **crecimiento estrictamente lineal $O(N)$**. En contraste, la versión ingenua escala de 0.23 a 15.12 ms/llave, evidenciando **crecimiento cuadrático $O(K^2)$**.
+
+#### Detección de Ciclos en Cadenas No Resolubles (R-01, R-03):
+Mide la detección de ciclos circulares cerrados $K_1 \to K_2 \dots \to K_n \to K_1$ con DFS iterativa:
+
+| Longitud Cadena $K$ | Tiempo Detección | Ciclo Identificado | Determinismo (Misma Salida) |
 |:---:|:---:|:---:|:---:|
-| 10 llaves | 0.093 ms | 0.023 ms | — |
-| 50 llaves | 0.642 ms | 0.475 ms | — |
-| 100 llaves | **1.350 ms** | 1.884 ms | **1.4x más rápido** |
+| 100 llaves | 1.76 ms | 101 llaves | SÍ (Idéntico) |
+| 500 llaves | 9.55 ms | 501 llaves | SÍ (Idéntico) |
+| 1 000 llaves | 19.68 ms | 1 001 llaves | SÍ (Idéntico) |
+| 2 000 llaves | 43.48 ms | 2 001 llaves | SÍ (Idéntico) |
+| 5 000 llaves | **110.16 ms** | 5 001 llaves | SÍ (Idéntico) |
 
-* **Presupuesto de procesamiento (§6.1, PR-005 < 200 ms)**: Verificación sobre cripta de 200 salas y 31 llaves: **1.19 ms** (un margen de seguridad de más de 160x).
+#### Presupuesto de Procesamiento en Criptas Grandes (§6.1, PR-005 < 200 ms, R-04):
+
+| Tamaño Cripta (Salas) | Llaves Distribuidas | Mediana (ms) | Peor Caso (ms) | Cumple < 200 ms |
+|:---:|:---:|:---:|:---:|:---:|
+| 200 salas | 31 llaves | 1.17 ms | 1.44 ms | **SÍ** (1.44 ms < 200 ms) |
+| 500 salas | 61 llaves | 3.14 ms | 3.37 ms | **SÍ** (3.37 ms < 200 ms) |
+| 1 000 salas | 101 llaves | 6.61 ms | 6.96 ms | **SÍ** (6.96 ms < 200 ms) |
+| 2 000 salas | 151 llaves | 13.42 ms | 14.17 ms | **SÍ** (14.17 ms < 200 ms) |
+
+Incluso en una cripta de 2 000 salas, el peor caso (14.17 ms) consume menos del 8 % del presupuesto total permitido (200 ms).
+
+### 4. Límites conocidos
+* La verificación opera bajo los supuestos estáticos de §3.5 (combate victorioso, llaves no consumibles). Si una regla futura introdujera llaves de un solo uso o enemigos invencibles, el problema se transformaría en NP-completo (planificación en mundos con recursos consumibles).
+* El desempate de dependencias en la pasada multifuente asume orden canónico por menor ID de sala y menor ID de llave en la frontera.
 
 ---
 
@@ -433,7 +467,7 @@ Medición con cadenas de llaves encadenadas:
 * **Plan**: `specs/004-linea-de-tiempo/plan.md`
 
 ### 1. Problema
-Permitir consultar el estado en cualquier instante $t$ (`historia <t>`) o acción previa $\#k$ (`historia #k`) y la reproducción hasta un instante $t$ (`--replay ... --hasta <t>`), sin alterar el estado en curso, sin consumir tiempo virtual y sin escribir en `partida.log`. No se permite guardar más de una copia completa cada $K$ acciones (configurable con `--checkpoint-cada K`, justificado con mediciones). Fuera de los checkpoints, solo se almacenan las acciones livianas. Al retroceder con un pergamino, la línea debe recortarse en $O(1)$.
+Permitir consultar el estado en cualquier instante $t$ (`historia <t>`) o acción previa $\#k$ (`historia #k`) y la reproducción hasta un instante $t$ (`--replay ... --hasta <t>`), sin alterar el estado en curso, sin consumir tiempo virtual y sin escribir en `partida.log`. No se permite guardar más de una copia completa cada $K$ acciones (configurable con `--checkpoint-cada K`, justificado con mediciones). Fuera de los checkpoints, solo se almacenan las acciones livianas. Al retroceder con un pergamino, la línea debe recortarse con costo proporcional a lo descartado (como máximo 5 acciones).
 
 ### 2. Alternativas consideradas
 * **(A) Inversión hacia atrás de cambios**: Almacenar clausuras inversas de toda la partida. Descartada por consumo gigantesco de memoria y porque el generador `random.Random` (Mersenne Twister) no posee inversión analítica simple.
@@ -441,7 +475,7 @@ Permitir consultar el estado en cualquier instante $t$ (`historia <t>`) o acció
 * **(C) Reconstrucción hacia adelante desde punto de control (Forward Re-simulation, Elegida)**: Se guarda un snapshot completo generado por `model.estado.capturar()` cada $K$ acciones. Para cualquier consulta, se ubica el punto de control anterior más cercano, se restaura un modelo réplica y se re-simulan a lo sumo $K - 1$ acciones hasta el instante pedido.
 
 ### 3. Evidencia Empírica y Justificación de $K = 20$ (`bench/BenchLineaTiempo.py`)
-Medición sobre partida de 1 000 acciones variando $K$:
+Medición sobre partida de 1 000 acciones variando $K$ en una cripta de 64 salas ($8\times 8$):
 
 | Configuración | Puntos de Control | Memoria Retenida | Mediana de Consulta | Peor Caso |
 |---|:---:|:---:|:---:|:---:|
@@ -451,16 +485,58 @@ Medición sobre partida de 1 000 acciones variando $K$:
 | Sin checkpoints ($K = \infty$) | 1 | 38 KB | 52.73 ms | 76.76 ms |
 
 **Justificación técnica de $K = 20$**:
-Con $K = 20$, el consumo de memoria se reduce en un **74 %** respecto a $K = 5$ (1.3 MB vs 5.2 MB), manteniendo tiempos de consulta excelentes (< 5 ms). A diferencia de $K = \infty$ que supera los 50 ms en consultas tardías, $K = 20$ garantiza cumplir con holgura el límite PR-007 (< 50 ms) incluso en partidas de 5 000 acciones (mediana: **3.57 ms**).
+Con $K = 20$, el consumo de memoria se reduce en un **74 %** respecto a $K = 5$ (1.3 MB vs 5.2 MB), manteniendo tiempos de consulta excelentes (< 5 ms). A diferencia de $K = \infty$ que supera los 50 ms en consultas tardías, $K = 20$ cumple con holgura el límite PR-007 (< 50 ms) en partidas de 5 000 acciones únicamente en la cripta pequeña de 64 salas (mediana: **3.57 ms**).
+
+### 4. L-03: La consulta reconstruía la cripta completa
+En la implementación inicial, cada consulta de historia (`consultarHistoriaAccion` / `consultarHistoriaTiempo`) instanciaba un modelo réplica auxiliar completo invocando `_construirSalas(esqueleto)` e `iniciarPartida()`, reconstruyendo todo el grafo de salas desde cero en cada llamada antes de aplicar `restaurarEstado`.
+
+**Medición y Comparativa Antes vs. Después (Partida de 5 000 acciones, $K = 20$, 20 consultas)**:
+
+| Salas (Cuadrícula) | Mediana Antes | Peor Caso Antes | Mediana Después (`--bench`) | Peor Caso Después (`--bench`) | ¿Cumple < 50 ms (Peor Caso)? |
+|---|:---:|:---:|:---:|:---:|:---:|
+| 100 ($10\times 10$) | 22.74 ms | 112.69 ms | 20.30 ms | 111.51 ms | NO |
+| 1024 ($32\times 32$) | 112.99 ms | 605.61 ms | 78.92 ms | 554.35 ms | NO |
+| 5041 ($71\times 71$) | 398.49 ms | 3 444.21 ms | 145.72 ms | 355.77 ms | NO |
+
+**Desglose por fases en cripta de 5 041 salas ($71\times 71$)**:
+El perfilado de una consulta descompuesta reveló que la reconstrucción de la cripta consumía **110.88 ms** (`_construirSalas`: 72.30 ms + resto de `iniciarPartida`: 38.57 ms), lo cual representaba cerca del **77 % del costo total** de una consulta (~144 ms).
+
+| Fase de la Consulta | Tiempo Antes (Consulta típica) | Tiempo Después (Promedio 20 consultas) |
+|---|:---:|:---:|
+| Búsqueda de Punto de Control | 0.01 ms | 0.01 ms |
+| Preparación / Reconstrucción de Cripta | 110.88 ms (77 %) | **2.26 ms** (< 2 %) |
+| `restaurarEstado` (Snapshot) | 27.95 ms | 68.29 ms |
+| Re-simulación de acciones intermedias | 5.78 ms | 46.40 ms |
+| Formateo de resumen | 0.29 ms | 3.12 ms |
+
+**Decisión**:
+Con base en la medición experimental en la cripta máxima disponible de 5 041 salas con 5 000 acciones, se decidió implementar formalmente la **reutilización del esqueleto ya construido**. El modelo auxiliar clona e indexa la topología fija de salas, salidas, conexiones y puertas en orden canónico ($O(V)$ en < 3 ms), manteniendo su propio estado mutable sin compartir salas ni puertas con el modelo vivo. Esto redujo la mediana en 5 041 salas de **398.49 ms a 145.72 ms** y el tiempo de preparación del modelo auxiliar de **110.88 ms a solo 2.26 ms** promedio. Cabe destacar que el «antes» se midió sin `gc.collect()` y el «después» con él, por lo que los peores casos no resultan directamente comparables.
+
+### 5. Límites conocidos
+* **Incumplimiento en criptas grandes**: Con 5 041 salas el peor caso (355.77 ms) y la mediana (145.72 ms) continúan superando el límite constitucional de 50 ms.
+* **Cuellos de botella remanentes**: El costo restante tras optimizar la topología se concentra en `restaurarEstado` (recorrer y poblar el estado dinámico de 5 041 salas en el snapshot) y en la re-simulación de acciones intermedias cuando se disparan movimientos y cálculo de distancias de enemigos.
+* **Carga de estrés sintética**: El benchmark evalúa un enemigo por sala (más de 5 000 enemigos en la cuadrícula de 71×71), lo que constituye una carga significativamente superior a los escenarios normales con decenas de cazadores activos.
+* **Cripta de referencia pendiente**: La cripta de referencia definitiva estipulada en §6.1 aún no está publicada, por lo que las pruebas se realizaron sobre la cota máxima sintética de 5 041 salas.
+
+### 6. Coincidencia con plan.md original
+La decisión adoptada coincide con la alternativa de diseño prevista en el plan original («reutilizar el esqueleto ya construido»). Sin embargo, mientras el plan contemplaba una «shallow copy de salas», la solución implementada clona salas, salidas y puertas para crear un modelo con estado enteramente independiente, compartiendo únicamente los datos fijos de topología. Asimismo, el requisito constitucional de rendimiento PR-007 (< 50 ms en el peor caso) no se logra satisfacer en criptas grandes (1 024 y 5 041 salas).
 
 ---
 
-## 5.6 Revisión de Decisiones de la Primera Parte
+## 5.6 Revisión de Decisiones de la Primera Parte (J-02)
 
-* **Agenda de eventos**: Sigue siendo óptima. Con decenas de cazadores activos reprogramando eventos de movimiento con costos variables, el ciclo de eventos mantuvo una mediana de 0.02 ms (< 20 ms). El heap binario propio con desempate por tupla nativa maneja sin degradación miles de eventos. Se mantuvo la decisión sin cambios.
-* **Historial de retroceso**: El buffer circular de 5 intervalos y el `Diario` reversible continúan operando en menos de 0.1 µs por intervalo. La adición de la línea de tiempo demostró que el diario de 5 intervalos no debía ampliarse para toda la historia (lo cual consumiría megabytes de memoria innecesaria), ratificando la separación entre el retroceso local (5 intervalos) y la línea de tiempo global con checkpoints cada $K$. Se mantuvo la decisión sin cambios.
-* **Inventario**: La lista doblemente enlazada mantiene equipar y soltar en $O(1)$ (< 0.3 µs) independientemente del tamaño del inventario.
-* **Formato de Guardado**: Evolucionó formalmente de `VERSION_FORMATO = 2` a `VERSION_FORMATO = 3` para incorporar la sección `"linea_tiempo"`, implementando la detección y rechazo explícito de partidas de la primera parte.
+Para validar las decisiones tomadas en la Parte I bajo las nuevas exigencias de la Parte II (incorporación de decenas de cazadores activos reprogramando eventos dinámicos, costos variables de puertas entre 10 y 200 ms, y registro continuo en la línea de tiempo), se repitieron las mediciones de la agenda de eventos y el motor (`BenchCazador.py` y `BenchMotor.py` regenerables con `--bench`).
+
+### Tabla Comparativa de Rendimiento (Antes vs. Después)
+
+| Subsistema / Escenario | Carga Parte I (sin cazadores) | Carga Parte II (cazadores activos + costos variables) | Límite / Cota Presupuestaria | Decisión Ratificada |
+|---|---|---|---|---|
+| **Agenda de Eventos (Ciclo de decisiones)** | Mediana: 0.02 ms (0 cazadores) | **30 cazadores**: Mediana 3.18 ms, Peor 9.14 ms<br>**60 cazadores**: Mediana 4.73 ms, Peor 14.27 ms | < 20.0 ms por turno (§6.1) | **Heap propio ratificado**. Incluso con 60 cazadores activos en cuadrícula de 900 salas con invalidación constante, el peor caso (14.27 ms) cumple holgadamente el presupuesto. |
+| **Historial de Retroceso (Local)** | 5 intervalos: 0.1 µs / intervalo | 5 intervalos + checkpoints cada $K=20$: 0.1 µs / intervalo | Inmediato | **Separación en dos niveles ratificada**. Retroceso táctico inmediato vía buffer circular de 5 y diario reversible; navegación temporal profunda vía `LineaTiempo`. |
+| **Inventario (Lista Doble)** | $O(1)$ equipar/soltar (< 0.3 µs) | $O(1)$ equipar/soltar (< 0.3 µs) | $O(1)$ | **Lista doblemente enlazada ratificada**. Independiente de la complejidad del mapa. |
+| **Formato de Guardado** | Binario / JSON v2 | Binario / JSON v3 con sección `"linea_tiempo"` | Deserialización < 5 ms | **Versión 3 ratificada**. Rechazo explícito de partidas v2 por cambio de esquema. |
+
+* **Conclusión**: El montículo binario (`Agenda`) y la lista doblemente enlazada (`Inventario`) absorben la carga combinada de la Parte II sin requerir rediseño arquitectónico, cumpliendo la regla de tiempo real por turno.
 
 ---
 

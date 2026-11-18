@@ -1,16 +1,2 @@
-HEADER|cripta-prueba|v1|demo|1
-ACCION|recoger 1
-ACCION|recoger 1
-ACCION|recoger 1
-ACCION|recoger 1
-ACCION|recoger 1
-ACCION|recoger 1
-ACCION|sig
-ACCION|equipar
-ACCION|sig
-ACCION|sig
-ACCION|sig
-ACCION|sig
-ACCION|equipar
-ACCION|mover S
-ACCION|atacar 1
+HEADER|cripta-02|52532a77ee04|4b9e75a42be5|1234
+ACCION|esperar
