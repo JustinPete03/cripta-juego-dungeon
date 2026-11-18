@@ -25,6 +25,7 @@ from model.Rastro import elegirDestinoRastreador
 from model.RutasCazador import RutasCazador
 from model.Cazador import elegirPasoCazador
 from model.MapaConocido import MapaConocido
+from model.Acciones import Accion
 from model import estado
 
 
@@ -73,6 +74,7 @@ class Modelo:
         # _construirSalas la reemplaza por una del tamaño de la cripta.
         self.rutasCazador = RutasCazador()
         self.mapaConocido = MapaConocido(self._registrar)
+        self._jugadorDanadoEnPaso = False
         from model.LineaTiempo import LineaTiempo
         self.lineaTiempo = LineaTiempo(k=getattr(self, "kCheckpoint", 20))
 
@@ -534,10 +536,10 @@ class Modelo:
         self.asignar(self.jugador, "sala", destino)
         self.asignar(destino, "rastro", self.reloj)
         # Las rutas del cazador detectan solas el cambio de sala del jugador (spec 005, D5)
-        self.mapaConocido.explorarSala(destino)
+        self.mapaConocido.explorarSala(destino, observarPuertas=True)
         if hasattr(self.efectos, "antorchaEncendida") and self.efectos.antorchaEncendida(self.jugador):
             for salida in destino.salidas:
-                self.mapaConocido.explorarSala(salida.destino)
+                self.mapaConocido.marcarExplorada(salida.destino)
         self.mensaje("Entras a: %s." % destino.nombre)
         self._activarDormidos(destino)
         self._activarTrampas(destino)
@@ -578,6 +580,8 @@ class Modelo:
         """Resta vida (nunca bajo 0). Si llega a 0 el actor muere en el acto."""
         if not actor.vivo or cantidad <= 0:
             return
+        if actor is self.jugador:
+            self._jugadorDanadoEnPaso = True
         nueva = max(0, actor.vida - cantidad)
         self.asignar(actor, "vida", nueva)
         if nueva == 0:
@@ -762,3 +766,55 @@ class Modelo:
     def restaurarEstado(self, datos):
         estado.restaurar(self, datos)
         self.rutasCazador.invalidar()      # puertas y sala del jugador cambian sin pasar por eventos
+
+    def darPasoViajeAutomatico(self, destId):
+        """Ejecuta un paso de viaje automático hacia destId en el modelo (N-03, §3.4).
+
+        Retorna (continuar: bool, motivo: str, accion: Accion|None).
+        Motivos posibles:
+          - 'LLEGO': jugador alcanzó la sala de destino.
+          - 'ENEMIGOS': la sala contiene enemigos.
+          - 'DANO': el jugador recibió daño durante el paso (independiente de curación/regeneración).
+          - 'SIN_RUTA': no existe ruta abierta conocida hacia el destino.
+          - 'NO_EXPLORADA': el destino no está explorado.
+          - 'PARTIDA_TERMINADA': la partida terminó (victoria o derrota).
+          - 'ERROR': la acción fue rechazada.
+          - 'OK': el paso se completó con éxito y el viaje puede continuar.
+        """
+        if self.estado != EN_CURSO:
+            return (False, "PARTIDA_TERMINADA", None)
+
+        salaDestino = self.salas.buscar(destId)
+        if salaDestino is None or not self.mapaConocido.estaExplorada(destId):
+            return (False, "NO_EXPLORADA", None)
+
+        if self.jugador.sala.id == destId:
+            return (False, "LLEGO", None)
+
+        from model.Dijkstra import elegirPasoViajeAutomatico
+        salida, costo = elegirPasoViajeAutomatico(
+            self.jugador.sala, salaDestino, self.salas, self.mapaConocido
+        )
+        if salida is None:
+            return (False, "SIN_RUTA", None)
+
+        self._jugadorDanadoEnPaso = False
+        accion = Accion(ACC_MOVER, salida.direccion)
+        res = self.ejecutar(accion)
+        if not res.ok:
+            return (False, "ERROR", accion)
+
+        # Reglas de parada tras el paso (§3.4)
+        if self.jugador.sala.id == destId:
+            return (False, "LLEGO", accion)
+
+        if getattr(self, "_jugadorDanadoEnPaso", False):
+            return (False, "DANO", accion)
+
+        if len(self.jugador.sala.enemigos) > 0:
+            return (False, "ENEMIGOS", accion)
+
+        if self.estado != EN_CURSO:
+            return (False, "PARTIDA_TERMINADA", accion)
+
+        return (True, "OK", accion)

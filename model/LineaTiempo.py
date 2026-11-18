@@ -1,16 +1,53 @@
 # Línea de tiempo y puntos de control (§3.6, §5.5 Parte II).
 # Cumple con el Principio I de la Constitución y gestiona puntos de control cada K acciones.
+# L-05: sin dict como tabla de búsqueda; registros con clases con __slots__.
 
 from model.Acciones import Accion
 from model.Constantes import (EN_CURSO, EV_JUGADOR)
 
 
-NOMBRES_EFECTO = {
-    0: "Veneno",
-    1: "Regeneración",
-    2: "Antorcha",
-    3: "Velocidad"
-}
+# L-05: función en vez de dict para nombres de efecto (Principio I).
+def nombreEfecto(clase):
+    """Devuelve el nombre legible de un efecto dado su código numérico."""
+    if clase == 0:
+        return "Veneno"
+    if clase == 1:
+        return "Regeneración"
+    if clase == 2:
+        return "Antorcha"
+    if clase == 3:
+        return "Velocidad"
+    return "Efecto-%s" % clase
+
+
+# L-05: registros con __slots__ en vez de dict para puntos de control y acciones.
+class PuntoControl:
+    """Punto de control: snapshot del modelo en un momento dado."""
+    __slots__ = ("numAccion", "reloj", "snapshot")
+
+    def __init__(self, numAccion, reloj, snapshot):
+        self.numAccion = numAccion
+        self.reloj = reloj
+        self.snapshot = snapshot
+
+    def __getitem__(self, clave):
+        return getattr(self, clave)
+
+    def __setitem__(self, clave, valor):
+        setattr(self, clave, valor)
+
+
+class RegistroAccion:
+    """Registro de una acción realizada por el jugador."""
+    __slots__ = ("numAccion", "accion", "reloj")
+
+    def __init__(self, numAccion, accion, reloj):
+        self.numAccion = numAccion
+        self.accion = accion
+        self.reloj = reloj
+
+    def __getitem__(self, clave):
+        return getattr(self, clave)
 
 
 def formatearResumenHistoria(modelo, numAccion=None, reloj=None):
@@ -41,7 +78,7 @@ def formatearResumenHistoria(modelo, numAccion=None, reloj=None):
     if activos:
         textosEf = []
         for ef in activos:
-            nom = NOMBRES_EFECTO.get(ef.clase, "Efecto-%s" % ef.clase)
+            nom = nombreEfecto(ef.clase)
             restante = max(0, ef.fin - modelo.reloj) if ef.fin > 0 else 0
             textosEf.append("%s (restante: %d)" % (nom, restante))
         lineas.append("Efectos activos (%d): %s" % (len(activos), ", ".join(textosEf)))
@@ -66,14 +103,16 @@ def formatearResumenHistoria(modelo, numAccion=None, reloj=None):
 def _crearModeloAuxiliar(proveedor, semilla, snapshot):
     """Instancia y restaura un modelo réplica para re-simulación sin tocar la partida en curso."""
     from model.Inventario import Inventario
-    from model.Diario import Diario
+    from model.Interfaces import DiarioNulo
     from model.efectosTrampa import efectosTrampa
     from model.Juego import Modelo
 
     efectos = efectosTrampa()
-    modeloAux = Modelo(proveedor, semilla, Inventario(proveedor), Diario(), efectos)
+    modeloAux = Modelo(proveedor, semilla, Inventario(proveedor), DiarioNulo(), efectos)
+    modeloAux.lineaTiempo = None
     efectos.registrarEn(modeloAux)
     modeloAux.iniciarPartida()
+    modeloAux.lineaTiempo = None
     modeloAux.restaurarEstado(snapshot)
     return modeloAux
 
@@ -83,22 +122,18 @@ class LineaTiempo:
 
     def __init__(self, k=20):
         self.k = max(1, k)
-        self._puntosControl = []  # lista de dicts: {"numAccion": int, "reloj": int, "snapshot": dict}
-        self._acciones = []       # lista de dicts: {"numAccion": int, "accion": Accion, "reloj": int}
+        self._puntosControl = []  # lista de PuntoControl
+        self._acciones = []       # lista de RegistroAccion
 
     def registrarPuntoControl(self, numAccion, reloj, snapshot):
         """Registra un punto de control con el estado completo del modelo."""
         # Si ya existe un punto de control para este número de acción, se reemplaza
         for p in self._puntosControl:
-            if p["numAccion"] == numAccion:
-                p["reloj"] = reloj
-                p["snapshot"] = snapshot
+            if p.numAccion == numAccion:
+                p.reloj = reloj
+                p.snapshot = snapshot
                 return
-        self._puntosControl.append({
-            "numAccion": numAccion,
-            "reloj": reloj,
-            "snapshot": snapshot
-        })
+        self._puntosControl.append(PuntoControl(numAccion, reloj, snapshot))
 
     def debeCrearPuntoControl(self, numAccion):
         """Indica si corresponde un punto de control tras ejecutar numAccion."""
@@ -106,21 +141,17 @@ class LineaTiempo:
 
     def registrarAccion(self, numAccion, accion, relojDecision):
         """Registra una acción canónica realizada por el jugador."""
-        self._acciones.append({
-            "numAccion": numAccion,
-            "accion": accion,
-            "reloj": relojDecision
-        })
+        self._acciones.append(RegistroAccion(numAccion, accion, relojDecision))
 
     def recortar(self, nuevoTotalAcciones):
-        """Descarta las acciones y puntos de control revertidos con pergamino (§3.6, §5.5)."""
-        # Recorta la lista de acciones a nuevoTotalAcciones en O(1)
+        """Descarta las acciones y puntos de control revertidos con pergamino (§3.6, §5.5, L-01)."""
+        # Recorta la lista de acciones a nuevoTotalAcciones in-place en O(eliminados)
         if nuevoTotalAcciones < len(self._acciones):
-            self._acciones = self._acciones[:nuevoTotalAcciones]
+            del self._acciones[nuevoTotalAcciones:]
 
         # Elimina puntos de control posteriores
         idx = len(self._puntosControl) - 1
-        while idx >= 0 and self._puntosControl[idx]["numAccion"] > nuevoTotalAcciones:
+        while idx >= 0 and self._puntosControl[idx].numAccion > nuevoTotalAcciones:
             self._puntosControl.pop()
             idx -= 1
 
@@ -131,25 +162,33 @@ class LineaTiempo:
         return len(self._acciones)
 
     def buscarPuntoControlMasCercanoAccion(self, k):
-        """Encuentra el punto de control anterior más cercano a la acción k."""
-        mejor = self._puntosControl[0]
-        for p in self._puntosControl:
-            if p["numAccion"] <= k - 1:
-                if p["numAccion"] >= mejor["numAccion"]:
-                    mejor = p
+        """Encuentra el último punto de control con numAccion <= k - 1 en O(log P) (§5.5, L-02)."""
+        pts = self._puntosControl
+        bajo = 0
+        alto = len(pts) - 1
+        mejor = pts[0]
+        while bajo <= alto:
+            medio = (bajo + alto) // 2
+            if pts[medio].numAccion <= k - 1:
+                mejor = pts[medio]
+                bajo = medio + 1
             else:
-                break
+                alto = medio - 1
         return mejor
 
     def buscarPuntoControlMasCercanoTiempo(self, t):
-        """Encuentra el punto de control anterior más cercano al tiempo t."""
-        mejor = self._puntosControl[0]
-        for p in self._puntosControl:
-            if p["reloj"] <= t:
-                if p["reloj"] >= mejor["reloj"]:
-                    mejor = p
+        """Encuentra el último punto de control con reloj <= t en O(log P) (§5.5, L-02)."""
+        pts = self._puntosControl
+        bajo = 0
+        alto = len(pts) - 1
+        mejor = pts[0]
+        while bajo <= alto:
+            medio = (bajo + alto) // 2
+            if pts[medio].reloj <= t:
+                mejor = pts[medio]
+                bajo = medio + 1
             else:
-                break
+                alto = medio - 1
         return mejor
 
     def consultarAccion(self, modeloBase, k):
@@ -229,23 +268,29 @@ class LineaTiempo:
     def capturar(self):
         accionesSerializadas = []
         for item in self._acciones:
-            acc = item["accion"]
-            accionesSerializadas.append([item["numAccion"], acc.tipo, acc.argumento, item["reloj"]])
+            acc = item.accion
+            accionesSerializadas.append([item.numAccion, acc.tipo, acc.argumento, item.reloj])
+
+        ptsSerializados = []
+        for p in self._puntosControl:
+            ptsSerializados.append({
+                "numAccion": p.numAccion,
+                "reloj": p.reloj,
+                "snapshot": p.snapshot
+            })
 
         return {
             "k": self.k,
-            "puntosControl": self._puntosControl,
+            "puntosControl": ptsSerializados,
             "acciones": accionesSerializadas
         }
 
     def restaurar(self, datos):
         self.k = datos.get("k", 20)
-        self._puntosControl = datos.get("puntosControl", [])
+        self._puntosControl = []
+        for p in datos.get("puntosControl", []):
+            self._puntosControl.append(PuntoControl(p["numAccion"], p["reloj"], p["snapshot"]))
         self._acciones = []
         for reg in datos.get("acciones", []):
             numAccion, tipo, arg, reloj = reg
-            self._acciones.append({
-                "numAccion": numAccion,
-                "accion": Accion(tipo, arg),
-                "reloj": reloj
-            })
+            self._acciones.append(RegistroAccion(numAccion, Accion(tipo, arg), reloj))

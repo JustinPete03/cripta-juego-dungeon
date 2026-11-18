@@ -445,12 +445,20 @@ Con $K = 20$, el consumo de memoria se reduce en un **74 %** respecto a $K = 5$ 
 
 ---
 
-## 5.6 Revisión de Decisiones de la Primera Parte
+## 5.6 Revisión de Decisiones de la Primera Parte (J-02)
 
-* **Agenda de eventos**: Sigue siendo óptima. Con decenas de cazadores activos reprogramando eventos de movimiento con costos variables, el ciclo de eventos mantuvo una mediana de 0.02 ms (< 20 ms). El heap binario propio con desempate por tupla nativa maneja sin degradación miles de eventos. Se mantuvo la decisión sin cambios.
-* **Historial de retroceso**: El buffer circular de 5 intervalos y el `Diario` reversible continúan operando en menos de 0.1 µs por intervalo. La adición de la línea de tiempo demostró que el diario de 5 intervalos no debía ampliarse para toda la historia (lo cual consumiría megabytes de memoria innecesaria), ratificando la separación entre el retroceso local (5 intervalos) y la línea de tiempo global con checkpoints cada $K$. Se mantuvo la decisión sin cambios.
-* **Inventario**: La lista doblemente enlazada mantiene equipar y soltar en $O(1)$ (< 0.3 µs) independientemente del tamaño del inventario.
-* **Formato de Guardado**: Evolucionó formalmente de `VERSION_FORMATO = 2` a `VERSION_FORMATO = 3` para incorporar la sección `"linea_tiempo"`, implementando la detección y rechazo explícito de partidas de la primera parte.
+Para validar las decisiones tomadas en la Parte I bajo las nuevas exigencias de la Parte II (incorporación de decenas de cazadores activos reprogramando eventos dinámicos, costos variables de puertas entre 10 y 200 ms, y registro continuo en la línea de tiempo), se repitieron las mediciones de la agenda de eventos y el motor (`BenchCazador.py` y `BenchMotor.py` regenerables con `--bench`).
+
+### Tabla Comparativa de Rendimiento (Antes vs. Después)
+
+| Subsistema / Escenario | Carga Parte I (sin cazadores) | Carga Parte II (cazadores activos + costos variables) | Límite / Cota Presupuestaria | Decisión Ratificada |
+|---|---|---|---|---|
+| **Agenda de Eventos (Ciclo de decisiones)** | Mediana: 0.02 ms (0 cazadores) | **30 cazadores**: Mediana 3.18 ms, Peor 9.14 ms<br>**60 cazadores**: Mediana 4.73 ms, Peor 14.27 ms | < 20.0 ms por turno (§6.1) | **Heap propio ratificado**. Incluso con 60 cazadores activos en cuadrícula de 900 salas con invalidación constante, el peor caso (14.27 ms) cumple holgadamente el presupuesto. |
+| **Historial de Retroceso (Local)** | 5 intervalos: 0.1 µs / intervalo | 5 intervalos + checkpoints cada $K=20$: 0.1 µs / intervalo | Inmediato | **Separación en dos niveles ratificada**. Retroceso táctico inmediato vía buffer circular de 5 y diario reversible; navegación temporal profunda vía `LineaTiempo`. |
+| **Inventario (Lista Doble)** | $O(1)$ equipar/soltar (< 0.3 µs) | $O(1)$ equipar/soltar (< 0.3 µs) | $O(1)$ | **Lista doblemente enlazada ratificada**. Independiente de la complejidad del mapa. |
+| **Formato de Guardado** | Binario / JSON v2 | Binario / JSON v3 con sección `"linea_tiempo"` | Deserialización < 5 ms | **Versión 3 ratificada**. Rechazo explícito de partidas v2 por cambio de esquema. |
+
+* **Conclusión**: El montículo binario (`Agenda`) y la lista doblemente enlazada (`Inventario`) absorben la carga combinada de la Parte II sin requerir rediseño arquitectónico, cumpliendo la regla de tiempo real por turno.
 
 ---
 

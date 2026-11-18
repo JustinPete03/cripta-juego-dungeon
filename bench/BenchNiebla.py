@@ -89,26 +89,32 @@ def benchExploracionProporcional():
 
 
 def benchPasoIrA():
-    print("\n--- 3. Cálculo de un paso de «ir a» (§6.1 Límite: 5 ms) ---")
-    salas, listaSalas = _crearCriptaSintetica(nSalas=200, semilla=123)
-    mapa = MapaConocido()
+    print("\n--- 3. Cálculo de un paso de «ir a» (§6.1 Límite: 5 ms, N-04) ---")
+    for nSalas in [100, 200, 400]:
+        salas, listaSalas = _crearCriptaSintetica(nSalas=nSalas, semilla=123)
+        mapa = MapaConocido()
 
-    # Mapa completamente conocido (peor caso para la búsqueda en anchura/Dijkstra)
-    for s in listaSalas:
-        mapa.explorarSala(s)
+        # Mapa completamente conocido (peor caso para la búsqueda Dijkstra)
+        for s in listaSalas:
+            mapa.explorarSala(s)
 
-    origen = listaSalas[0]
-    destino = listaSalas[150]
+        origen = listaSalas[0]
+        destino = listaSalas[int(nSalas * 0.75)]
 
-    repeticiones = 50
-    t0 = time.perf_counter()
-    for _ in range(repeticiones):
-        salida, costo = elegirPasoViajeAutomatico(origen, destino, salas, mapa)
-    tPasoMs = (time.perf_counter() - t0) / repeticiones * 1000
+        repeticiones = 50
+        tiempos = []
+        for _ in range(repeticiones):
+            t0 = time.perf_counter()
+            salida, costo = elegirPasoViajeAutomatico(origen, destino, salas, mapa)
+            tiempos.append((time.perf_counter() - t0) * 1000)
 
-    print("  Tiempo de cálculo de 1 paso de «ir a» (200 salas conocidas): %6.3f ms" % tPasoMs)
-    print("  Cumple presupuesto (< 5 ms): %s" % ("SÍ" if tPasoMs < 5.0 else "NO"))
-    assert tPasoMs < 5.0, "El paso de ir a excede el límite de 5 ms"
+        tiempos.sort()
+        medianaMs = tiempos[len(tiempos) // 2]
+        peorMs = max(tiempos)
+
+        print("  Cripta %3d salas | Mediana: %5.2f ms | Peor caso: %5.2f ms | Cumple (< 5 ms): %s" %
+              (nSalas, medianaMs, peorMs, "SÍ" if peorMs < 5.0 else "NO"))
+        assert peorMs < 5.0, "El peor paso de ir a (%5.2f ms) excede el límite de 5 ms" % peorMs
 
 
 def main():

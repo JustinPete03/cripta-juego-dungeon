@@ -18,3 +18,4 @@ puntajes_locales.json
 
 # Basura de consolas
 .Rhistory
+.DS_Store

@@ -174,7 +174,7 @@ class InventarioVisual:
 
 
 class CeldaVisual:
-    def __init__(self, x, y, idSala, nombre, visitada, actual, esSalida, cerrada):
+    def __init__(self, x, y, idSala, nombre, visitada, actual, esSalida, cerrada, avistada=False):
         self.x = x
         self.y = y
         self.idSala = idSala
@@ -183,6 +183,7 @@ class CeldaVisual:
         self.actual = actual
         self.esSalida = esSalida
         self.cerrada = cerrada
+        self.avistada = avistada
 
 
 class ResultadoVisual:
@@ -425,11 +426,16 @@ def celdasDelMapa(modelo):
                     cerrada = True
             elif salida.puerta.cerrada:
                 cerrada = True
-        visitada = (modelo.mapaConocido.estaExplorada(sala.id)
-                    if hasattr(modelo, "mapaConocido") and modelo.mapaConocido is not None
-                    else sala.rastro >= 0)
+        visitada = False
+        avistada = False
+        if hasattr(modelo, "mapaConocido") and modelo.mapaConocido is not None:
+            visitada = modelo.mapaConocido.estaExplorada(sala.id)
+            if not visitada and hasattr(modelo, "salas"):
+                avistada = (modelo.mapaConocido.estadoSala(sala.id, modelo.salas) == "avistada")
+        else:
+            visitada = (sala.rastro >= 0)
         celdas.append(CeldaVisual(x, y, sala.id, sala.nombre, visitada,
-                                  sala.id == actual, sala.id == modelo.salaSalidaId, cerrada))
+                                  sala.id == actual, sala.id == modelo.salaSalidaId, cerrada, avistada))
     return celdas
 
 

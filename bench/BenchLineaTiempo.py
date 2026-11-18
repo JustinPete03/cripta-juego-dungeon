@@ -105,7 +105,7 @@ def benchConsultaPartidaLarga5000Acciones():
     print("    Tiempo mediana  : %.2f ms" % medianaMs)
     print("    Peor caso       : %.2f ms" % peorMs)
     print("  ¿Cumple requisito PR-007 (< 50 ms)?: %s" %
-          ("SÍ (%.2f ms < 50 ms)" % medianaMs if medianaMs < 50 else "NO"))
+          ("SÍ (peor caso %.2f ms < 50 ms)" % peorMs if peorMs < 50 else "NO (peor caso %.2f ms >= 50 ms)" % peorMs))
 
 
 def main():
