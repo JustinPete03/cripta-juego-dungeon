@@ -1244,10 +1244,43 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 * **Fecha**: 2026-11-01
 * **Herramienta**: Antigravity (Google)
 * **Comando / Prompt**:
+  `/speckit.clarify 003-resolubilidad`
+  "Clarificar los supuestos formales de verificación de resolubilidad bajo §3.5: transitabilidad de salidas, llaves infinitas (no consumibles), resolución victoriosa de combates, consideración de llaves soltadas por enemigos en su sala de origen, formato del reporte en caso no resoluble (frontera bloqueada y ciclo concreto de dependencias circulares), y comportamiento de banderas CLI --verificar y --forzar."
+* **Uso de la respuesta**:
+  Incorporación de las clarificaciones Q1 a Q6 en `specs/003-resolubilidad/spec.md` para delimitar con exactitud las reglas de negocio y los contratos de aceptación.
+
+---
+
+### Entrada 2026-11-01 / Antigravity (Google)
+* **Fecha**: 2026-11-01
+* **Herramienta**: Antigravity (Google)
+* **Comando / Prompt**:
   `/speckit.plan 003-resolubilidad`
   "Diseñar algoritmo de recorrido incremental O(V + E + K) sin reiniciar BFS por cada llave: cola de exploración, puertas en espera por ID de llave, orden determinista usando selector de ordenamiento propio, adaptadores de cliente para consulta de llaves con presupuesto de red, y detección determinista de ciclos en el subgrafo inalcanzable."
 * **Uso de la respuesta**:
-  Generación de `specs/003-resolubilidad/plan.md` y descomposición detallada de tareas en `specs/003-resolubilidad/tasks.md`.
+  Generación de `specs/003-resolubilidad/plan.md` y alineación con los principios de la Constitución.
+
+---
+
+### Entrada 2026-11-01 / Antigravity (Google)
+* **Fecha**: 2026-11-01
+* **Herramienta**: Antigravity (Google)
+* **Comando / Prompt**:
+  `/speckit.tasks 003-resolubilidad`
+  "Descomponer la implementación de la Capacidad 3 en tareas concretas trazables a los requisitos funcionales FR-021 a FR-028: Fase 1 (adaptadores de red y offline para obtenerLlaves), Fase 2 (algoritmo incremental de verificación y detección de ciclos en model/Resolubilidad.py y pruebas en test_resolubilidad.py), Fase 3 (banderas CLI --verificar y --forzar en main.py y pruebas de aceptación), y Fase 4 (benchmarks empíricos y documentación en DECISIONES.md)."
+* **Uso de la respuesta**:
+  Creación de `specs/003-resolubilidad/tasks.md` con 11 tareas numeradas (T001 a T011) cubriendo todo el ciclo de desarrollo.
+
+---
+
+### Entrada 2026-11-01 / Antigravity (Google)
+* **Fecha**: 2026-11-01
+* **Herramienta**: Antigravity (Google)
+* **Comando / Prompt**:
+  `/speckit.analyze 003-resolubilidad`
+  "Analizar la consistencia entre spec.md, plan.md, tasks.md y el código de resolubilidad: verificar ausencia de estructuras nativas prohibidas (dict, set, heapq), cumplimiento de la cota de 200 ms, trazabilidad de requisitos FR-021 a FR-028, y consumo correcto de presupuesto de red en GET /criptas/<id>/llaves."
+* **Uso de la respuesta**:
+  Validación de conformidad constitucional, confirmando que la lógica reside enteramente en el modelo (`model/Resolubilidad.py`) y utiliza `Tabla` propia sin dependencias externas.
 
 ---
 
@@ -1259,6 +1292,22 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   "Implementar endpoint obtenerLlaves en adapters/clienteCripta.py, clienteHttp.py, clienteOffline.py, estrategiaRed.py y ProveedorRed.py; algoritmo de verificación y detección de ciclos en model/Resolubilidad.py; banderas --verificar y --forzar en main.py; suite de 9 pruebas de aceptación en tests/test_resolubilidad.py; suite de benchmarks en bench/BenchResolubilidad.py; y documentación en DECISIONES.md."
 * **Uso de la respuesta**:
   Implementación completa de la Capacidad 3 con 203 pruebas pasando al 100%, verificación en cripta grande de 200 salas en 1.16 ms (< 200 ms) y documentación completa.
+
+---
+
+### Entrada 2026-11-17 / Antigravity (Google)
+* **Fecha**: 2026-11-17
+* **Herramienta**: Antigravity (Google)
+* **Comando / Prompt**:
+  `Correcciones técnicas R-01 a R-05 (Diego Mena — Verificación de Resolubilidad)`
+  "Aplicar correcciones del plan de revisión técnica:
+  1. R-01: Reescribir detección de ciclos como DFS iterativa con pila explícita y marcas de 3 estados (0=no visitado, 1=en pila, 2=terminado) en model/Resolubilidad.py, eliminando el riesgo de RecursionError en cadenas largas (> 1000 llaves).
+  2. R-02 y R-05: Reemplazar las F exploraciones BFS independientes por una única pasada BFS multifuente sobre la región no alcanzada, encolando determinísticamente las puertas de la frontera bloqueada y eliminando código muerto 'elif not sal[cerrada]'.
+  3. R-03: Corregir la asimetría del benchmark en bench/BenchResolubilidad.py implementando la versión ingenua sobre Tabla propia e IndiceOrdenado propio, evaluando escalabilidad lineal O(N) vs cuadrática O(K^2) para K en [100, 500, 1000, 2000, 5000] y midiendo detección de ciclos en casos no resolubles.
+  4. R-04: Ampliar benchmark de criptas grandes hasta 2000 salas garantizando peor caso < 200 ms.
+  5. Actualizar DECISIONES.md (sección 5.4), plan.md y agregar pruebas automatizadas en tests/test_resolubilidad.py."
+* **Uso de la respuesta**:
+  Resolución completa de los hallazgos R-01, R-02, R-03, R-04 y R-05. Pasan todas las pruebas y los benchmarks confirman empíricamente el comportamiento asintótico lineal y tiempo en 2000 salas de 14.15 ms.
 
 ---
 
