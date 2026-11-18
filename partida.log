@@ -1,4 +1,5 @@
 HEADER|cripta-prueba|v1|demo|3
+HEADER|cripta-prueba|v1|demo|1
 ACCION|recoger 1
 ACCION|recoger 1
 ACCION|recoger 1
@@ -30,6 +31,7 @@ ACCION|sig
 ACCION|equipar
 ACCION|ant
 ACCION|sig
+ACCION|equipar
 ACCION|sig
 ACCION|sig
 ACCION|sig
@@ -52,4 +54,22 @@ ACCION|sig
 ACCION|sig
 ACCION|sig
 ACCION|mover O
+ACCION|mover S
+ACCION|atacar 1
+ACCION|recoger 1
+ACCION|esperar
+ACCION|mover E
+ACCION|atacar 1
+ACCION|atacar 1
+ACCION|mover N
+ACCION|atacar 1
+ACCION|abrir E
+ACCION|sig
+ACCION|ant
+ACCION|sig
+ACCION|ant
+ACCION|retroceso
+ACCION|abrir E
+ACCION|mover E
+ACCION|atacar 1
 ACCION|mover E
