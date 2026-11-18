@@ -56,6 +56,130 @@ class ProveedorNiebla:
 
 class TestNieblaYViaje(unittest.TestCase):
 
+
+    def test_N01_antorcha_no_observa_puertas_de_vecinas(self):
+        """[FR-014, FR-013, N-01] Con la antorcha, la vecina B queda explorada y la puerta A-B
+        observada, pero la puerta B-C (que el jugador nunca tuvo enfrente) queda sin observar."""
+        esqueleto = [
+            {"id": 1, "nombre": "Inicio", "salidas": {"E": {"sala": 2}}},
+            {"id": 2, "nombre": "A", "salidas": {"O": {"sala": 1}, "E": {"sala": 3}}},
+            {"id": 3, "nombre": "B", "salidas": {"O": {"sala": 2}, "E": {"sala": 4, "cerrada": True}}},
+            {"id": 4, "nombre": "C", "salidas": {"O": {"sala": 3}}},
+            {"id": 99, "nombre": "Salida", "salidas": {}}
+        ]
+        contenidos = [
+            {"sala": 1, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 2, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 3, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 4, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 99, "enemigos": [], "objetos": [], "trampas": []}
+        ]
+        prov = ProveedorNiebla(esqueleto, contenidos, [])
+        efectos = efectosJuego()
+        modelo = Modelo(prov, semilla=1, inventario=Inventario(prov), diario=Diario(), efectos=efectos)
+        efectos.registrarEn(modelo)
+        modelo.iniciarPartida()
+        efectos.encenderAntorcha(modelo, modelo.jugador, 500)
+
+        # El jugador entra a A (sala 2); B (sala 3) es su vecina
+        modelo.ejecutar(Accion(ACC_MOVER, "E"))
+        self.assertEqual(modelo.jugador.sala.id, 2)
+
+        mapa = modelo.mapaConocido
+        self.assertTrue(mapa.estaExplorada(3))
+        self.assertEqual(mapa.estadoPuertaRecordada(2, 3), "abierta")
+        self.assertEqual(mapa.estadoPuertaRecordada(3, 4), "sin_observar")
+
+    def test_N02_ir_a_no_usa_puerta_sin_observar_y_mapa_no_revela_estado(self):
+        """[FR-013, FR-017, N-02] Una puerta que el jugador nunca observó y que en realidad está
+        abierta: «ir a» no la usa y el mapa la muestra como sin observar."""
+        esqueleto = [
+            {"id": 1, "nombre": "Sala 1", "salidas": {"E": {"sala": 2}}},
+            {"id": 2, "nombre": "Sala 2", "salidas": {"O": {"sala": 1}, "E": {"sala": 3}}},
+            {"id": 3, "nombre": "Sala 3", "salidas": {"O": {"sala": 2}}},
+            {"id": 99, "nombre": "Salida", "salidas": {}}
+        ]
+        contenidos = [
+            {"sala": 1, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 2, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 3, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 99, "enemigos": [], "objetos": [], "trampas": []}
+        ]
+        prov = ProveedorNiebla(esqueleto, contenidos, [])
+        modelo = Modelo(prov, semilla=1, inventario=Inventario(prov), diario=Diario())
+        modelo.iniciarPartida()
+
+        # Salas 2 y 3 conocidas, pero solo marcadas: ninguna puerta de ellas fue observada
+        modelo.mapaConocido.marcarExplorada(modelo.salas.buscar(2))
+        modelo.mapaConocido.marcarExplorada(modelo.salas.buscar(3))
+
+        # La puerta 2-3 está realmente abierta
+        self.assertFalse(modelo.salas.buscar(2).salida("E").puerta.cerrada)
+        self.assertEqual(modelo.mapaConocido.estadoPuertaRecordada(2, 3), "sin_observar")
+
+        # «ir a» no la usa: no hay ruta conocida y no se mueve ni gasta tiempo
+        salida, motivo = modelo.pasoViaje(3)
+        self.assertIsNone(salida)
+        self.assertEqual(motivo, Modelo.VIAJE_SIN_RUTA)
+        self.assertEqual(modelo.jugador.sala.id, 1)
+        self.assertEqual(modelo.reloj, 0)
+
+        # El mapa no revela el estado real de esa puerta
+        controlador = Controlador(modelo)
+        mensajes = []
+        controlador._decir = lambda m: mensajes.append(m)
+        controlador.procesar("mapa")
+        self.assertIn(
+            "E->Sala 3 (costo: 100, sin observar)",
+            "\n".join(mensajes),
+        )
+    def test_N03_viaje_se_detiene_por_danio_aunque_la_vida_se_recupere(self):
+        """[FR-018, N-03] El daño se detecta por el aviso del modelo, no comparando la vida:
+        si hay regeneración en el mismo paso, el viaje se detiene igual. Corre sin controlador."""
+        esqueleto = [
+            {"id": 1, "nombre": "Sala 1", "salidas": {"E": {"sala": 2}}},
+            {"id": 2, "nombre": "Sala 2", "salidas": {"O": {"sala": 1}, "E": {"sala": 3}}},
+            {"id": 3, "nombre": "Sala 3", "salidas": {"O": {"sala": 2}}},
+            {"id": 99, "nombre": "Salida", "salidas": {}}
+        ]
+        contenidos = [
+            {"sala": 1, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 2, "enemigos": [], "objetos": [],
+             "trampas": [{"instancia": "t-1", "tipo": "trp_dardos"}]},
+            {"sala": 3, "enemigos": [], "objetos": [], "trampas": []},
+            {"sala": 99, "enemigos": [], "objetos": [], "trampas": []}
+        ]
+        fichas = [
+            {"id": "trp_dardos", "clase": "trampa", "nombre": "Dardos", "daño": 5, "rearme": 300}
+        ]
+        prov = ProveedorNiebla(esqueleto, contenidos, fichas)
+        modelo = Modelo(prov, semilla=1, inventario=Inventario(prov), diario=Diario())
+        modelo.iniciarPartida()
+        modelo.mapaConocido.explorarSala(modelo.salas.buscar(2))
+        modelo.mapaConocido.explorarSala(modelo.salas.buscar(3))
+
+        # Regeneración simulada: cada daño al jugador se cura en el mismo paso
+        original = modelo.aplicarDanio
+
+        def conRegeneracion(actor, cantidad):
+            original(actor, cantidad)
+            if actor is modelo.jugador:
+                modelo.curar(actor, cantidad)
+        modelo.aplicarDanio = conRegeneracion
+
+        vidaAntes = modelo.jugador.vida
+        salida, motivo = modelo.pasoViaje(3)
+
+        self.assertIsNotNone(salida)
+        self.assertEqual(modelo.jugador.sala.id, 2)
+        self.assertEqual(modelo.jugador.vida, vidaAntes)       # comparar vidas no vería nada
+        self.assertEqual(motivo, Modelo.VIAJE_DANIO)
+
+
+
+
+
+
     def test_T004_mapa_conocido_estados_iniciales(self):
         """[FR-011, FR-012] La sala inicial está explorada, sus vecinas avistadas, las demás desconocidas."""
         s1 = Sala(1, "Entrada")
@@ -243,6 +367,16 @@ class TestNieblaYViaje(unittest.TestCase):
         # El enemigo de sala 2 fue despertado al entrar
         enemigo = modelo.jugador.sala.enemigos[0]
         self.assertTrue(enemigo.activo)
+        # Desde la sala con enemigos, hay una ruta conocida hacia la sala 3.
+        self.assertTrue(modelo.mapaConocido.puertaRecordadaAbierta(2, 3))
+        relojAntes = modelo.reloj
+
+        salida, motivo = modelo.pasoViaje(3)
+
+        self.assertIsNone(salida)
+        self.assertEqual(motivo, Modelo.VIAJE_ENEMIGOS)
+        self.assertEqual(modelo.jugador.sala.id, 2)
+        self.assertEqual(modelo.reloj, relojAntes)
 
     def test_escenario_memoria_puerta_cerrada_actualizacion_y_recalculo(self):
         """[FR-013, FR-017, Apéndice B] El mapa recuerda abierta una puerta que en realidad está cerrada:
@@ -274,7 +408,7 @@ class TestNieblaYViaje(unittest.TestCase):
         puerta23.cerrada = True
 
         # El mapa del jugador en sala 1 todavía recuerda que la puerta 2-3 estaba abierta
-        self.assertTrue(modelo.mapaConocido.puertaRecordadaAbierta(2, 3, puerta23))
+        self.assertTrue(modelo.mapaConocido.puertaRecordadaAbierta(2, 3))
 
         mensajes = []
         controlador._decir = lambda m: mensajes.append(m)
@@ -287,7 +421,7 @@ class TestNieblaYViaje(unittest.TestCase):
         controlador.procesar("ir a 3")
 
         self.assertEqual(modelo.jugador.sala.id, 2)
-        self.assertTrue(modelo.mapaConocido.puertaRecordadaCerrada(2, 3, puerta23))
+        self.assertEqual(modelo.mapaConocido.estadoPuertaRecordada(2, 3), "cerrada")
         self.assertTrue(any("no existe ruta conocida abierta" in m for m in mensajes))
 
     def test_n01_antorcha_no_observa_puertas_lejanas(self):
@@ -388,6 +522,13 @@ class TestNieblaYViaje(unittest.TestCase):
         self.assertFalse(continuar)
         self.assertEqual(motivo, "DANO")
         self.assertEqual(modelo.jugador.sala.id, 2)
+
+
+
+
+
+
+
 
 
 

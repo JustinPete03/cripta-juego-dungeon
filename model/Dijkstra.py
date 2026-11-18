@@ -321,7 +321,7 @@ def _reglaConocimiento(mapaConocido):
     el jugador recuerda abierta. Qué conoce el jugador lo define la spec 002."""
     def puedeUsar(sala, salida):
         return (mapaConocido.estaExplorada(salida.destinoId)
-                and mapaConocido.puertaRecordadaAbierta(sala.id, salida.destinoId, salida.puerta))
+                and mapaConocido.puertaRecordadaAbierta(sala.id, salida.destinoId))
     return puedeUsar
 
 

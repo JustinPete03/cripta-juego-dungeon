@@ -33,7 +33,35 @@ def _benchRetroceso():
     hilo.join()
 
 
-def ejecutarBenchmarks():
+def _benchNiebla(args):
+    cliente = crearCliente(args)
+    idCripta = args.cripta
+
+    if idCripta is None:
+        criptas = cliente.obtenerListaCriptas().get("criptas", [])
+        if not criptas:
+            raise RuntimeError("No hay criptas para medir el benchmark de niebla.")
+        referencia = max(criptas, key=lambda cripta: int(cripta["salas"]))
+        idCripta = referencia["id"]
+
+    semilla = args.semilla if args.semilla is not None else 123
+    _, modelo = construirModelo(
+        cliente, idCripta, semilla, args.cacheSize, args.checkpointCada
+    )
+    modelo.iniciarPartida()
+    print("Cripta medida: %s (%d salas)" % (idCripta, modelo.salas.cantidad()))
+
+    benchNiebla = _modulo("bench.BenchNiebla")
+    benchNiebla.benchConsultasMapaConocido()
+    benchNiebla.benchExploracionProporcional()
+
+    try:
+        benchNiebla.benchPasoIrA(salasReferencia=modelo.salas)
+    except AssertionError as error:
+        print("Resultado del benchmark de niebla: %s" % error)
+
+
+def ejecutarBenchmarks(args):
     # Cada benchmark corre aislado: en la defensa se pasan los otros cinco aunque uno falte.
     _bench("Bench de Ordenamientos (sección 4.9)", lambda: _modulo("bench.Ordenamientos").main())
     _bench("Bench de Cache (sección 4.3 / sección 4.4)", lambda: _modulo("bench.Cache").main())
@@ -47,7 +75,7 @@ def ejecutarBenchmarks():
     _bench("Bench de Terreno y Cazador (Parte II §5.1, §5.2)",
            lambda: _modulo("bench.BenchCazador").main())
     _bench("Bench de Niebla de Guerra y Viaje 'ir a' (Parte II §5.3)",
-           lambda: _modulo("bench.BenchNiebla").main())
+           lambda: _benchNiebla(args))
     _bench("Bench de Verificación de Resolubilidad (Parte II §5.4)",
            lambda: _modulo("bench.BenchResolubilidad").main())
     _bench("Bench de Línea de Tiempo y Puntos de Control (Parte II §5.5)",
@@ -295,7 +323,7 @@ def main():
         return
 
     if args.bench:
-        ejecutarBenchmarks()
+        ejecutarBenchmarks(args)
         return
 
     if args.puntajes:

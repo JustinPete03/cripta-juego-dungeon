@@ -371,24 +371,34 @@ El bench usa el modelo real con 30 cazadores activos en una cuadrícula de 900 s
 * **Plan**: `specs/002-niebla-y-viaje/plan.md`
 
 ### 1. Problema
-El jugador experimenta niebla de guerra: no conoce el mapa completo, solo las salas *Exploradas* y *Avistadas*. Debe mantener memoria independiente del estado de las puertas observadas, actualizarse cuando se entra a las salas contiguas, e interactuar con el efecto de la antorcha (que revela salas vecinas sin despertar entidades). Todo el conocimiento del jugador forma parte del estado del juego y debe poder revertirse con pergaminos de retroceso de manera económica, sin hacer copias completas del mapa. Además, el comando «ir a» debe calcular la ruta óptima paso a paso exclusivamente sobre el subgrafo conocido y salidas recordadas abiertas, con desempate determinista por menor ID de vecina.
+
+El jugador conoce las salas *Exploradas* y *Avistadas* y conserva el último estado que observó de cada puerta. La antorcha revela salas vecinas sin activar sus enemigos ni trampas. Revelar una vecina tampoco permite observar las puertas que conectan esa vecina con otras salas. El pergamino debe poder revertir tanto la exploración como los cambios en la memoria de puertas. El comando «ir a» debe calcular cada paso sobre el mapa conocido y detenerse si el jugador recibe daño, aunque se cure durante ese mismo paso.
 
 ### 2. Decisión
+
 Se implementó `MapaConocido` sobre `Tabla` propia con dispersión djb2.
-* La consulta de si una sala está explorada toma $O(1)$.
-* La consulta de si está avistada revisa únicamente los vecinos inmediatos de la sala (máximo 4), tomando $O(4) = O(1)$.
-* La exploración de una nueva sala registra su inversa en el `Diario` en $O(1)$, haciendo que revertir con un pergamino sea una simple llamada a `quitar` en la tabla hash.
+
+* **Exploración y observación (N-01).** Al entrar en una sala, `explorarSala()` la marca como explorada y observa sus puertas. La antorcha usa `marcarExplorada()` para revelar las vecinas. Cada cambio registra su inversa en el `Diario` para que el pergamino pueda restaurar el estado anterior.
+* **Memoria de puertas (N-02).** La consulta devuelve «abierta», «cerrada» o «sin observar» a partir de la memoria del jugador. `mapa` muestra esos estados e «ir a» solo usa salidas hacia salas exploradas cuyas puertas se recuerdan abiertas.
+* **Búsqueda compartida (K-05).** «Ir a» y el cazador reutilizan `calcularDistancias()` y `elegirPrimerPaso()`. Cada uno aporta su regla de paso. El cazador usa el estado real de las puertas y «ir a» usa el conocimiento del jugador. Ambos desempatan por el menor ID de la vecina. La búsqueda desde el destino se apoya en que las salidas inversas comparten puerta y costo, condición comprobada en las criptas de demostración por `tests/test_rutas_invalidacion.py`.
+* **Control del viaje (N-03).** `Modelo.validarViaje()` valida el destino y `Modelo.pasoViaje()` recalcula y ejecuta cada movimiento. Si hay enemigos en la sala de partida, el viaje se detiene antes de moverse. `aplicarDanio()` registra el daño recibido para que una curación en el mismo paso no oculte el motivo de detención. El controlador repite los pasos, los registra en `partida.log` y muestra el motivo de salida.
+
+**Coincidencia con el plan original.** Se conservaron `Tabla`, el registro de inversas en `Diario` y el recálculo por paso. Se ajustó el plan para reflejar los tres estados de las puertas, las reglas de viaje en el modelo y el uso del núcleo de búsqueda de la spec 005.
 
 ### 3. Evidencia Empírica (`bench/BenchNiebla.py`)
-* **Consultas al mapa conocido**:
-  * Estado de sala (`explorada`/`avistada`/`desconocida`): **1.04 µs** por operación.
-  * Memoria de puertas: **0.50 µs** por operación.
-* **Costo de exploración vs. Tamaño del mapa conocido**:
-  * Con 10 salas previas: explorar 5 nuevas toma **0.011 ms**.
-  * Con 50 salas previas: explorar 5 nuevas toma **0.013 ms**.
-  * Con 300 salas previas: explorar 5 nuevas toma **0.012 ms**.
-  * El costo es estrictamente plano ($O(1)$) e independiente del tamaño del mapa conocido.
-* **Cálculo de un paso de «ir a»**: **1.39 ms** sobre 200 salas (límite exigido: < 5 ms).
+
+* **Consultas al mapa conocido.** Estado de sala: **2.908 µs** por operación. Memoria de puertas: **1.364 µs** por operación.
+* **Exploración de cinco salas nuevas.** Cada repetición prepara el mapa previo antes de iniciar el cronómetro.
+
+  | Salas exploradas previamente | Tiempo promedio |
+  | ---: | ---: |
+  | 10 | 0.114 ms |
+  | 50 | 0.079 ms |
+  | 150 | 0.064 ms |
+  | 300 | 0.063 ms |
+
+* **Cálculo de un paso de «ir a» (N-04).** Con `python main.py --bench` se midió el mapa conocido completo de `cripta-06`, de **300 salas**. De los 200 pares de origen y destino evaluados, 51 tenían ruta. El promedio fue de **1.098 ms** y el peor tiempo medido fue de **2.115 ms**, por debajo del límite de **5 ms**.
+* **Pruebas.** `python -m pytest -q tests/test_niebla_viaje.py tests/test_rutas_invalidacion.py` reportó **40 pruebas aprobadas en 2.28 s**.
 
 ---
 

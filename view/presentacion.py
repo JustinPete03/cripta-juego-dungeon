@@ -422,7 +422,7 @@ def celdasDelMapa(modelo):
         cerrada = False
         for salida in sala.salidas:
             if hasattr(modelo, "mapaConocido") and modelo.mapaConocido is not None:
-                if modelo.mapaConocido.puertaRecordadaCerrada(sala.id, salida.destinoId, salida.puerta):
+                if modelo.mapaConocido.estadoPuertaRecordada(sala.id, salida.destinoId) == "cerrada":
                     cerrada = True
             elif salida.puerta.cerrada:
                 cerrada = True
