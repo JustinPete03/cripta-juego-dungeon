@@ -1359,3 +1359,20 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   `/speckit-analyze specs/001-terreno-y-cazador`
 * **Uso de la respuesta**:
   Análisis cruzado de consistencia y trazabilidad entre `spec.md`, `plan.md` y `tasks.md`: 10 de 10 requisitos funcionales (FR-001 a FR-010) y 2 de rendimiento (PR-001, PR-002) cuentan con tareas asignadas y pruebas automatizadas (T001-T018). Se constató la concordancia con la Constitución técnica (estructuras de datos propias sin `heapq`/`dict`/`set`, determinismo en desempates y preservación del modelo MVC). Se documentó la integración armónica con la optimización de rutas acotadas de la especificación 005.
+
+
+---
+
+### Entrada 2026-11-18 / Claude (Anthropic)
+* **Fecha de registro**: 2026-11-18
+* **Herramienta**: Claude (Anthropic), con el PDF de revisión, fragmentos del proyecto y resultados de ejecución compartidos en la conversación.
+* **Comando / Prompt**:
+  > ya yo corregi casi que todo, pero solo necesito que me digas si ya esta terminado o necesito cambiar alguna otra cosa
+
+  > dame la clase actualizada
+
+  > actualiza los documentos con mis partes para copiar y pegar, solo toca lo que tiene que ver conmigo
+* **Uso de la respuesta**:
+  Se revisaron las correcciones N-01 a N-04 de niebla de guerra y viaje automático y la integración con la búsqueda compartida de la spec 005 (K-05). Se ajustó el benchmark para medir cinco salas nuevas en cada repetición y usar la cripta de referencia al ejecutar `python main.py --bench`. Se reforzaron las pruebas para comprobar que `mapa` muestra «sin observar» en la puerta esperada y que «ir a» se detiene sin mover al jugador ni avanzar el reloj si la sala de partida contiene enemigos.
+
+  Se actualizaron `spec.md`, `plan.md` y `tasks.md` de `specs/002-niebla-y-viaje/` y se documentó la evidencia en la sección 5.3 de `DECISIONES.md`. La ejecución conjunta de `tests/test_niebla_viaje.py` y `tests/test_rutas_invalidacion.py` reportó 40 pruebas aprobadas en 2.28 s. El peor tiempo medido para un paso de «ir a» en `cripta-06` fue de 2.115 ms, por debajo del límite de 5 ms.

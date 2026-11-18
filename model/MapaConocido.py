@@ -7,6 +7,11 @@ ESTADO_EXPLORADA = "explorada"
 ESTADO_AVISTADA = "avistada"
 ESTADO_DESCONOCIDA = "desconocida"
 
+# Los tres estados que el mapa puede recordar de una puerta (§3.3, N-02)
+PUERTA_ABIERTA = "abierta"
+PUERTA_CERRADA = "cerrada"
+PUERTA_SIN_OBSERVAR = "sin_observar"
+
 
 def claveConexion(uId, vId):
     u = int(uId)
@@ -17,16 +22,26 @@ def claveConexion(uId, vId):
 
 
 class MapaConocido:
-    """Gestiona el conocimiento parcial del mapa, las salas exploradas,
-    las salas avistadas y la memoria de puertas observadas.
-    
-    Totalmente reversible para el Diario (pergamino de retroceso).
+    """Gestiona el conocimiento parcial del mapa: salas exploradas, salas avistadas
+    y memoria de puertas observadas.
+
+    Dos operaciones distintas (N-01):
+      * marcarExplorada(sala): la sala pasa a ser conocida (por ejemplo, la revela la antorcha).
+        NO registra ninguna puerta.
+      * actualizarPuertasObservadas(sala): el jugador está en esa sala y ve el estado real
+        de sus puertas (§3.3: una puerta solo se observa estando en una de sus dos salas).
+
+    explorarSala(sala) hace las dos y SOLO debe usarse cuando el jugador entra a la sala.
+    Las vecinas reveladas por la antorcha usan marcarExplorada.
+
+    La memoria nunca consulta el estado real de una puerta que no se observó (N-02).
+    Todo es reversible para el Diario (pergamino de retroceso).
     """
 
     def __init__(self, registrador=None):
         self._exploradas = Tabla()
-        self._memoriaPuertas = Tabla()   # claveConexion -> bool (cerrada)
-        self._registrador = registrador  # funcion para registrar inversas en el Diario
+        self._memoriaPuertas = Tabla()   # claveConexion -> bool (True = cerrada)
+        self._registrador = registrador  # función para registrar inversas en el Diario
 
     def fijarRegistrador(self, registrador):
         self._registrador = registrador
@@ -39,22 +54,26 @@ class MapaConocido:
         return self._exploradas.contiene(idSala)
 
     def marcarExplorada(self, sala):
-        """Marca una sala como explorada (ej. por antorcha) sin registrar sus puertas más lejanas (N-01)."""
+        """Marca una sala como explorada sin observar sus puertas (N-01).
+        La usa la antorcha con las vecinas de la sala donde está el jugador."""
         if not self._exploradas.contiene(sala.id):
             self._exploradas.guardar(sala.id, True)
             salaId = sala.id
+
             def deshacerExplorada():
                 self._exploradas.quitar(salaId)
             self._registrar(deshacerExplorada)
 
-    def explorarSala(self, sala, observarPuertas=True):
-        """Marca una sala como explorada y opcionalmente observa las puertas de la sala del jugador."""
+    def explorarSala(self, sala):
+        """Marca la sala como explorada y observa sus puertas al entrar.
+        Para las vecinas reveladas por la antorcha, usa marcarExplorada()."""
         self.marcarExplorada(sala)
-        if observarPuertas:
-            self.actualizarPuertasObservadas(sala)
+        self.actualizarPuertasObservadas(sala)
 
     def actualizarPuertasObservadas(self, sala):
-        """El jugador observa las puertas de todas las salidas de la sala en la que está."""
+        """El jugador observa las puertas de todas las salidas de la sala en la que está.
+        Debe llamarse al entrar a la sala y cada vez que una puerta de esa sala cambia
+        mientras el jugador está en ella."""
         for salida in sala.salidas:
             clave = claveConexion(sala.id, salida.destinoId)
             estadoReal = salida.puerta.cerrada
@@ -62,6 +81,7 @@ class MapaConocido:
 
             if estadoAnterior != estadoReal:
                 self._memoriaPuertas.guardar(clave, estadoReal)
+
                 def deshacerPuerta(c=clave, ant=estadoAnterior):
                     if ant is None:
                         self._memoriaPuertas.quitar(c)
@@ -70,30 +90,18 @@ class MapaConocido:
                 self._registrar(deshacerPuerta)
 
     def estadoPuertaRecordada(self, uId, vId):
-        """Devuelve 'abierta', 'cerrada' o 'sin_observar' (§3.3, N-02)."""
-        clave = claveConexion(uId, vId)
-        recordada = self._memoriaPuertas.obtener(clave, None)
+        """Devuelve PUERTA_ABIERTA, PUERTA_CERRADA o PUERTA_SIN_OBSERVAR (§3.3, N-02)."""
+        recordada = self._memoriaPuertas.obtener(claveConexion(uId, vId), None)
         if recordada is None:
-            return "sin_observar"
-        return "cerrada" if bool(recordada) else "abierta"
+            return PUERTA_SIN_OBSERVAR
+        if recordada:
+            return PUERTA_CERRADA
+        return PUERTA_ABIERTA
 
-    def puertaRecordadaCerrada(self, uId, vId, puertaReal=None):
-        """Indica si el mapa del jugador recuerda la puerta cerrada (§3.3, N-02)."""
-        clave = claveConexion(uId, vId)
-        recordada = self._memoriaPuertas.obtener(clave, None)
-        if recordada is not None:
-            return bool(recordada)
-        return False
-
-    def puertaRecordadaAbierta(self, uId, vId, puertaReal=None):
-        """Indica si el mapa del jugador recuerda la puerta abierta (§3.4, N-02).
-        Salidas sin observar NO se consideran abiertas.
-        """
-        clave = claveConexion(uId, vId)
-        recordada = self._memoriaPuertas.obtener(clave, None)
-        if recordada is None:
-            return False
-        return not bool(recordada)
+    def puertaRecordadaAbierta(self, uId, vId):
+        """True solo si el jugador observó la puerta y la vio abierta (§3.4, N-02).
+        Una puerta sin observar NO se considera abierta."""
+        return self.estadoPuertaRecordada(uId, vId) == PUERTA_ABIERTA
 
     def estadoSala(self, idSala, salasIndice):
         """Determina el estado de una sala: explorada, avistada o desconocida."""
