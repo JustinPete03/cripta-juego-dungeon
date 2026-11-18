@@ -85,8 +85,8 @@ def formatearResumenHistoria(modelo, numAccion=None, reloj=None):
     return "\n".join(lineas)
 
 
-def _crearModeloAuxiliar(proveedor, semilla, snapshot):
-    """Instancia y restaura un modelo réplica para re-simulación sin tocar la partida en curso."""
+def _crearModeloAuxiliarCompleto(proveedor, semilla, snapshot):
+    """Instancia y restaura un modelo réplica completo mediante iniciarPartida() (reconstrucción completa)."""
     from model.Inventario import Inventario
     from model.Diario import Diario
     from model.efectosTrampa import efectosTrampa
@@ -100,6 +100,58 @@ def _crearModeloAuxiliar(proveedor, semilla, snapshot):
     return modeloAux
 
 
+def _crearModeloAuxiliar(proveedor, semilla, snapshot, modeloBase=None):
+    """Instancia y restaura un modelo réplica para re-simulación sin tocar la partida en curso."""
+    if modeloBase is not None and getattr(modeloBase, "lineaTiempo", None) is not None:
+        modeloAux = modeloBase.lineaTiempo._obtenerModeloAuxiliar(modeloBase)
+        modeloAux.restaurarEstado(snapshot)
+        return modeloAux
+    return _crearModeloAuxiliarCompleto(proveedor, semilla, snapshot)
+
+
+def _consultarAccionCompleta(modeloBase, k):
+    """Reconstruye historia #k usando reconstrucción completa (método de referencia para pruebas cruzadas)."""
+    lt = modeloBase.lineaTiempo
+    total = len(lt._acciones)
+    if k == total + 1:
+        return formatearResumenHistoria(modeloBase, numAccion=k, reloj=modeloBase.reloj)
+    cp = lt.buscarPuntoControlMasCercanoAccion(k)
+    modeloAux = _crearModeloAuxiliarCompleto(modeloBase.proveedor, modeloBase.semilla, cp.snapshot)
+    for item in lt._acciones[cp.numAccion : k - 1]:
+        modeloAux.ejecutar(item.accion)
+    return formatearResumenHistoria(modeloAux, numAccion=k, reloj=modeloAux.reloj)
+
+
+def _consultarTiempoCompleto(modeloBase, t):
+    """Reconstruye historia t usando reconstrucción completa (método de referencia para pruebas cruzadas)."""
+    lt = modeloBase.lineaTiempo
+    if t == modeloBase.reloj:
+        return formatearResumenHistoria(modeloBase, reloj=t)
+    cp = lt.buscarPuntoControlMasCercanoTiempo(t)
+    modeloAux = _crearModeloAuxiliarCompleto(modeloBase.proveedor, modeloBase.semilla, cp.snapshot)
+    idx = cp.numAccion
+    total = len(lt._acciones)
+    while idx < total:
+        item = lt._acciones[idx]
+        relojAccion = item.reloj
+        if relojAccion > t:
+            modeloAux._correrEventosHasta(t)
+            break
+        elif relojAccion == t:
+            break
+        else:
+            sigReloj = lt._acciones[idx + 1].reloj if idx + 1 < total else None
+            if sigReloj is not None and sigReloj <= t:
+                modeloAux.ejecutar(item.accion)
+            else:
+                modeloAux.ejecutarHasta(item.accion, t)
+                break
+        idx += 1
+    if idx >= total and modeloAux.reloj < t:
+        modeloAux._correrEventosHasta(t)
+    return formatearResumenHistoria(modeloAux, reloj=t)
+
+
 class LineaTiempo:
     """Administra puntos de control cada K acciones y la reconstrucción histórica (§3.6, §5.5)."""
 
@@ -107,6 +159,101 @@ class LineaTiempo:
         self.k = max(1, k)
         self._puntosControl = []  # lista de objetos PuntoControl
         self._acciones = []       # lista de objetos RegistroAccion
+        self._modeloAux = None
+        self._salasAux = None
+        self._puertasAux = None
+
+    def prepararModeloAuxiliar(self, modeloBase):
+        """Construye un modelo réplica que comparte la topología fija de modeloBase
+        (salas, conexiones, salidas y costos) creando estado mutable propio e independiente (FR-032).
+        """
+        from model.Entidades import Sala, Salida, Puerta, Jugador
+        from model.Salas import IndiceOrdenado
+        from model.Inventario import Inventario
+        from model.Diario import Diario
+        from model.efectosTrampa import efectosTrampa
+        from model.Juego import Modelo
+        from model.estado import _listaPuertas
+
+        salasBase = modeloBase.salas
+        cant = salasBase.cantidad()
+        if cant == 0:
+            return
+
+        # 1. Indexar y clonar puertas únicas
+        puertas = _listaPuertas(modeloBase)
+        for idx, p in enumerate(puertas):
+            p._idxP = idx
+
+        puertasAux = []
+        for p in puertas:
+            np = Puerta(p.cerrada, p.llave, p.cierreAutomatico)
+            np.costo = p.costo
+            np.salaA = p.salaA
+            np.salaB = p.salaB
+            np._cerradaInicial = p.cerrada
+            puertasAux.append(np)
+
+        # 2. Clonar salas con la misma topología e índice
+        salasAux = []
+        for i in range(cant):
+            sOrig = salasBase.enPosicion(i)
+            sn = Sala(sOrig.id, sOrig.nombre)
+            sn.indice = sOrig.indice
+            salasAux.append(sn)
+
+        # 3. Conectar salidas apuntando a las nuevas salas y puertas
+        for i in range(cant):
+            sOrig = salasBase.enPosicion(i)
+            sn = salasAux[i]
+            salidasClon = []
+            for sal in sOrig.salidas:
+                pclon = puertasAux[sal.puerta._idxP]
+                sc = Salida(sal.direccion, sn, sal.destinoId, pclon, sal.costo)
+                sc.destino = salasAux[sal.destino.indice]
+                salidasClon.append(sc)
+            sn.salidas = salidasClon
+
+        # 4. Instanciar el modelo réplica con su propio estado
+        efectos = efectosTrampa()
+        modeloAux = Modelo(modeloBase.proveedor, modeloBase.semilla,
+                           Inventario(modeloBase.proveedor), Diario(), efectos)
+        efectos.registrarEn(modeloAux)
+
+        indiceAux = IndiceOrdenado()
+        indiceAux._claves = list(salasBase._claves)
+        indiceAux._valores = salasAux
+        modeloAux.salas = indiceAux
+        modeloAux.salaInicialId = modeloBase.salaInicialId
+        modeloAux.salaSalidaId = modeloBase.salaSalidaId
+        modeloAux.llaveSalida = modeloBase.llaveSalida
+        modeloAux.rutasCazador = modeloBase.rutasCazador.__class__(cant)
+        modeloAux.inventario.configurar(modeloBase.inventario.capacidad)
+        modeloAux.jugador = Jugador(modeloBase.jugador.vidaMax, modeloBase.jugador.ataque,
+                                    modeloBase.jugador.defensa, modeloBase.jugador.velocidad)
+
+        self._modeloAux = modeloAux
+        self._salasAux = salasAux
+        self._puertasAux = puertasAux
+
+    def _obtenerModeloAuxiliar(self, modeloBase):
+        """Retorna el modelo auxiliar con su estado dinámico limpio listo para restaurarEstado."""
+        if self._modeloAux is None:
+            self.prepararModeloAuxiliar(modeloBase)
+
+        if self._modeloAux is not None:
+            for s in self._salasAux:
+                s.rastro = -1
+                s.contenidoIncorporado = False
+                s.enemigos = []
+                s.objetos = []
+                s.trampas = []
+            for p in self._puertasAux:
+                p.cerrada = p._cerradaInicial
+                p.eventoCierre = None
+            return self._modeloAux
+
+        return _crearModeloAuxiliarCompleto(modeloBase.proveedor, modeloBase.semilla, None)
 
     def registrarPuntoControl(self, numAccion, reloj, snapshot):
         """Registra un punto de control con el estado completo del modelo.
@@ -191,7 +338,8 @@ class LineaTiempo:
 
         # Ubicar punto de control anterior
         cp = self.buscarPuntoControlMasCercanoAccion(k)
-        modeloAux = _crearModeloAuxiliar(modeloBase.proveedor, modeloBase.semilla, cp.snapshot)
+        modeloAux = self._obtenerModeloAuxiliar(modeloBase)
+        modeloAux.restaurarEstado(cp.snapshot)
 
         # Re-simular hacia adelante desde cp.numAccion hasta k - 1
         accionesAEjecutar = self._acciones[cp.numAccion : k - 1]
@@ -214,7 +362,8 @@ class LineaTiempo:
 
         # Ubicar punto de control más cercano anterior o igual a t
         cp = self.buscarPuntoControlMasCercanoTiempo(t)
-        modeloAux = _crearModeloAuxiliar(modeloBase.proveedor, modeloBase.semilla, cp.snapshot)
+        modeloAux = self._obtenerModeloAuxiliar(modeloBase)
+        modeloAux.restaurarEstado(cp.snapshot)
 
         # Re-simular acciones
         # Buscamos cuáles acciones ocurrieron antes o en t

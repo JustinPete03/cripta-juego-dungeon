@@ -204,6 +204,8 @@ class Modelo:
         self._correrHastaDecision()
         if getattr(self, "lineaTiempo", None) is not None:
             self.lineaTiempo.registrarPuntoControl(0, self.reloj, self.capturarEstado())
+            if hasattr(self.lineaTiempo, "prepararModeloAuxiliar"):
+                self.lineaTiempo.prepararModeloAuxiliar(self)
 
     def _construirSalas(self, esqueleto):
         for datos in esqueleto:

@@ -33,7 +33,7 @@
   - `buscarPuntoControlMasCercanoAccion(k)`: Búsqueda binaria propia sobre `_puntosControl` buscando el mayor punto con `numAccion <= k - 1`. Costo $O(\log(N / K))$.
   - `buscarPuntoControlMasCercanoTiempo(t)`: Búsqueda binaria propia sobre `_puntosControl` buscando el mayor punto con `reloj <= t`. Costo $O(\log(N / K))$.
 
-### 1.2 Reconstrucción de Estados: Hacia Adelante (pendiente de medición L-03)
+### 1.2 Reconstrucción de Estados: Hacia Adelante 
 - **Decisión de diseño**: Re-simulación hacia adelante desde el punto de control anterior más cercano.
   - Al consultar `historia <t>` o `historia #k`, se localiza el punto de control previo más cercano (a distancia máxima $K - 1$ acciones).
   - Se instancia una réplica mediante la función auxiliar `_crearModeloAuxiliar(proveedor, semilla, snapshot)`, que construye un modelo auxiliar completo invocando `_construirSalas(esqueleto)` e `iniciarPartida()`, y luego aplica `restaurarEstado(snapshot)`.

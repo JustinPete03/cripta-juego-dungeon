@@ -430,3 +430,53 @@ def test_consulta_historia_limites_t0_y_negativos():
     with pytest.raises(ValueError) as excKNeg2:
         modelo.consultarHistoriaAccion(-5)
     assert "No se puede consultar la acción #-5" in str(excKNeg2.value)
+
+
+def test_comparacion_historia_esqueleto_compartido_vs_reconstruccion_completa():
+    """FR-030, FR-031, FR-032, T019: Compara el resultado de historia con el esqueleto
+    compartido contra el de la reconstrucción completa para varias acciones k y varios
+    tiempos t, y comprueba que el modelo vivo permanece intacto sin mutaciones.
+    """
+    from model.LineaTiempo import _consultarAccionCompleta, _consultarTiempoCompleto
+
+    # Crear una partida con varias acciones y cambios de estado (movimientos y esperas)
+    proveedor = FuentePrueba(ancho=6, alto=6, semillaCripta=2026, vidaJugador=100000)
+    efectos = efectosTrampa()
+    modelo = Modelo(proveedor, 2026, Inventario(proveedor), Diario(), efectos, kCheckpoint=5)
+    efectos.registrarEn(modelo)
+    modelo.iniciarPartida()
+    direcciones = ["S", "E", "S", "O", "N", "E"]
+    for i in range(30):
+        if i < len(direcciones):
+            d = direcciones[i]
+            res = modelo.ejecutar(Accion(ACC_MOVER, d))
+            if not res.ok:
+                modelo.ejecutar(Accion(ACC_ESPERAR))
+        else:
+            modelo.ejecutar(Accion(ACC_ESPERAR))
+
+    # Guardar snapshot completo del modelo vivo antes de cualquier consulta
+    snapshotVivoInicial = modelo.capturarEstado()
+
+    # Comparar múltiples acciones k (cubriendo distintos puntos de control)
+    accionesK = [1, 5, 6, 12, 18, 25, 30]
+    for k in accionesK:
+        resCompartido = modelo.consultarHistoriaAccion(k)
+        resCompleto = _consultarAccionCompleta(modelo, k)
+        assert resCompartido == resCompleto, (
+            "Diferencia en historia #%d entre esqueleto compartido y reconstrucción completa" % k
+        )
+
+    # Comparar múltiples instantes de tiempo t
+    relojActual = modelo.reloj
+    tiemposT = [0, relojActual // 5, relojActual // 2, relojActual * 3 // 4, relojActual]
+    for t in tiemposT:
+        resCompartido = modelo.consultarHistoriaTiempo(t)
+        resCompleto = _consultarTiempoCompleto(modelo, t)
+        assert resCompartido == resCompleto, (
+            "Diferencia en historia t=%d entre esqueleto compartido y reconstrucción completa" % t
+        )
+
+    # Comprobar que el modelo vivo no sufrió ninguna modificación (FR-032)
+    snapshotVivoFinal = modelo.capturarEstado()
+    assert snapshotVivoInicial == snapshotVivoFinal, "El modelo vivo fue mutado durante las consultas de historia"
