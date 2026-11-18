@@ -6,6 +6,7 @@ import time
 import random
 import json
 import sys
+import gc
 
 from tests.FuentePrueba import FuentePrueba
 from model.Acciones import Accion
@@ -16,9 +17,9 @@ from model.efectosTrampa import efectosTrampa
 from model.Juego import Modelo
 
 
-def _crearPartidaSimulada(nAcciones=1000, checkpointCada=20, semilla=2026):
+def _crearPartidaSimulada(nAcciones=1000, checkpointCada=20, semilla=2026, ancho=8, alto=8):
     azar = random.Random(semilla)
-    proveedor = FuentePrueba(ancho=8, alto=8, semillaCripta=semilla, vidaJugador=10000000, enemigosPorSala=1)
+    proveedor = FuentePrueba(ancho=ancho, alto=alto, semillaCripta=semilla, vidaJugador=10000000, enemigosPorSala=1)
     efectos = efectosTrampa()
     modelo = Modelo(proveedor, semilla, Inventario(proveedor), Diario(), efectos, kCheckpoint=checkpointCada)
     efectos.registrarEn(modelo)
@@ -81,31 +82,38 @@ def benchConsultaPartidaLarga5000Acciones():
     print("\n--- 2. Consulta historia en partida de 5 000 acciones (PR-007 Límite: 50 ms) ---")
     nAcciones = 5000
     kDefecto = 20
-    print("  Simulando partida de %d acciones con K=%d por defecto..." % (nAcciones, kDefecto))
-    modelo = _crearPartidaSimulada(nAcciones=nAcciones, checkpointCada=kDefecto, semilla=2026)
-    lt = modelo.lineaTiempo
-
     azar = random.Random(42)
     # 20 consultas en puntos aleatorios a lo largo de toda la historia
     puntosConsulta = [azar.randint(10, nAcciones) for _ in range(20)]
 
-    tiempos = []
-    for numAcc in puntosConsulta:
-        t0 = time.perf_counter()
-        _ = lt.consultarAccion(modelo, numAcc)
-        tiempos.append(time.perf_counter() - t0)
+    cuadriculas = [(10, 10, 100), (32, 32, 1024), (71, 71, 5041)]
 
-    tiempos.sort()
-    medianaMs = tiempos[len(tiempos) // 2] * 1000
-    peorMs = max(tiempos) * 1000
-    promedioMs = (sum(tiempos) / len(tiempos)) * 1000
+    print("  %-16s | %-12s | %-13s | %-14s | %s" %
+          ("Salas", "Mediana (ms)", "Promedio (ms)", "Peor caso (ms)", "¿Cumple límite (< 50 ms)?"))
+    print("  " + "-" * 78)
 
-    print("  Resultados para 20 consultas arbitrarias (1 a %d):" % nAcciones)
-    print("    Tiempo promedio : %.2f ms" % promedioMs)
-    print("    Tiempo mediana  : %.2f ms" % medianaMs)
-    print("    Peor caso       : %.2f ms" % peorMs)
-    print("  ¿Cumple requisito PR-007 (< 50 ms)?: %s" %
-          ("SÍ (%.2f ms < 50 ms)" % medianaMs if medianaMs < 50 else "NO"))
+    for ancho, alto, salas in cuadriculas:
+        modelo = _crearPartidaSimulada(
+            nAcciones=nAcciones, checkpointCada=kDefecto, semilla=2026, ancho=ancho, alto=alto
+        )
+        lt = modelo.lineaTiempo
+        gc.collect()
+        tiempos = []
+        for numAcc in puntosConsulta:
+            t0 = time.perf_counter()
+            _ = lt.consultarAccion(modelo, numAcc)
+            tiempos.append(time.perf_counter() - t0)
+
+        tiempos.sort()
+        medianaMs = tiempos[len(tiempos) // 2] * 1000
+        peorMs = max(tiempos) * 1000
+        promedioMs = (sum(tiempos) / len(tiempos)) * 1000
+        cumple = peorMs < 50.0
+        cumpleTxt = "SÍ" if cumple else "NO"
+
+        etiquetaSalas = "%d (%dx%d)" % (salas, ancho, alto)
+        print("  %-16s | %12.2f | %13.2f | %14.2f | %s" %
+              (etiquetaSalas, medianaMs, promedioMs, peorMs, cumpleTxt))
 
 
 def main():
