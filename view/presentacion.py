@@ -35,7 +35,7 @@ SPRITES_POR_COMPORTAMIENTO = (
     ("guardián", "esqueleto"),
     ("errante", "murcielago"),
     ("rastreador", "rata"),
-    ("cazador", "esqueleto"),
+    ("cazador", "cazador"),
 )
 
 DESLICES = (("N", 0, -1), ("S", 0, 1), ("E", 1, 0), ("O", -1, 0))
@@ -235,6 +235,8 @@ def spriteDeObjeto(ficha):
 
 
 def spriteDeEnemigo(ficha, nombre, comportamiento):
+    if str(comportamiento).lower() == "cazador":
+        return "cazador"
     texto = nombre.lower()
     for palabra, sprite in SPRITES_POR_NOMBRE:
         if palabra in texto:
