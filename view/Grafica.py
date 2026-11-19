@@ -261,6 +261,7 @@ class VistaGrafica:
                 self._hojasMap[(nombre, escala)] = superficie
 
     def apagar(self):
+        self.sfx.detenerMusica()
         pygame.quit()
 
     def fuente(self, tam):
@@ -2907,6 +2908,7 @@ class VistaGrafica:
         for evento in pygame.event.get():
             self._manejarEvento(evento)
         self._avanzarAnimaciones(dt)
+        self.sfx.actualizarMusica(self.escena, self.combate)
         if self.escena == "portada":
             self._dibujarPortada()
         elif self.escena == "titulo":
