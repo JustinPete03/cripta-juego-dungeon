@@ -148,15 +148,18 @@ que en la consola.
 
 | Tecla | Acción |
 |---|---|
-| flechas / `WASD` | mover el cursor |
-| `Z` / Enter | confirmar (avanzar, atacar, usar) |
+| flechas / `WASD` | caminar con el avatar por la sala (en exploración) o mover el cursor de los menús |
+| `C` | alternar entre caminar por la sala (`WASD`) y navegar el menú lateral (`¿QUÉ HACES?`) |
+| `Z` / Enter | confirmar (tomar objeto/abrir puerta cercana, avanzar, atacar, usar) |
 | `X` / Esc | cancelar, retroceder o abrir menú del sistema |
 | `I` | abrir la bolsa (inventario) |
-| `M` | ver mapa conocido (exploradas, avistadas, puertas y clic para `ir a`) |
-| `T` | consultar la línea de tiempo (`historia`) sin consumir tiempo virtual |
-| `Tab` | ver bitácora completa de los últimos 20 eventos |
+| `M` | ver plano del mapa conocido (exploradas, avistadas, inspector de sala y clic para `ir a`) |
+| `T` | consultar la línea de tiempo (`historia #k` y `historia <t>`) sin consumir tiempo virtual |
+| `R` | ver el reporte completo de resolubilidad de la cripta (o semilla al azar en selección) |
+| `Tab` | ver bitácora completa de los últimos 20 eventos (o alternar `#k`/`<t>` en historia) |
 | `H` / `F1` | mostrar u ocultar la ayuda y controles |
-| ratón | clic en opciones de menú o en salas exploradas del minimapa (`ir a`) |
+| `F2` | activar o silenciar la música ambiental chiptune y los efectos de sonido (SFX) |
+| ratón | clic en puertas, objetos del suelo, opciones de menú o salas del minimapa (`ir a`) |
 
 Pantallas: selección de cripta y semilla (con validación de resolubilidad), sala con el
 explorador, salidas con costo visible y enemigos (distinguiendo cazadores con su rango),
@@ -317,6 +320,7 @@ view/                    Dos vistas del mismo estado, intercambiables
   Grafica.py             Vista pygame estilo Pokémon (--gui): escenas, menús, animaciones
   presentacion.py        Instantáneas del modelo para dibujar (no importa pygame)
   sprites.py             Hoja de sprites pixel art (rectángulos sobre una cuadrícula 16x16)
+  sonidos.py             Sintetizador retro de efectos de sonido (SFX) y música chiptune en memoria
 adapters/                Red y disco detrás de interfaces
   clienteCripta.py       Interfaz del cliente (incluye cuentaComoRed para el presupuesto)
   clienteHttp.py         Cliente HTTP robusto con jerarquía de excepciones y logging estructurado
