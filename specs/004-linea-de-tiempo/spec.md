@@ -54,6 +54,11 @@
 - **Q8: ¿Cómo deben tratarse los valores negativos o cero en los comandos `historia <t>` y `historia #k`?**
   - **Decisión**: Se rechazan estrictamente cualquier $t < 0$ y cualquier $k \le 0$ con un mensaje de error descriptivo indicando que el valor está fuera de rango. No se admite indexación negativa relativa.
 
+### Sesión 2026-11-18
+
+- **Q9: ¿Bajo qué condiciones debe evaluarse el cumplimiento del límite de 50 ms de PR-007 en una consulta de historia? (PR-007)**
+  - **Decisión**: Conforme a §6.1, la condición formal es una partida de al menos 5 000 acciones del jugador con el valor de $K$ por defecto; el enunciado no fija el tamaño de la cripta (la cripta de referencia de §6.1 aún no está publicada). Se mide con cripta-06 (300 salas, la mayor publicada) y las cuadrículas sintéticas de hasta 5 041 salas corresponden a pruebas de estrés propias del equipo. El seguimiento del peor caso se adopta como criterio interno de calidad más estricto que el del curso.
+
 ---
 
 ## Historias de usuario
@@ -137,5 +142,5 @@ Como administrador del sistema, quiero que la memoria de la partida esté acotad
 
 ## Requisitos de rendimiento
 
-- **PR-007**: La consulta de historia toma menos de 50 ms sobre una partida de al menos 5 000 acciones del jugador utilizando el valor de $K$ por defecto (§6.1).
+- **PR-007**: La consulta de historia toma menos de 50 ms sobre una partida de al menos 5 000 acciones del jugador utilizando el valor de $K$ por defecto (§6.1). Se mide con cripta-06 (300 salas, la mayor publicada) y cuadrículas sintéticas de hasta 5 041 salas como pruebas de estrés propias, evaluando el peor caso como criterio interno de calidad del equipo.
 - **PR-008**: El consumo de memoria de la línea de tiempo crece proporcionalmente a la cantidad de cambios ocurridos más un punto de control cada $K$ acciones, y no como el producto de acciones por el tamaño del estado completo (§5.5).

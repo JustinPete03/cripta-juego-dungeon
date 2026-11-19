@@ -1271,6 +1271,16 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 
 ---
 
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-clarify specs/003-resolubilidad`
+* **Uso de la respuesta**:
+  Revisión y validación de las clarificaciones formales Q1 a Q6 de `spec.md` (§3.5): supuestos de transitabilidad, llaves infinitas (no consumibles), resolución victoriosa de combates, ubicación de llaves soltadas por enemigos en su sala inicial, formato del reporte en criptas no resolubles (frontera bloqueada y ciclo de dependencias circulares) y comportamiento de banderas CLI `--verificar` y `--forzar`. El informe concluyó sin ambigüedades pendientes.
+
+---
+
 ### Entrada 2026-11-01 / Antigravity (Google)
 * **Fecha**: 2026-11-01
 * **Herramienta**: Antigravity (Google)
@@ -1279,6 +1289,26 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   "Diseñar algoritmo de recorrido incremental O(V + E + K) sin reiniciar BFS por cada llave: cola de exploración, puertas en espera por ID de llave, orden determinista usando selector de ordenamiento propio, adaptadores de cliente para consulta de llaves con presupuesto de red, y detección determinista de ciclos en el subgrafo inalcanzable."
 * **Uso de la respuesta**:
   Generación de `specs/003-resolubilidad/plan.md` y descomposición detallada de tareas en `specs/003-resolubilidad/tasks.md`.
+
+---
+
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-tasks specs/003-resolubilidad`
+* **Uso de la respuesta**:
+  Validación y seguimiento de las 11 tareas de `tasks.md` (T001 a T011) frente a `spec.md` y `plan.md`. Se verificó que todas las fases cubren los requisitos funcionales FR-021 a FR-028 y los requisitos de rendimiento PR-005 y PR-006.
+
+---
+
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-analyze specs/003-resolubilidad`
+* **Uso de la respuesta**:
+  Análisis cruzado de consistencia y trazabilidad entre `spec.md`, `plan.md` y `tasks.md`: 8 de 8 requisitos funcionales (FR-021 a FR-028) y 2 de rendimiento (PR-005, PR-006) cuentan con tareas y pruebas unitarias/aceptación asignadas. Se validó la conformidad estricta con la Constitución (uso de `Tabla` propia sin `dict`/`set`/`heapq`, determinismo en desempates de llaves y frontera, y consumo de 1 solicitud en `presupuesto_solicitudes` para `GET /criptas/<id>/llaves`). Sin inconsistencias semánticas ni observaciones bloqueantes.
 
 ---
 
@@ -1304,6 +1334,16 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 
 ---
 
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-clarify specs/004-linea-de-tiempo`
+* **Uso de la respuesta**:
+  Revisión y validación de las clarificaciones Q1 a Q8 en `spec.md`: definición del estado en el instante $t$ (§3.6), datos mínimos del resumen histórico, aislamiento de la partida viva y no consumo de tiempo virtual, política de puntos de control cada $K$ acciones (--checkpoint-cada K), interacción de recorte con el pergamino de retroceso, semántica de `--replay ... --hasta`, y compatibilidad de formato binario (versión 3 rechazando v2). No se requirieron modificaciones adicionales al spec.
+
+---
+
 ### Entrada 2026-11-01 / Antigravity (Google)
 * **Fecha**: 2026-11-01
 * **Herramienta**: Antigravity (Google)
@@ -1312,6 +1352,26 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   "Diseñar arquitectura de Línea de Tiempo y puntos de control: clase LineaTiempo, checkpoints completos cada K acciones con estado de random.Random, reconstrucción hacia adelante mediante re-simulación en modelo réplica (atendiendo consultas en <= K acciones), recorte O(1) ante retroceso, formato binario VERSION_FORMATO = 3 con sección linea_tiempo, y mediciones para justificar el valor por defecto K = 20."
 * **Uso de la respuesta**:
   Generación de `specs/004-linea-de-tiempo/plan.md` y descomposición de tareas en `specs/004-linea-de-tiempo/tasks.md`.
+
+---
+
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-tasks specs/004-linea-de-tiempo`
+* **Uso de la respuesta**:
+  Validación de las tareas de `tasks.md` frente a `spec.md` y `plan.md`. El desglose en 4 fases cubre satisfactoriamente los requisitos funcionales FR-029 a FR-038 y los requisitos de rendimiento PR-007 y PR-008.
+
+---
+
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-analyze specs/004-linea-de-tiempo`
+* **Uso de la respuesta**:
+  Análisis cruzado de consistencia y trazabilidad entre `spec.md`, `plan.md` y `tasks.md`: 10 de 10 requisitos funcionales (FR-029 a FR-038) y 2 de rendimiento cuentan con tareas asignadas y pruebas automatizadas en `tests/test_linea_tiempo.py`. Se confirmó el cumplimiento de la Constitución (memoria acotada proporcional a cambios y puntos de control cada $K$, recorte sin copia y consultas de historia en menos de 50 ms). Aprobado sin observaciones críticas.
 
 ---
 
