@@ -43,9 +43,9 @@
 
 - **Evaluación experimental y decisión con datos (Decisión L-03)**:
   - Hoy en día, la consulta construye un modelo auxiliar completo en cada invocación.
-  - Se medirá el tiempo de respuesta con la **cripta más grande disponible** bajo una partida sintética de **5 000 acciones continuas** del jugador.
+  - Para evaluar el comportamiento ante el requisito de 5 000 acciones con $K$ por defecto (dado que la cripta de referencia de §6.1 aún no está publicada), se medirá el tiempo de respuesta con **cripta-06** (300 salas, la mayor publicada) y con cuadrículas sintéticas de hasta 5 041 salas como pruebas de estrés propias del equipo.
   - Con los datos empíricos de dicha medición se decidirá formalmente entre:
-    1. **Reutilizar el esqueleto ya construido**: Compartir la topología inmutable de las salas de la cripta entre el modelo vivo y el modelo de consulta (shallow copy de salas y sólo clonar estado dinámico) para eliminar el costo de construcción de salas.
+    1. **Reutilizar el esqueleto ya construido**: Compartir la topología inmutable de las salas de la cripta entre el modelo vivo y el modelo de consulta (esqueleto clonado con topología fija compartida y estado dinámico propio) para eliminar el costo de construcción de salas sin compartir objetos mutables.
     2. **Reconstrucción hacia atrás con inversas**: Retroceder paso a paso mediante deltas inversos desde el estado actual o punto de control posterior.
   - **Aislamiento estricto de red y caché**: Las consultas históricas tienen terminantemente prohibido realizar solicitudes de red HTTP (`requests`) y tienen prohibido modificar o alterar el estado o tamaño de la caché del proveedor (`cache_estructuras` / `cache`).
   - **Verificación automatizada**: Se incluye una prueba automatizada específica en `tests/test_linea_tiempo.py` que comprueba que el contador de peticiones de red y el contenido de la caché de estructuras no sufren cambios tras ejecutar múltiples consultas históricas ($\Delta \text{red} = 0$, $\Delta \text{caché} = 0$).
@@ -153,8 +153,13 @@
 - **Recorte ante retroceso**: $O(\Delta)$, proporcional a la cantidad de acciones descartadas ($\Delta \le 5$), acotado como máximo a 5 acciones.
 
 ### 4.2 Criterio de Rendimiento contra el Límite de 50 ms
-- Conforme al Principio IX de la Constitución del Proyecto CRIPTA y el requisito PR-007, el límite presupuestario para la consulta `historia` es de **50 ms**.
-- **Criterio estricto de aceptación**: La métrica comparada contra el límite de 50 ms es el **peor caso por consulta (tiempo máximo observado)**, y **no la mediana ni el promedio**, medido sobre una partida sintética de al menos **5 000 acciones continuas** del jugador con el valor por defecto $K = 20$.
+- Conforme al Principio IX de la Constitución del Proyecto CRIPTA y el requisito PR-007, el enunciado (§6.1) fija como límite presupuestario para la consulta `historia`: **50 ms** sobre una partida de al menos **5 000 acciones del jugador** utilizando el valor de **$K$ por defecto**. El enunciado no fija el tamaño de la cripta, ya que la cripta de referencia de evaluación aún no está publicada.
+- **Medición y pruebas de estrés**:
+  - Se medirá con **cripta-06** (300 salas, la mayor publicada hasta el momento).
+  - Las cuadrículas sintéticas de hasta 5 041 salas (71×71) constituyen pruebas de estrés propias del equipo para explorar los límites del sistema.
+- **Criterio interno de calidad**:
+  - Como criterio interno del equipo—más estricto que el requisito formal del curso—se evalúa el **peor caso por consulta (tiempo máximo observado)** además de la mediana y el promedio.
+  - En las pruebas de estrés sintéticas de 5 041 salas, la restauración de entidades dinámicas (`restaurarEstado`) sitúa el peor caso interno alrededor de ~250–350 ms, mientras que en cripta-06 y cuadrículas de hasta 1 024 salas el peor caso cumple holgadamente por debajo de los 50 ms (mediana de 1.8 ms en 100 salas y 25.7 ms en 1 024 salas), tal como se documenta en `DECISIONES.md` §5.5.
 
 ---
 

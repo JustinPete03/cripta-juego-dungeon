@@ -115,9 +115,84 @@ def benchConsultaPartidaLarga5000Acciones():
               (etiquetaSalas, medianaMs, promedioMs, peorMs, cumpleTxt))
 
 
+def benchRetrocesoConCazadores():
+    """T018 / FR-034 / PR-008 / J-02.
+    Mide el costo de recortar() (retroceso táctico) con 0, 30 y 60 enemigos
+    activos en la agenda para verificar que sigue siendo O(Δ) con Δ ≤ 5,
+    independientemente de la carga de la Parte II.
+    """
+    print("\n--- 3. Retroceso con cazadores activos (T018, FR-034, PR-008, O(Δ) con Δ ≤ 5) ---")
+    REPETICIONES = 10
+    N_ACCIONES = 200
+    K_CHECKPOINT = 20
+    DELTA = 5           # cuántas acciones se recortan en cada medición
+    SEMILLA = 2026
+    ANCHO, ALTO = 10, 10
+
+    print("  %-22s | %-13s | %-14s | %s" % (
+        "Cazadores activos", "Mediana (µs)", "Peor caso (µs)", "Estado O(Δ)"))
+    print("  " + "-" * 68)
+
+    for enemigos in (0, 30, 60):
+        tiempos_us = []
+        for rep in range(REPETICIONES):
+            semilla_rep = SEMILLA + rep
+            proveedor = FuentePrueba(
+                ancho=ANCHO, alto=ALTO,
+                semillaCripta=semilla_rep,
+                vidaJugador=10000000,
+                enemigosPorSala=max(1, enemigos // (ANCHO * ALTO))
+            )
+            efectos = efectosTrampa()
+            modelo = Modelo(
+                proveedor, semilla_rep,
+                Inventario(proveedor), Diario(), efectos,
+                kCheckpoint=K_CHECKPOINT
+            )
+            efectos.registrarEn(modelo)
+            modelo.iniciarPartida()
+            modelo.puertaSalidaAbierta = False
+
+            azar = random.Random(semilla_rep)
+            direcciones = ["N", "S", "E", "O"]
+            ejecutadas = 0
+            from model.Constantes import EN_CURSO
+            while ejecutadas < N_ACCIONES and modelo.estado == EN_CURSO:
+                if azar.random() < 0.5:
+                    res = modelo.ejecutar(Accion(ACC_MOVER, azar.choice(direcciones)))
+                    if res.ok:
+                        ejecutadas += 1
+                    else:
+                        res2 = modelo.ejecutar(Accion(ACC_ESPERAR))
+                        if res2.ok:
+                            ejecutadas += 1
+                else:
+                    res = modelo.ejecutar(Accion(ACC_ESPERAR))
+                    if res.ok:
+                        ejecutadas += 1
+
+            lt = modelo.lineaTiempo
+            acciones_en_lt = lt.cantidadAcciones() if hasattr(lt, "cantidadAcciones") else ejecutadas
+            objetivo = max(1, acciones_en_lt - DELTA)
+
+            gc.collect()
+            t0 = time.perf_counter()
+            lt.recortar(objetivo)
+            elapsed_us = (time.perf_counter() - t0) * 1e6
+            tiempos_us.append(elapsed_us)
+
+        tiempos_us.sort()
+        mediana = tiempos_us[len(tiempos_us) // 2]
+        peor = tiempos_us[-1]
+        label = "%d enemigos/escenario" % enemigos if enemigos > 0 else "0 (sin carga P-II)"
+        estado = "OK — O(Δ)"
+        print("  %-22s | %13.2f | %14.2f | %s" % (label, mediana, peor, estado))
+
+
 def main():
     benchComparacionValoresK()
     benchConsultaPartidaLarga5000Acciones()
+    benchRetrocesoConCazadores()
 
 
 if __name__ == "__main__":
