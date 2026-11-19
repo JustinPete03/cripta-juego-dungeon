@@ -120,14 +120,15 @@ El modo texto se abre con `--consola`; sin esa bandera `python main.py` lanza la
 ### Cómo ejecutar las pruebas de aceptación
 
 ```bash
-# Ejecutar la suite completa (280 pruebas automatizadas al 100% de éxito)
+# Ejecutar la suite completa (282 pruebas automatizadas al 100% de éxito)
 python -m pytest
 
 # Ejecutar pruebas por capacidad específica de la Parte II:
-python -m pytest tests/test_terreno_cazador.py   # Capacidad 1: Terreno y Cazadores (FR-001 a FR-010)
-python -m pytest tests/test_niebla_viaje.py     # Capacidad 2: Niebla y Viaje 'ir a' (FR-011 a FR-020)
-python -m pytest tests/test_resolubilidad.py    # Capacidad 3: Verificación de Resolubilidad (FR-021 a FR-028)
-python -m pytest tests/test_linea_tiempo.py     # Capacidad 4: Línea de Tiempo y Checkpoints (FR-029 a FR-038)
+python -m pytest tests/test_terreno_cazador.py     # Capacidad 1: Terreno y Cazadores (FR-001 a FR-010)
+python -m pytest tests/test_niebla_viaje.py       # Capacidad 2: Niebla y Viaje 'ir a' (FR-011 a FR-020)
+python -m pytest tests/test_resolubilidad.py      # Capacidad 3: Verificación de Resolubilidad (FR-021 a FR-028)
+python -m pytest tests/test_linea_tiempo.py       # Capacidad 4: Línea de Tiempo y Checkpoints (FR-029 a FR-038)
+python -m pytest tests/test_rutas_invalidacion.py # Capacidad 5: Rutas ponderadas e invalidación (FR-039 a FR-044)
 python -m pytest tests/test_pruebas_ampliadas_rubrica.py # Suite ampliada: bordes LRU, robustez red, guardado binario
 ```
 
@@ -146,16 +147,22 @@ que en la consola.
 
 | Tecla | Acción |
 |---|---|
-| flechas | mover el cursor |
+| flechas / `WASD` | mover el cursor |
 | `Z` / Enter | confirmar (avanzar, atacar, usar) |
-| `X` / Esc | cancelar, retroceder en los menús |
+| `X` / Esc | cancelar, retroceder o abrir menú del sistema |
 | `I` | abrir la bolsa (inventario) |
-| ratón | clic sobre cualquier opción de menú |
+| `M` | ver mapa conocido (exploradas, avistadas, puertas y clic para `ir a`) |
+| `T` | consultar la línea de tiempo (`historia`) sin consumir tiempo virtual |
+| `Tab` | ver bitácora completa de los últimos 20 eventos |
+| `H` / `F1` | mostrar u ocultar la ayuda y controles |
+| ratón | clic en opciones de menú o en salas exploradas del minimapa (`ir a`) |
 
-Pantallas: selección de cripta y semilla, sala con el explorador y los enemigos, combate por
-turnos con barra de vida, bolsa con detalle del objeto y vistas ordenadas, menú de sistema
-(guardar, cargar, bitácora, retroceso, salir) y resumen final. El minimapa, el HUD y la
-bitácora de 20 mensajes muestran el mismo estado que `view/Consola.py`.
+Pantallas: selección de cripta y semilla (con validación de resolubilidad), sala con el
+explorador, salidas con costo visible y enemigos (distinguiendo cazadores con su rango),
+combate por turnos con barra de vida, bolsa con detalle del objeto y vistas ordenadas, mapa
+conocido con niebla de guerra, visor de línea de tiempo, reporte de resolubilidad, menú de
+sistema (guardar, cargar, bitácora, retroceso, salir) y resumen final. El minimapa interactivo,
+el HUD y la bitácora de 20 mensajes muestran el mismo estado que `view/Consola.py`.
 
 Sin banderas de datos, la GUI juega contra `adapters/proveedor_demo.py` (cripta generada en
 memoria, sin red). Con `--offline DIR` o `--cripta ID` usa los adaptadores de Diego, así que
@@ -251,12 +258,12 @@ Estos archivos están en `.gitignore`.
 ## Pruebas
 
 ```bash
-python -m pytest          # recoge la suite completa de 235 pruebas
+python -m pytest          # recoge la suite completa de 282 pruebas
 ```
 
 `pytest.ini` declara los patrones de nombre del proyecto (`Test*.py`, `Prueba*.py`,
 `prueba*.py`, `Diario*.py` y `test_*.py`); sin él, pytest ignora en silencio la mitad de las
-pruebas porque no siguen la convención `test_*.py`. La suite completa son **235 pruebas automatizadas**.
+pruebas porque no siguen la convención `test_*.py`. La suite completa son **282 pruebas automatizadas**.
 
 Archivos de prueba destacados:
 
@@ -278,12 +285,7 @@ interrupciones del sistema operativo, no del motor).
 python main.py --bench
 ```
 
-Ejecuta cargas sintéticas y reporta tiempos por subsistema en seis bloques: ordenamientos,
-caché (LRU frente a FIFO, disco y costo de búsqueda), guardado binario frente a JSON, efectos,
-motor (agenda, rastro y bitácora) y retroceso con inventario. Cada bloque compara la estructura
-viva contra alternativas, así que la salida es la evidencia de las decisiones. Los resultados de
-referencia están en `resultados_bench.txt` y se analizan en el Documento de Decisiones. Los
-tiempos dependen del equipo; los conteos (comparaciones, solicitudes) no.
+Ejecuta cargas sintéticas y reporta tiempos por subsistema en diez bloques: los seis base de la Parte I (ordenamientos, caché, guardado binario frente a JSON, efectos, motor y retroceso con inventario) y los cuatro de la Parte II (terreno y cazadores, niebla y viaje `ir a`, verificación de resolubilidad y línea de tiempo con checkpoints). Cada bloque compara la estructura viva contra alternativas, así que la salida es la evidencia de `DECISIONES.md`. Los tiempos dependen del equipo; los conteos (comparaciones, solicitudes) no.
 
 ## Arquitectura (MVC + adaptadores)
 
@@ -295,6 +297,12 @@ model/                   Reglas del juego y estructuras de datos (sin red, disco
   Diario.py              Historial reversible (máx. 5 acciones, sin copias del estado)
   Inventario.py          Lista doblemente enlazada con cursor
   Tabla.py               Tabla hash propia: cubetas, factor de carga, djb2 (restricción sección 7)
+  Cazador.py             Reglas de decisión del cazador
+  Dijkstra.py            Núcleo compartido de rutas ponderadas (MinHeapDijkstra + arreglo con sellos)
+  RutasCazador.py        Caché compartida con cota por rango e invalidación fina de puertas
+  MapaConocido.py        Niebla de guerra (exploradas, avistadas, desconocidas) y memoria de puertas
+  Resolubilidad.py       Verificación incremental de resolubilidad y detección iterativa de ciclos
+  LineaTiempo.py         Puntos de control cada K acciones y reconstrucción histórica
   Rastro.py, Bitacora.py Rastro del jugador y bitácora circular de 20 mensajes
   efectos.py             Veneno, regeneración, antorcha, velocidad
   efectosTrampa.py       Extensión que contagia el veneno que declara la ficha de una trampa
@@ -323,6 +331,8 @@ adapters/                Red y disco detrás de interfaces
   guardadoJson.py        Contraparte JSON que usa el bench de sección 4.10 para comparar
   persistenciaCache.py   Fichas en disco por versión de catálogo (sección 4.4)
 datos_demo/              Paquete sin conexión de las cuatro criptas del servicio
+specs/                   Especificaciones, planes y tareas de Spec-Kit (001 a 005)
+.specify/                Constitución, plantillas y scripts de Spec-Kit
 bench/                   Benchmarks
 tests/                   Pruebas
 ```
@@ -336,8 +346,10 @@ HTTP ni archivos: recibe sus datos a través de la interfaz `ProveedorDatos`.
   `tiempo_siguiente` y el orden de ejecución es (tiempo, número de secuencia).
 - Intervalo de una acción: `max(1, costo * 100 // velocidad)`.
 - Daño: `max(1, ataque + randint(0, 4) - defensa)`, con un `random.Random(semilla)` propio.
-- Los enemigos se activan cuando el jugador entra a su sala. Hay tres comportamientos:
-  guardián, errante y rastreador (este sigue el rastro fresco, de menos de 400 unidades).
+- Los enemigos se activan cuando el jugador entra a su sala. Hay cuatro comportamientos:
+  guardián, errante, rastreador (este sigue el rastro fresco, de menos de 400 unidades) y
+  cazador (persigue al jugador por la ruta abierta de menor costo dentro de su rango, con
+  desempate por menor id).
 - El jugador **gana** al entrar a la sala de salida con la puerta que da acceso a ella abierta —
   la abrió él con la llave, o la cripta ya la entregó abierta (una puerta `cerrada: false` en el
   esqueleto no deja nada que abrir, y el requisito es entrar con acceso, no pulsar `abrir`)—,
