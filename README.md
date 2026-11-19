@@ -1,26 +1,27 @@
 # CRIPTA — Juego de mazmorra dirigido por eventos
 
-Proyecto 1 de **Estructuras de Datos II** (II Ciclo 2026).
+Proyecto de **Estructuras de Datos** (EIF-207 · II Ciclo 2026 — **Partes I y II**).
 Diseño, implementación y evaluación de estructuras de datos propias en un juego de mazmorra
-por eventos, con contenido descargado de un servicio web.
+por eventos, con contenido descargado de un servicio web y desarrollo dirigido por
+especificaciones (`spec-kit`).
 
 > Las reglas del juego están especificadas por el enunciado; las decisiones de estructuras
-> de datos son nuestras y se justifican en el Documento de Decisiones de Diseño (sección 8
-> del enunciado), que acompaña a esta entrega como documento aparte.
+> de datos son nuestras y se justifican con evidencia empírica en
+> [DECISIONES.md](DECISIONES.md) (Parte I §8 y Parte II §7.1).
 
 ## Integrantes
 
-| Integrante | Responsabilidad principal |
-|---|---|
-| Diego Barquero | Cliente HTTP/offline, presupuesto de red, precarga, bitácora y `--replay`, tabla de puntajes |
-| Keilor Baltodano | Caché de fichas, ordenamientos, bench |
-| Jorge | Inventario, historial reversible (pergaminos de retroceso) |
-| Justin | Motor de eventos, agenda, rastro, bitácora en pantalla |
-| Jurnier | Efectos, guardado binario |
+| Integrante | Parte I | Parte II |
+|---|---|---|
+| Diego Barquero | Cliente HTTP/offline, presupuesto de red, precarga, bitácora y `--replay`, tabla de puntajes | Verificación incremental de resolubilidad, detección de ciclos y ubicación de llaves (`003`) |
+| Keilor Baltodano | Caché de fichas, ordenamientos, benchmarks | Rutas ponderadas compartidas, cota por rango, invalidación fina y revisión final (`005`) |
+| Jorge | Inventario, historial reversible (pergaminos de retroceso) | Línea de tiempo, puntos de control cada *K* acciones e historial `--hasta` (`004`) |
+| Justin | Motor de eventos, agenda, rastro, bitácora en pantalla | Terreno con costos variables, cazador e integración del motor (`001`) |
+| Jurnier | Efectos temporales, guardado binario | Niebla de guerra, memoria de puertas, antorcha, viaje automático «ir a» y persistencia (`002`) |
 
 ## Requisitos
 
-- **Python 3.11 o superior** (probado con **3.14.0**).
+- **Python 3.11 o superior** (probado con **3.14.6**).
 - Dependencias externas: **`requests`** (modo en línea y `--offline`), **`pytest`** (pruebas) y
   **`pygame-ce`** (solo la interfaz gráfica, que es el arranque por defecto; se usa la edición
   comunitaria porque `pygame` clásico no tiene ruedas para Python 3.14).
@@ -366,20 +367,23 @@ almacenamiento contiguo, y `struct`, `json`, `requests` y `argparse`.
 
 ## Documentación de la entrega
 
-- Documento de Decisiones de Diseño (sección 8 del enunciado): una sección por cada problema de
-  sección 4 con problema, alternativas, decisión, complejidad, evidencia empírica y límites
-  conocidos. La escribe el equipo aparte de este README.
-- Bitácora de prompts de LLM (sección 10.3): archivo aparte de la entrega.
-- `resultados_bench.txt` — salida de referencia de `--bench`, generada en el equipo local.
+- [DECISIONES.md](DECISIONES.md) — Documento de Decisiones de Diseño (Parte I y Parte II §5.1–§5.6): problema, alternativas, decisión, complejidad, evidencia empírica y límites conocidos.
+- [PROMPTS_LLM.md](PROMPTS_LLM.md) — Bitácora de prompts de LLM (Parte I y Parte II, incluyendo los comandos de `spec-kit`).
+- `.specify/memory/constitution.md` y `specs/001`–`005` — Constitución, especificaciones, planes y tareas de `spec-kit`.
+- `resultados_bench.txt` — salida de referencia de `--bench` de la Parte I (para las mediciones actuales de ambas partes, ejecutar `python main.py --bench`).
 
 ## Estado y limitaciones conocidas
 
-> Actualice esta sección antes de cada entrega.
-
+- [x] **Parte II completa (`001` a `005`)**:
+  - Terreno con costos variables y enemigos con comportamiento `cazador` (`001`).
+  - Niebla de guerra (exploradas, avistadas, desconocidas), memoria de puertas sin observar, efecto de antorcha y viaje automático `ir a <sala>` (`002`).
+  - Verificación incremental de resolubilidad `O(V + E + K)`, detección iterativa de ciclos, `--verificar` y `--forzar` (`003`).
+  - Línea de tiempo con puntos de control configurables (`--checkpoint-cada K`), `historia <t>` / `historia #k` y `--replay ... --hasta <t>` (`004`).
+  - Núcleo compartido de rutas ponderadas (`calcularDistancias` con arreglo indexado por sellos), cota por mayor rango activo, desempate común por menor id e invalidación fina en `RutasCazador` (`005`).
 - [x] Todos los modos conectados en `main.py`: consola, `--offline`, `--replay`, `--puntajes`,
   `--bench` e `--gui` usan el mismo modelo, el mismo controlador y los mismos adaptadores.
 - [x] Paquete sin conexión publicado en `datos_demo/` (las cuatro criptas del servicio).
-- [x] Interfaz gráfica (`view/Grafica.py`) con las mismas 11 interacciones de sección 10.2 que la consola.
+- [x] Interfaz gráfica (`view/Grafica.py`) con todas las interacciones de consola y Parte II (minimapa interactivo con niebla real, costos en salidas, cazadores con rango, modales de mapa conocido `[M]`, historia `[T]`, ayuda `[H]` y reporte de resolubilidad).
 - [x] `guardar` / `cargar` conectados a la interfaz. `model/estado.py` expone `capturar` /
   `restaurar` (reloj, posición, inventario, efectos, agenda, semilla y estado del azar) y
   `Modelo.capturarEstado` / `restaurarEstado` los publican; `adapters/guardadoPartida.py` los
@@ -426,5 +430,4 @@ almacenamiento contiguo, y `struct`, `json`, `requests` y `argparse`.
 - **El requisito de 20 ms (§5.2)** se verifica con la mediana del ciclo de 600 enemigos; en este
   equipo la mediana ronda 7-17 ms, pero bajo carga del sistema la prueba `testCicloMenorA20ms`
   puede tocar 25 ms por interrupciones del planificador de Windows, no del motor.
-- El Documento de Decisiones (sección 8) y la bitácora de prompts (sección 10.3) son documentos
-  aparte que el equipo debe escribir antes de la entrega.
+- **Línea de tiempo en cuadrículas sintéticas extremas (`5041` salas)**: aunque la reutilización del esqueleto redujo la preparación a < 3 ms, en cuadrículas de estrés con `5041` salas y `5041` enemigos `restaurarEstado` y la inicialización perezosa de la primera consulta superan el límite de 50 ms (ver detalle en `DECISIONES.md` §5.5).
