@@ -263,6 +263,7 @@ def lanzarInterfaz(args):
         modelo = armarModelo(proveedor, semilla, checkpointCada)
         registro.iniciarNuevaBitacora(idCripta, datos["version"], versionCatalogo, semilla)
         modelo.iniciarPartida()
+        modelo.reporteResolubilidad = resResolubilidad.reporte()
         controlador = Controlador(modelo, vista, registro, puntajes,
                                   armarGuardado(idCripta, datos["version"], versionCatalogo), reporte)
         controlador.nombre = args.nombre if args.nombre else "Explorador"

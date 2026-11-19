@@ -64,7 +64,8 @@ class SueloVisual:
 class EnemigoVisual:
     """Enemigo con el índice que espera ACC_ATACAR sobre sala.enemigos."""
 
-    def __init__(self, indice, etiqueta, nombre, vida, vidaMax, sprite, comportamiento, activo):
+    def __init__(self, indice, etiqueta, nombre, vida, vidaMax, sprite, comportamiento, activo,
+                 rango=0):
         self.indice = indice
         self.etiqueta = etiqueta
         self.nombre = nombre
@@ -73,6 +74,7 @@ class EnemigoVisual:
         self.sprite = sprite
         self.comportamiento = comportamiento
         self.activo = activo
+        self.rango = rango
 
 
 class SalidaVisual:
@@ -330,7 +332,8 @@ def instantaneaDeSala(modelo):
         enemigos.append(EnemigoVisual(i, enemigo.etiqueta(), enemigo.nombre, enemigo.vida,
                                       enemigo.vidaMax,
                                       spriteDeEnemigo(ficha, enemigo.nombre, enemigo.comportamiento),
-                                      enemigo.comportamiento, enemigo.activo))
+                                      enemigo.comportamiento, enemigo.activo,
+                                      getattr(enemigo, "rango", 0)))
     suelo = []
     for i in range(len(sala.objetos)):
         suelo.append(SueloVisual(i, fichaVisual(modelo, sala.objetos[i].tipoId)))
