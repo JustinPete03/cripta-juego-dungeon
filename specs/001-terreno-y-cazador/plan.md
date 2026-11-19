@@ -45,20 +45,20 @@ Todos los cazadores persiguen al mismo jugador. En lugar de un Dijkstra por caza
 
 - **Cálculo compartido**: 1 Dijkstra por ciclo, O((V + E) log V). Cada cazador consulta O(1).
 - **Cálculo individual**: N Dijkstras por ciclo, cada uno potencialmente O((V + E) log V).
-- **Corte por rango individual**: El Dijkstra compartido se ejecuta completo una vez. Cazadores de rango pequeño descartan la ruta si `dist > rango`. El costo total es siempre 1 Dijkstra.
+- **Corte por rango**: El cálculo compartido y la cota por rango activo se unificaron en `specs/005-rutas-e-invalidacion` (`calcularDistancias` con `rangoMax`).
 
-**Optimización de invalidación (§5.2)**: Se marca una bandera `_rutasInvalidas` cuando cambia el estado de una puerta o el jugador se mueve. El Dijkstra solo se recalcula si la bandera está activa al momento de decidir. Si ninguna puerta cambió y el jugador no se movió desde el último cálculo, se reutilizan las distancias anteriores.
+**Optimización de invalidación (§5.2)**: Inicialmente se usó una bandera de invalidación gruesa en `Juego`, reemplazada en `005` por el componente `model/RutasCazador.py` (`rutasCazador`) con invalidación fina demostrable cuando cambia una puerta o la sala del jugador.
 
 ### Módulos nuevos
 
 | Módulo | Responsabilidad |
 |---|---|
-| `model/Dijkstra.py` | Montículo binario propio para Dijkstra + función `dijkstraInverso(salas, salaJugador)` que devuelve tabla de distancias y predecesores |
-| `model/Cazador.py` | Función `elegirDestinoCazador(enemigo, distancias, salas)` que aplica las reglas de §3.2 |
+| `model/Dijkstra.py` | Montículo binario propio (`MinHeapDijkstra`) + función `dijkstraDesde(salaOrigen, indiceSalas, rangoMax=None)` (envoltorio sobre `calcularDistancias`) que devuelve `Tabla` de distancias sin predecesores |
+| `model/Cazador.py` | Función `elegirPasoCazador(cazador, distancias, salas)` que aplica las reglas de §3.2 y el desempate común `elegirPrimerPaso` |
 
 ### Montículo para Dijkstra (MinHeapDijkstra)
 
-Montículo binario de pares `(distancia, salaId)` con operación `disminuirClave`. Se implementa con lista plana y mapa de posiciones (usando `Tabla` propia) para mantener O(log n) en la extracción y O(log n) en la disminución.
+Montículo binario de pares `(distancia, salaId)` con **eliminación perezosa**: se implementa sobre `list` propia sin mapa de posiciones ni `disminuirClave`; al extraer un par, se descarta si la distancia registrada en distancias ya es menor.
 
 ---
 
