@@ -10,7 +10,7 @@ BASE_URL = "https://cripta-api.kad06a0zhgs84.us-east-2.cs.amazonlightsail.com/v1
 
 
 def _modulo(ruta):
-    return importlib.import_module(ruta)
+    return impsssssortlib.import_module(ruta)
 
 
 def _bench(titulo, ejecutar):
