@@ -1014,26 +1014,6 @@ Defensa / Que pasa si el profesor cambia la cripta por una con 50 veces más sal
 
 Identificar los límites conocidos de mi motor y diseñar una forma de comprobar el determinismo del replay
 
-31
-
-15-18 nov. 2026
-
-Antigravity (Google DeepMind)
-
-/speckit-clarify specs/001-terreno-y-cazador
-
-Clarificar requisitos de la capacidad 001 (§2.2): unificación de puertas compartidas en salas conectadas por direcciones no opuestas, contrato de salas y costo en Puerta (J-03), y manejo de cierres automáticos entre turnos del cazador (J-01).
-
-32
-
-15-18 nov. 2026
-
-Antigravity (Google DeepMind)
-
-/speckit-analyze specs/001-terreno-y-cazador
-
-Analizar trazabilidad de spec 001 (§2.2) contra el código implementado en Entidades.py, Juego.py, test_terreno_cazador.py y bench/BenchCazador.py, verificando cumplimiento de los contratos de invalidación fina y resolución determinista.
-
 Jurnier — Efectos y guardado binario
 
 #
@@ -1249,6 +1229,37 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 
 ---
 
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-clarify specs/002-niebla-y-viaje`
+* **Uso de la respuesta**:
+  Se revisaron las clarificaciones Q1 a Q8 de `spec.md`, incluidos los estados de las puertas, el efecto de la antorcha, las reglas de «ir a» y los requisitos de rendimiento. El informe marcó la revisión como aprobada, sin ambigüedades críticas ni preguntas adicionales.
+
+---
+
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-tasks specs/002-niebla-y-viaje`
+* **Uso de la respuesta**:
+  Se validaron las 15 tareas de `tasks.md` (T001 a T015) frente a `spec.md` y `plan.md`. El informe confirmó que el desglose cubre los requisitos funcionales FR-011 a FR-020 y los de rendimiento PR-003 y PR-004.
+
+---
+
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-analyze specs/002-niebla-y-viaje`
+* **Uso de la respuesta**:
+  Se revisó la consistencia entre `spec.md`, `plan.md` y `tasks.md`. El análisis reportó 12 de 12 requisitos cubiertos, 0 conflictos críticos con la Constitución y 0 inconsistencias semánticas. Resultado: aprobado sin observaciones bloqueantes.
+
+---
+
+
 ### Entrada 2026-11-01 / Antigravity (Google)
 * **Fecha**: 2026-11-01
 * **Herramienta**: Antigravity (Google)
@@ -1264,43 +1275,10 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 * **Fecha**: 2026-11-01
 * **Herramienta**: Antigravity (Google)
 * **Comando / Prompt**:
-  `/speckit.clarify 003-resolubilidad`
-  "Clarificar los supuestos formales de verificación de resolubilidad bajo §3.5: transitabilidad de salidas, llaves infinitas (no consumibles), resolución victoriosa de combates, consideración de llaves soltadas por enemigos en su sala de origen, formato del reporte en caso no resoluble (frontera bloqueada y ciclo concreto de dependencias circulares), y comportamiento de banderas CLI --verificar y --forzar."
-* **Uso de la respuesta**:
-  Incorporación de las clarificaciones Q1 a Q6 en `specs/003-resolubilidad/spec.md` para delimitar con exactitud las reglas de negocio y los contratos de aceptación.
-
----
-
-### Entrada 2026-11-01 / Antigravity (Google)
-* **Fecha**: 2026-11-01
-* **Herramienta**: Antigravity (Google)
-* **Comando / Prompt**:
   `/speckit.plan 003-resolubilidad`
   "Diseñar algoritmo de recorrido incremental O(V + E + K) sin reiniciar BFS por cada llave: cola de exploración, puertas en espera por ID de llave, orden determinista usando selector de ordenamiento propio, adaptadores de cliente para consulta de llaves con presupuesto de red, y detección determinista de ciclos en el subgrafo inalcanzable."
 * **Uso de la respuesta**:
-  Generación de `specs/003-resolubilidad/plan.md` y alineación con los principios de la Constitución.
-
----
-
-### Entrada 2026-11-01 / Antigravity (Google)
-* **Fecha**: 2026-11-01
-* **Herramienta**: Antigravity (Google)
-* **Comando / Prompt**:
-  `/speckit.tasks 003-resolubilidad`
-  "Descomponer la implementación de la Capacidad 3 en tareas concretas trazables a los requisitos funcionales FR-021 a FR-028: Fase 1 (adaptadores de red y offline para obtenerLlaves), Fase 2 (algoritmo incremental de verificación y detección de ciclos en model/Resolubilidad.py y pruebas en test_resolubilidad.py), Fase 3 (banderas CLI --verificar y --forzar en main.py y pruebas de aceptación), y Fase 4 (benchmarks empíricos y documentación en DECISIONES.md)."
-* **Uso de la respuesta**:
-  Creación de `specs/003-resolubilidad/tasks.md` con 11 tareas numeradas (T001 a T011) cubriendo todo el ciclo de desarrollo.
-
----
-
-### Entrada 2026-11-01 / Antigravity (Google)
-* **Fecha**: 2026-11-01
-* **Herramienta**: Antigravity (Google)
-* **Comando / Prompt**:
-  `/speckit.analyze 003-resolubilidad`
-  "Analizar la consistencia entre spec.md, plan.md, tasks.md y el código de resolubilidad: verificar ausencia de estructuras nativas prohibidas (dict, set, heapq), cumplimiento de la cota de 200 ms, trazabilidad de requisitos FR-021 a FR-028, y consumo correcto de presupuesto de red en GET /criptas/<id>/llaves."
-* **Uso de la respuesta**:
-  Validación de conformidad constitucional, confirmando que la lógica reside enteramente en el modelo (`model/Resolubilidad.py`) y utiliza `Tabla` propia sin dependencias externas.
+  Generación de `specs/003-resolubilidad/plan.md` y descomposición detallada de tareas en `specs/003-resolubilidad/tasks.md`.
 
 ---
 
@@ -1312,22 +1290,6 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   "Implementar endpoint obtenerLlaves en adapters/clienteCripta.py, clienteHttp.py, clienteOffline.py, estrategiaRed.py y ProveedorRed.py; algoritmo de verificación y detección de ciclos en model/Resolubilidad.py; banderas --verificar y --forzar en main.py; suite de 9 pruebas de aceptación en tests/test_resolubilidad.py; suite de benchmarks en bench/BenchResolubilidad.py; y documentación en DECISIONES.md."
 * **Uso de la respuesta**:
   Implementación completa de la Capacidad 3 con 203 pruebas pasando al 100%, verificación en cripta grande de 200 salas en 1.16 ms (< 200 ms) y documentación completa.
-
----
-
-### Entrada 2026-11-17 / Antigravity (Google)
-* **Fecha**: 2026-11-17
-* **Herramienta**: Antigravity (Google)
-* **Comando / Prompt**:
-  `Correcciones técnicas R-01 a R-05 (Diego Mena — Verificación de Resolubilidad)`
-  "Aplicar correcciones del plan de revisión técnica:
-  1. R-01: Reescribir detección de ciclos como DFS iterativa con pila explícita y marcas de 3 estados (0=no visitado, 1=en pila, 2=terminado) en model/Resolubilidad.py, eliminando el riesgo de RecursionError en cadenas largas (> 1000 llaves).
-  2. R-02 y R-05: Reemplazar las F exploraciones BFS independientes por una única pasada BFS multifuente sobre la región no alcanzada, encolando determinísticamente las puertas de la frontera bloqueada y eliminando código muerto 'elif not sal[cerrada]'.
-  3. R-03: Corregir la asimetría del benchmark en bench/BenchResolubilidad.py implementando la versión ingenua sobre Tabla propia e IndiceOrdenado propio, evaluando escalabilidad lineal O(N) vs cuadrática O(K^2) para K en [100, 500, 1000, 2000, 5000] y midiendo detección de ciclos en casos no resolubles.
-  4. R-04: Ampliar benchmark de criptas grandes hasta 2000 salas garantizando peor caso < 200 ms.
-  5. Actualizar DECISIONES.md (sección 5.4), plan.md y agregar pruebas automatizadas en tests/test_resolubilidad.py."
-* **Uso de la respuesta**:
-  Resolución completa de los hallazgos R-01, R-02, R-03, R-04 y R-05. Pasan todas las pruebas y los benchmarks confirman empíricamente el comportamiento asintótico lineal y tiempo en 2000 salas de 14.15 ms.
 
 ---
 
@@ -1428,263 +1390,3 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
   `/speckit-analyze specs/001-terreno-y-cazador`
 * **Uso de la respuesta**:
   Análisis cruzado de consistencia y trazabilidad entre `spec.md`, `plan.md` y `tasks.md`: 10 de 10 requisitos funcionales (FR-001 a FR-010) y 2 de rendimiento (PR-001, PR-002) cuentan con tareas asignadas y pruebas automatizadas (T001-T018). Se constató la concordancia con la Constitución técnica (estructuras de datos propias sin `heapq`/`dict`/`set`, determinismo en desempates y preservación del modelo MVC). Se documentó la integración armónica con la optimización de rutas acotadas de la especificación 005.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  `Vamos al carpeta specs/004-linea-de-tiempo`
-* **Uso de la respuesta**:
-  Navegación inicial hacia el directorio de la especificación 004 (Línea de Tiempo).
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  `Vamos al carpeta specs/004-linea-de-tiempo, dime que archivos hay?`
-* **Uso de la respuesta**:
-  Inspección y listado de los artefactos existentes en la carpeta de especificación (`spec.md`, `plan.md`, `tasks.md`).
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  `/speckit-clarify`
-* **Uso de la respuesta**:
-  Ejecución del comando de clarificación de Spec-Kit para resolver preguntas sobre puntos de control y consultas históricas.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  `A` (respuestas a preguntas de clarificación de spec-kit)
-* **Uso de la respuesta**:
-  Selección de opciones recomendadas de clarificación sobre los invariantes de los puntos de control y comportamiento ante consultas históricas.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  /speckit-plan 
-  Alctualiza el plan de la carpeta 004 conservando lo que ya se implementó y documento previamente, corrige solamente lo siguiente
-  Corrige lo que no coincide con el código real. Verifica que cada nombre del plan exista en model/LineaTiempo.py y model/Juego.py. Por ejemplo, el plan dice «recorte O(1)»: el costo real es proporcional a lo descartado, como máximo 5 acciones.
-  Documenta el invariante de los puntos de control: se agregan en orden creciente de acción y de reloj, y siempre existe el punto 0 creado al iniciar la partida. Por eso la búsqueda binaria es válida y registrar un punto solo necesita mirar el último.
-  L-03: la consulta de historia hoy construye un modelo auxiliar completo. El plan debe decir que se medirá con la cripta más grande disponible y 5000 acciones, y que se decidirá con esos datos entre reutilizar el esqueleto ya construido o reconstruir hacia atrás con inversas. La consulta no debe gastar solicitudes de red ni cambiar la caché, y habrá una prueba que lo compruebe.
-  Criterio de rendimiento: el peor caso por consulta, no la mediana, contra el límite de 50 ms.
-  Contratos: con Jurnier, el guardado binario y la reversión del mapa conocido; con Diego, --replay --hasta.
-  No agregues bibliotecas ni estructuras nativas prohibidas
-  ```
-* **Uso de la respuesta**:
-  Actualización completa de `specs/004-linea-de-tiempo/plan.md` reflejando el costo real de recorte $O(\Delta)$, los invariantes de puntos de control, el criterio de peor caso (< 50 ms), la decisión de medición L-03 y los contratos de interfaces.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  `estoy en jorge-parte-2 y esa rama usaremos la carpeta es la specs/004-linea-de-tiempo`
-* **Uso de la respuesta**:
-  Alineación de la rama de trabajo `jorge-parte2` y fijación de la carpeta activa de la especificación 004.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  /speckit-tasks 
-  Genera las tareas de la 004 conservando las ya hechas (marcadas [x], si no vez ninguan x diem antes de cambiar) por mis compañeros: no las borres ni las reescribas. Agrega solo tareas nuevas, sin marcar, para lo que me falta:
-
-  L-02: que el registro de un punto de control compare solo con el último punto, sin recorrer toda la lista.
-  L-03: medir la consulta de historia con la cripta más grande disponible y 5000 acciones, y decidir con esos datos entre reutilizar el esqueleto ya construido o reconstruir hacia atrás con inversas. La tarea es «medir y decidir», no implementar una opción desde ya.
-  Prueba de que la consulta de historia no gasta solicitudes de red ni cambia la caché, y que falla si se hiciera una solicitud.
-  L-04: que el bench use el peor caso para decir si cumple el límite de 50 ms.
-  L-01: corregir el comentario del recorte para que diga que el costo es proporcional a lo descartado.
-  J-02: repetir las mediciones de retroceso con decenas de cazadores activos y comparar contra la Parte I (depende de la medición de Keilor).
-
-  Cada tarea nueva cita su requisito FR-xxx. No agregues tareas que modifiquen archivos de otros integrantes sin indicarlo.
-  ```
-* **Uso de la respuesta**:
-  Generación de la Fase 5 en `specs/004-linea-de-tiempo/tasks.md` incorporando las tareas L-01 a L-04 y J-02 sin alterar las tareas ya completadas (T001-T012).
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  Ajusta solo la Fase 5 de specs/004-linea-de-tiempo/tasks.md. No toques T001 a T012 ni ningún otro archivo, y no marques ninguna tarea como hecha. Haz estos cambios:
-
-  T017: quítale el [P], porque edita bench/BenchLineaTiempo.py, el mismo archivo que T016 y T018, y no puede ir en paralelo con ellas.
-  T015: ya existe una prueba en tests/test_linea_tiempo.py sin confirmar en git. Cambia la descripción para que la tarea sea revisar esa prueba y comprobar que falla si la consulta hiciera una solicitud de red o cambiara la caché. Si no cumple eso, se corrige.
-  T016: deja solo «medir y decidir», sin implementar nada todavía.
-  Agrega estas tareas nuevas al final de la Fase 5, sin marcar, con su FR-xxx:
-  T019: implementar la opción elegida en T016 y comprobar que el peor caso de historia queda por debajo de 50 ms. Si la medición muestra que no hace falta cambiar nada, esta tarea se cierra con ese dato. Depende de T016.
-  T020 [FR-031]: prueba de que historia #k con k igual a las acciones realizadas más 1 muestra el estado actual, según la clarificación acordada.
-  T021 [FR-033]: prueba de que historia rechaza t menor que 0 y k menor o igual a 0 con mensaje de error, y de que t igual a 0 sí es válido.
-  T022 [FR-029, FR-036]: prueba de los invariantes de los puntos de control: orden creciente de acciones y de reloj, y el punto 0 siempre presente.
-  T023 [L-05]: quitar __getitem__ y __setitem__ de PuntoControl y RegistroAccion si el código ya usa atributos, y actualizar el plan.md si los menciona.
-
-  Muéstrame el resultado con el diff de tasks.md.
-  ```
-* **Uso de la respuesta**:
-  Refinamiento y desglose de tareas T015 a T023 en `tasks.md`, asegurando secuencialidad en `BenchLineaTiempo.py` y precisión en los requisitos evaluados.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  Necesito que hagas estos cambios y solo estos cambios
-  Ajusta la Fase 5 de tasks.md, no marques nada como hecho, no toques otros archivos y no toques de T001 a T0012
-  T015: la prueba actual de red y caché en tests/test_linea_tiempo.py no puede fallar nunca: el contador de solicitudes y el objeto de caché son de juguete y nada los modifica. Cambia la tarea para que sea reescribirla con un contador real de las solicitudes que hace el proveedor (envolviendo sus métodos de acceso a datos) y con la caché real. La tarea debe exigir comprobar que la prueba falla cuando se fuerza una solicitud a propósito dentro de una consulta de historia.
-  T020: reduce el alcance a lo que falta. Ya existen pruebas de k = 0 y de k demasiado grande. Solo falta probar que historia #k con k igual a las acciones realizadas más 1 muestra el estado actual.
-  T021: reduce el alcance a lo que falta. Solo falta probar que t menor que 0 se rechaza con mensaje de error, que k negativo se rechaza y que t igual a 0 es válido. El caso k = 0 ya está probado.
-  T023: cambia el orden interno de la tarea. Primero, reemplazar todos los accesos con corchetes y texto (cp["snapshot"], cp["numAccion"], item["accion"], item["reloj"], p["numAccion"] y similares) por acceso a atributos, tanto en model/LineaTiempo.py como en las pruebas de tests/test_linea_tiempo.py que usan _puntosControl[i]["numAccion"]. Después, quitar __getitem__ y __setitem__ de PuntoControl y RegistroAccion. Al terminar, deben pasar todas las pruebas. Actualiza plan.md solo si menciona esos métodos.
-
-  No agregues más tareas. Muéstrame el diff de tasks.md.
-  ```
-* **Uso de la respuesta**:
-  Ajuste del enunciado y alcance de las tareas T015, T020, T021 y T023 en `tasks.md`.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  `/speckit-analyze`
-* **Uso de la respuesta**:
-  Ejecución del análisis cruzado de consistencia y cobertura entre `spec.md`, `plan.md` y `tasks.md` para la especificación 004, validando 100 % de cobertura de requisitos.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  /speckit-implement 
-  Ejecuta solo estas tareas de specs/004-linea-de-tiempo/tasks.md, en este orden: T013, T022, T014, T020, T021, T023, T015 y T017. No hagas T016, T018 ni T019. No hagas commits. No toques DECISIONES.md, PROMPTS_LLM.md ni archivos de otros integrantes. Reglas: en T022 la prueba debe pasar antes de hacer T014. En T023 cambia primero los accesos por corchetes a atributos y después quita __getitem__ y __setitem__. En T015 el contador de solicitudes debe ser real y la prueba debe fallar si fuerzo una solicitud. Marca cada tarea como hecha solo si sus pruebas pasan, y corre pytest al final. No uses dict, set, bisect, heapq ni collections.
-  ```
-* **Uso de la respuesta**:
-  Implementación en orden estricto de las tareas T013, T022, T014, T020, T021, T023 y T015 en `model/LineaTiempo.py` y `tests/test_linea_tiempo.py`.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  Continúa donde se quedó el trabajo anterior. Primero revisa git status, git diff --stat y qué tareas de la Fase 5 de specs/004-linea-de-tiempo/tasks.md siguen sin marcar. No repitas lo que ya está hecho y bien.
-
-  Pendientes, en este orden: T013, T022, T014, T020, T021, T023, T015 y T017. No hagas T016, T018 ni T019. No hagas commits. No toques DECISIONES.md, PROMPTS_LLM.md ni archivos de otros integrantes.
-
-  Reglas: la prueba de T022 debe pasar antes de hacer T014. En T023 cambia primero los accesos por corchetes a atributos y después quita __getitem__ y __setitem__. En T015 el contador de solicitudes debe ser real y la prueba debe fallar si se fuerza una solicitud. Marca una tarea como hecha solo si sus pruebas pasan, y corre pytest al final. No uses dict, set, bisect, heapq ni collections.
-
-  Antes de empezar, dime en una lista qué encontraste hecho y qué falta.
-  ```
-* **Uso de la respuesta**:
-  Reanudación tras pausa de sesión, finalizando la tarea T017 en `bench/BenchLineaTiempo.py` (evaluación de PR-007 con peor caso) y ejecutando la suite completa de 270 pruebas con éxito.
-
----
-
-### Entrada 2026-11-16 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-16
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  Ejecuta solo la tarea T016 de specs/004-linea-de-tiempo/tasks.md. Modifica únicamente bench/BenchLineaTiempo.py; no toques el modelo ni otros archivos y no hagas commits.
-
-  En _crearPartidaSimulada, recibe ancho y alto como parámetros, con 8 y 8 por defecto, para no romper los usos actuales.
-  Repite la medición de la consulta de historia con 5 000 acciones, K=20 y 20 consultas, en cuadrículas de 10×10, 32×32 y 71×71 (100, 1024 y 5041 salas), igual que usó el bench de rutas.
-  Imprime una tabla con una fila por tamaño: salas, mediana, promedio, peor caso en ms y si cumple el límite de 50 ms según el peor caso.
-  No implementes ninguna opción de optimización (esqueleto o inversas). Solo mide.
-  No uses dict, set, bisect, heapq ni collections.
-  No marques T016 como hecha; eso lo hago yo después de decidir.
-
-  Al final, corre solo la sección de línea de tiempo del bench y pégame la tabla.
-  ```
-* **Uso de la respuesta**:
-  Modificación de `bench/BenchLineaTiempo.py` para medir cuadrículas de 10×10, 32×32 y 71×71 bajo 5 000 acciones continuas, obteniendo la tabla de referencia previa a optimizar.
-
----
-
-### Entrada 2026-11-17 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-17
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  Sin modificar model/ ni marcar tareas, perfila una sola consulta de consultarHistoriaAccion en una cripta de 5041 salas (71×71) con 5 000 acciones y K=20, usando cProfile o time.perf_counter por fases. Dime cuánto tarda cada parte: _construirSalas, iniciarPartida, restaurarEstado (el snapshot) y la re-simulación de las acciones intermedias. Repite con 1024 salas. Haz una consulta de calentamiento antes de medir, y reporta aparte el peor caso con y sin la primera consulta. Pégame los números en una tabla. No propongas ni implementes cambios todavía.
-  ```
-* **Uso de la respuesta**:
-  Perfilado fino de cada fase de la consulta de historia, identificando que la reconstrucción de la cripta (`_construirSalas` + `iniciarPartida`) demandaba el 77 % del tiempo total en cripta grande (110.88 ms de ~144 ms).
-
----
-
-### Entrada 2026-11-17 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-17
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  Ejecuta solo la tarea T019 de specs/004-linea-de-tiempo/tasks.md: implementar la opción «reutilizar el esqueleto ya construido» en model/LineaTiempo.py (y en model/Juego.py solo lo mínimo necesario). Primero dime qué partes de la cripta son topología fija (ids, posiciones, conexiones, costos) y cuáles son estado cambiante (puertas, enemigos, objetos), y qué incluye el «resto» de iniciarPartida. Después implementa: el modelo auxiliar comparte solo la topología fija y crea estado propio, para que la consulta no pueda alterar el modelo vivo (FR-032). No compartas objetos mutables. No uses dict, set, bisect, heapq ni collections. No toques archivos de otros integrantes, no hagas commits y no marques T016 ni T019.
-
-  Agrega una prueba en tests/test_linea_tiempo.py que compare el resultado de historia con el esqueleto compartido contra el de la reconstrucción completa, para varias acciones k y varios tiempos t, y que compruebe que el modelo vivo no cambió. Corre pytest completo. Luego repite la tabla del bench en 100, 1024 y 5041 salas y el desglose por fases en 5041 salas.
-  ```
-* **Uso de la respuesta**:
-  Implementación de la reutilización del esqueleto ya construido en `model/LineaTiempo.py` y `model/Juego.py`, incorporación de la prueba de validación cruzada e inmutabilidad en `tests/test_linea_tiempo.py` (271/271 pruebas pasando) y reporte de la nueva medición del bench (reducción de preparación a 2.26 ms).
-
----
-
-### Entrada 2026-11-17 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-17
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  Edita únicamente la sección 5.5 de DECISIONES.md. No toques ninguna otra sección ni otros archivos, y no hagas commits.
-
-  En «1. Problema», cambia «recortarse en O(1)» por «recortarse con costo proporcional a lo descartado (como máximo 5 acciones)».
-  En «3. Evidencia Empírica», rotula la tabla existente como medida en una cripta de 64 salas y 1 000 acciones. En la «Justificación técnica de K = 20», quita la afirmación de que K = 20 cumple con holgura el límite de 50 ms en partidas de 5 000 acciones, y di que eso solo vale en la cripta pequeña.
-  Agrega una subsección «L-03: la consulta reconstruía la cripta completa». Corre antes py main.py --bench y usa los números reales que salgan, no los inventes. Incluye: una tabla de antes y después con 100, 1024 y 5041 salas (mediana y peor caso, 5 000 acciones, K = 20); el desglose por fases en 5041 salas (reconstruir la cripta era cerca del 77 % del costo); la decisión de reutilizar el esqueleto de la cripta; y la medición con la cual se decidió.
-  Agrega «Límites conocidos»: con 5041 salas el peor caso sigue sobre 50 ms; el costo restante está en restaurar el estado de todas las salas y en re-simular acciones; el bench usa un enemigo por sala, una carga mayor que decenas de cazadores; la cripta de referencia de §6.1 aún no está publicada.
-  Agrega el campo «Coincidencia con plan.md original», diciendo la verdad: la decisión coincide, pero el requisito de 50 ms no se logra en cripta grande.
-
-  Muéstrame el diff.
-  ```
-* **Uso de la respuesta**:
-  Ejecución de `python main.py --bench` y redacción formal de la subsección 5.5 de `DECISIONES.md` documentando la decisión L-03 y los límites conocidos con datos experimentales reales.
-
----
-
-### Entrada 2026-11-17 / Antigravity (Google DeepMind)
-* **Fecha**: 2026-11-17
-* **Herramienta**: Antigravity (Google DeepMind)
-* **Comando / Prompt**:
-  ```text
-  Edita solo la sección 5.5 de DECISIONES.md, sin tocar otras secciones ni hacer commits.
-
-  En «Decisión», quita la frase que dice que el peor caso bajó de 3 444.21 ms a 355.77 ms. Sustitúyela por la comparación de medianas en 5 041 salas (398.49 → 145.72 ms) y la reducción de preparación del modelo (110.88 → 2.26 ms). Agrega que el «antes» se midió sin gc.collect() y el «después» con él, así que el peor caso no es comparable.
-  En la tabla por fases, aclara que «Antes» es una consulta típica y «Después» es el promedio de 20 consultas, o rehaz ambas columnas con la misma medición.
-  Cambia «cumpliendo estrictamente el aislamiento de FR-032» por «sin compartir salas ni puertas con el modelo vivo».
-  En «Coincidencia con plan.md original», di que el plan decía «shallow copy de salas» y lo implementado clona salas, salidas y puertas y comparte solo los datos fijos.
-  Muéstrame el diff.
-  ```
-* **Uso de la respuesta**:
-  Ajuste y refinamiento técnico de la sección 5.5 de `DECISIONES.md` aclarando las condiciones metodológicas de medición (`gc.collect()`), el desglose por fases y la precisión del aislamiento de objetos en memoria.

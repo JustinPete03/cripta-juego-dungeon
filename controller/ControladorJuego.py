@@ -295,7 +295,8 @@ class Controlador:
                 continue
             salidas = []
             for s in sala.salidas:
-                estadoP = mapa.estadoPuertaRecordada(sala.id, s.destinoId)
+                pCerrada = mapa.puertaRecordadaCerrada(sala.id, s.destinoId, s.puerta)
+                estadoP = "cerrada" if pCerrada else "abierta"
                 salidas.append("%s->Sala %s (costo: %d, %s)" % (s.direccion, s.destinoId, s.costo, estadoP))
             lineas.append("  Sala %s (%s): %s" % (sala.id, sala.nombre, "; ".join(salidas) if salidas else "sin salidas"))
         lineas.append("Salas avistadas (%d): %s" % (len(avistadas), ", ".join(str(x) for x in avistadas) if avistadas else "ninguna"))
@@ -324,25 +325,45 @@ class Controlador:
         if self.registro is not None and hasattr(self.registro, "registrarComentario"):
             self.registro.registrarComentario("ir a %s" % destId)
 
-        while True:
-            continuar, motivo, accion = self.modelo.darPasoViajeAutomatico(destId)
+        from model.Dijkstra import elegirPasoViajeAutomatico
+        from model.Constantes import ACC_MOVER
+        from model.Acciones import Accion
 
-            if accion is not None and self.registro is not None:
-                self.registro.registrarAccion(accion.aTexto())
-
-            if self.modelo.estado != EN_CURSO:
-                self._cerrarPartida()
+        while self.modelo.estado == EN_CURSO and self.modelo.jugador.sala.id != destId:
+            # 1. Comprobar si hay enemigos en la sala actual
+            if len(self.modelo.jugador.sala.enemigos) > 0:
+                self._decir("El viaje se detiene: la sala contiene enemigos.")
                 break
 
-            if not continuar:
-                if motivo == "LLEGO":
-                    self._decir("Has llegado a tu destino: %s." % salaDestino.nombre)
-                elif motivo == "ENEMIGOS":
-                    self._decir("El viaje se detiene: la sala contiene enemigos.")
-                elif motivo == "DANO":
-                    self._decir("El viaje se detiene: has recibido daño.")
-                elif motivo == "SIN_RUTA":
-                    self._decir("El viaje se detiene: no existe ruta conocida abierta hacia %s." % salaDestino.nombre)
-                elif motivo == "ERROR":
-                    self._decir("El viaje se detiene por error en el movimiento.")
+            # 2. Calcular siguiente paso sobre subgrafo conocido
+            salida, costo = elegirPasoViajeAutomatico(
+                self.modelo.jugador.sala, salaDestino, self.modelo.salas, self.modelo.mapaConocido
+            )
+            if salida is None:
+                self._decir("El viaje se detiene: no existe ruta conocida abierta hacia %s." % salaDestino.nombre)
+                break
+
+            vidaAntes = self.modelo.jugador.vida
+
+            # 3. Ejecutar acción de movimiento ordinaria
+            accion = Accion(ACC_MOVER, salida.direccion)
+            res = self.ejecutarAccion(accion)
+            if not res.ok:
+                self._decir("El viaje se detiene: %s" % res.mensaje)
+                break
+
+            # 4. Paradas tras el paso (§3.4)
+            if self.modelo.jugador.sala.id == destId:
+                self._decir("Has llegado a tu destino: %s." % salaDestino.nombre)
+                break
+
+            if self.modelo.jugador.vida < vidaAntes:
+                self._decir("El viaje se detiene: has recibido daño.")
+                break
+
+            if len(self.modelo.jugador.sala.enemigos) > 0:
+                self._decir("El viaje se detiene: la sala contiene enemigos.")
+                break
+
+            if self.modelo.estado != EN_CURSO:
                 break
