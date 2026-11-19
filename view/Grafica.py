@@ -5,7 +5,7 @@
 
 import math
 import random
-
+import os
 import pygame
 
 from model.Constantes import (ACC_ABRIR, ACC_ANTERIOR, ACC_ATACAR, ACC_EQUIPAR, ACC_ESPERAR,
@@ -3686,3 +3686,71 @@ def _objetivoCercano(self):
         if heroe.colliderect(pygame.Rect(x, y, 32, 32)):
             return (ACC_RECOGER, sala.suelo[i].indice)
     return None
+
+    # ------------------------------------------------------------------ sistema de audio
+    def _rutaAudio(self, archivo):
+        baseDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(baseDir, "sonidos", archivo)
+
+    def _iniciarAudio(self):
+        if not hasattr(self, "_sonidos"):
+            self._sonidos = {}
+            self._pistaActual = None
+            self._musicaSilenciada = False
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=1024)
+            print("[AUDIO] Mixer activo:", pygame.mixer.get_init())
+
+            archivos = ("musica_titulo", "musica_mazmorra", "musica_combate",
+                        "golpe", "puerta", "objeto")
+            for clave in archivos:
+                for ext in (".wav", ".ogg", ".mp3"):
+                    ruta = self._rutaAudio(clave + ext)
+                    if os.path.exists(ruta):
+                        snd = pygame.mixer.Sound(ruta)
+                        snd.set_volume(0.45 if clave.startswith("musica_") else 0.65)
+                        self._sonidos[clave] = snd
+                        print("[AUDIO] Cargado:", ruta)
+                        break
+        except Exception as e:
+            print("[AUDIO] Error al iniciar:", e)
+
+    def _actualizarMusica(self):
+        if not hasattr(self, "_sonidos") or not self._sonidos:
+            self._iniciarAudio()
+        if not pygame.mixer.get_init() or self._musicaSilenciada:
+            return
+
+        if self.escena in ("portada", "titulo"):
+            objetivo = "musica_titulo"
+        elif self.combate:
+            objetivo = "musica_combate"
+        else:
+            objetivo = "musica_mazmorra"
+
+        if objetivo == self._pistaActual:
+            return
+        self._pistaActual = objetivo
+
+        for clave in ("musica_titulo", "musica_mazmorra", "musica_combate"):
+            if clave in self._sonidos:
+                self._sonidos[clave].stop()
+
+        snd = self._sonidos.get(objetivo)
+        if snd is not None:
+            snd.play(loops=-1)
+            print("[AUDIO] Reproduciendo:", objetivo)
+
+
+        def _reproducirSfx(self, clave):
+            if not hasattr(self, "_sonidos") or self._musicaSilenciada or not pygame.mixer.get_init():
+                return
+            snd = self._sonidos.get(clave)
+            if snd is not None:
+                snd.play()
+
+        def ejecutar(self):
+            self._iniciarAudio()
+            self._actualizarMusica()
+            super().ejecutar()
