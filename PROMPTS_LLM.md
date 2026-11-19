@@ -1229,6 +1229,37 @@ Pedir orientación para completar las pruebas de los casos del Apéndice B
 
 ---
 
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-clarify specs/002-niebla-y-viaje`
+* **Uso de la respuesta**:
+  Se revisaron las clarificaciones Q1 a Q8 de `spec.md`, incluidos los estados de las puertas, el efecto de la antorcha, las reglas de «ir a» y los requisitos de rendimiento. El informe marcó la revisión como aprobada, sin ambigüedades críticas ni preguntas adicionales.
+
+---
+
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-tasks specs/002-niebla-y-viaje`
+* **Uso de la respuesta**:
+  Se validaron las 15 tareas de `tasks.md` (T001 a T015) frente a `spec.md` y `plan.md`. El informe confirmó que el desglose cubre los requisitos funcionales FR-011 a FR-020 y los de rendimiento PR-003 y PR-004.
+
+---
+
+### Entrada 2026-11-18 / Antigravity (Google)
+* **Fecha**: 2026-11-18
+* **Herramienta**: Antigravity (Google) con Spec-Kit
+* **Comando / Prompt**:
+  `/speckit-analyze specs/002-niebla-y-viaje`
+* **Uso de la respuesta**:
+  Se revisó la consistencia entre `spec.md`, `plan.md` y `tasks.md`. El análisis reportó 12 de 12 requisitos cubiertos, 0 conflictos críticos con la Constitución y 0 inconsistencias semánticas. Resultado: aprobado sin observaciones bloqueantes.
+
+---
+
+
 ### Entrada 2026-11-01 / Antigravity (Google)
 * **Fecha**: 2026-11-01
 * **Herramienta**: Antigravity (Google)
