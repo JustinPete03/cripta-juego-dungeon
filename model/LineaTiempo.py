@@ -11,14 +11,6 @@ def nombreEfecto(clase):
     """Devuelve el nombre legible de un efecto dado su código numérico."""
     if clase == 0:
         return "Veneno"
-    if clase == 1:
-        return "Regeneración"
-    if clase == 2:
-        return "Antorcha"
-    if clase == 3:
-def nombreEfecto(clase):
-    if clase == 0:
-        return "Veneno"
     elif clase == 1:
         return "Regeneración"
     elif clase == 2:
@@ -31,7 +23,6 @@ def nombreEfecto(clase):
 # L-05: registros con __slots__ en vez de dict para puntos de control y acciones.
 class PuntoControl:
     """Punto de control: snapshot del modelo en un momento dado."""
-class PuntoControl:
     __slots__ = ("numAccion", "reloj", "snapshot")
 
     def __init__(self, numAccion, reloj, snapshot):
@@ -48,8 +39,6 @@ class PuntoControl:
 
 class RegistroAccion:
     """Registro de una acción realizada por el jugador."""
-
-class RegistroAccion:
     __slots__ = ("numAccion", "accion", "reloj")
 
     def __init__(self, numAccion, accion, reloj):
@@ -187,17 +176,6 @@ class LineaTiempo:
         self.k = max(1, k)
         self._puntosControl = []  # lista de PuntoControl
         self._acciones = []       # lista de RegistroAccion
-
-    def registrarPuntoControl(self, numAccion, reloj, snapshot):
-        """Registra un punto de control con el estado completo del modelo."""
-        # Si ya existe un punto de control para este número de acción, se reemplaza
-        for p in self._puntosControl:
-            if p.numAccion == numAccion:
-                p.reloj = reloj
-                p.snapshot = snapshot
-                return
-        self._puntosControl = []  # lista de objetos PuntoControl
-        self._acciones = []       # lista de objetos RegistroAccion
         self._modeloAux = None
         self._salasAux = None
         self._puertasAux = None
@@ -365,33 +343,6 @@ class LineaTiempo:
             else:
                 alto = medio - 1
         return mejor
-        """Encuentra el punto de control anterior más cercano a la acción k usando búsqueda binaria propia O(log P)."""
-        target = k - 1
-        low = 0
-        high = len(self._puntosControl) - 1
-        ans = 0
-        while low <= high:
-            mid = (low + high) // 2
-            if self._puntosControl[mid].numAccion <= target:
-                ans = mid
-                low = mid + 1
-            else:
-                high = mid - 1
-        return self._puntosControl[ans]
-
-    def buscarPuntoControlMasCercanoTiempo(self, t):
-        """Encuentra el punto de control anterior más cercano al tiempo t usando búsqueda binaria propia O(log P)."""
-        low = 0
-        high = len(self._puntosControl) - 1
-        ans = 0
-        while low <= high:
-            mid = (low + high) // 2
-            if self._puntosControl[mid].reloj <= t:
-                ans = mid
-                low = mid + 1
-            else:
-                high = mid - 1
-        return self._puntosControl[ans]
 
     def consultarAccion(self, modeloBase, k):
         """Reconstruye el estado justo antes de la acción #k del jugador (§3.6)."""
@@ -490,10 +441,6 @@ class LineaTiempo:
                 "reloj": p.reloj,
                 "snapshot": p.snapshot
             })
-
-        return {
-            "k": self.k,
-            "puntosControl": ptsSerializados,
 
         return {
             "k": self.k,

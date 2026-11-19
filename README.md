@@ -120,7 +120,7 @@ El modo texto se abre con `--consola`; sin esa bandera `python main.py` lanza la
 ### Cómo ejecutar las pruebas de aceptación
 
 ```bash
-# Ejecutar la suite completa (235 pruebas automatizadas al 100% de éxito)
+# Ejecutar la suite completa (280 pruebas automatizadas al 100% de éxito)
 python -m pytest
 
 # Ejecutar pruebas por capacidad específica de la Parte II:
