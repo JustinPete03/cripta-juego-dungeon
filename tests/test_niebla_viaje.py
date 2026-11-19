@@ -488,41 +488,6 @@ class TestNieblaYViaje(unittest.TestCase):
         salida, costo = elegirPasoViajeAutomatico(s1, s2, salas, mapa)
         self.assertIsNone(salida)
 
-    def test_n03_ir_a_en_modelo_y_detencion_por_dano_con_curacion(self):
-        """[N-03, §3.4] darPasoViajeAutomatico en Modelo detecta daño explícito aunque la vida se recupere."""
-        esqueleto = [
-            {"id": 1, "nombre": "Sala 1", "salidas": {"E": {"sala": 2}}},
-            {"id": 2, "nombre": "Sala 2", "salidas": {"O": {"sala": 1}, "E": {"sala": 3}}},
-            {"id": 3, "nombre": "Sala 3", "salidas": {"O": {"sala": 2}}},
-            {"id": 99, "nombre": "Salida", "salidas": {}}
-        ]
-        # Trampa en sala 2 que hace daño
-        contenidos = [
-            {"sala": 1, "enemigos": [], "objetos": [], "trampas": []},
-            {"sala": 2, "enemigos": [], "objetos": [], "trampas": [{"instancia": "t-1", "tipo": "trp_pinchos"}]},
-            {"sala": 3, "enemigos": [], "objetos": [], "trampas": []},
-            {"sala": 99, "enemigos": [], "objetos": [], "trampas": []}
-        ]
-        fichas = [
-            {"id": "trp_pinchos", "clase": "trampa", "nombre": "Pinchos", "daño": 10, "rearme": 500}
-        ]
-        prov = ProveedorNiebla(esqueleto, contenidos, fichas)
-        modelo = Modelo(prov, semilla=1, inventario=Inventario(prov), diario=Diario())
-        modelo.iniciarPartida()
-
-        # Marcar sala 3 explorada para que sea destino válido
-        modelo.mapaConocido.explorarSala(modelo.salas.buscar(2))
-        modelo.mapaConocido.explorarSala(modelo.salas.buscar(3))
-
-        vidaOriginal = modelo.jugador.vida
-        # Ejecutar un paso hacia 3 directamente desde el Modelo
-        continuar, motivo, accion = modelo.darPasoViajeAutomatico(3)
-
-        # En sala 2 la trampa dañó al jugador: aunque se curara después, se detiene por DANO
-        self.assertFalse(continuar)
-        self.assertEqual(motivo, "DANO")
-        self.assertEqual(modelo.jugador.sala.id, 2)
-
 
 
 

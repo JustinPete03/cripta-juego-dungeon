@@ -25,17 +25,17 @@
 
 ## Fase 3: Dijkstra propio y montículo binario
 
-- [x] T008 [FR-005] Implementar `MinHeapDijkstra` en `model/Dijkstra.py`: montículo binario de pares (distancia, id) con disminuirClave, usando `Tabla` propia para posiciones.
-- [x] T009 [FR-005] Implementar `dijkstraInverso(indiceSalas, salaObjetivoId)`: Dijkstra inverso desde la sala del jugador, devuelve Tabla de distancias y Tabla de predecesores.
+- [x] T008 [FR-005] Implementar `MinHeapDijkstra` en `model/Dijkstra.py`: montículo binario de pares `(distancia, id)` con eliminación perezosa sobre lista propia.
+- [x] T009 [FR-005] Implementar `dijkstraDesde(salaOrigen, indiceSalas, rangoMax=None)` (envoltorio sobre `calcularDistancias`): Dijkstra desde la sala del jugador que devuelve `Tabla` de distancias (sin predecesores).
 - [x] T010 [FR-005] Escribir pruebas unitarias del montículo y de Dijkstra sobre grafos sintéticos.
 
 ---
 
 ## Fase 4: Comportamiento del cazador
 
-- [x] T011 [FR-005, FR-008] Implementar `elegirDestinoCazador(enemigo, distancias, indiceSalas)` en `model/Cazador.py`.
-- [x] T012 [FR-005] Integrar en `Juego._enemigoSeComporta`: caso `"cazador"` que consulta distancias y llama a `elegirDestinoCazador`.
-- [x] T013 [FR-007] Implementar invalidación: bandera `_rutasInvalidas` en el modelo, activada por apertura/cierre de puertas y movimiento del jugador.
+- [x] T011 [FR-005, FR-008] Implementar `elegirPasoCazador(cazador, distancias, indiceSalas)` en `model/Cazador.py` (usando `elegirPrimerPaso`).
+- [x] T012 [FR-005] Integrar en `Juego._enemigoSeComporta`: caso `"cazador"` que consulta `rutasCazador` y llama a `elegirPasoCazador`.
+- [x] T013 [FR-007] Implementar invalidación de rutas en `Juego` (`rutasCazador` en `model/RutasCazador.py` tras `005`), activada por apertura/cierre de puertas, cambio de sala del jugador, retroceso y carga.
 - [x] T014 [FR-005, FR-006, FR-007] Escribir pruebas del cazador: ataca en misma sala, espera sin ruta, espera fuera de rango, sigue ruta mínima, desempate por menor id, puerta se cierra entre turnos.
 
 ---

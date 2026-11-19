@@ -220,6 +220,10 @@ class VistaGrafica:
         self.transicion = 0.0
         self.combate = False
         self.mostrarAyuda = False
+        self.errorTitulo = None
+        self.historiaAccion = 1
+        self.historiaTexto = ""
+        self.resolubilidadTexto = ""
         # Superficies recicladas: las cajas, el escenario y las luces se dibujan una sola vez.
         self.cajas = {}
         self.escenarios = {}
@@ -863,8 +867,15 @@ class VistaGrafica:
             self.indiceCripta = indice
         if semilla is not None:
             self.semilla = semilla
-        self.controlador = self.fabrica(self.indiceCripta, self.semilla)
+        self.errorTitulo = None
+        try:
+            self.controlador = self.fabrica(self.indiceCripta, self.semilla)
+        except RuntimeError as error:
+            self.errorTitulo = str(error)
+            self.avisar(self.errorTitulo)
+            return
         self.modelo = self.controlador.modelo
+        self.resolubilidadTexto = getattr(self.modelo, "reporteResolubilidad", "")
         self.barras = []
         self.parpadeos = []
         self.flotantes = []
@@ -880,6 +891,8 @@ class VistaGrafica:
         self.submenu = None
         self.cursorMenu = 0
         self.cursorBolsa = 0
+        self.historiaAccion = 1
+        self.historiaTexto = ""
         self.escena = "escenario"
         self.transicion = 1.0
         self._capturar(True)
@@ -1033,9 +1046,24 @@ class VistaGrafica:
                 if self.captura is not None and destId == self.captura.sala.id:
                     self.flotantes.append(["¡Ya estás en la Sala %d!" % destId, ANCHO - 260, 160, 0.9])
                 else:
+                    self.escena = "escenario"
                     self.controlador.procesar("ir a %d" % destId)
                     self._refrescarCaptura()
                     self.flotantes.append(["Viaje a Sala %d" % destId, ANCHO - 260, 160, 1.0])
+            elif entrada.dato == "abrir_mapa":
+                self.escena = "mapa"
+            elif entrada.dato == "historia":
+                self._cargarHistoria(max(1, self.modelo.jugador.acciones + 1))
+                self.escena = "historia"
+            elif entrada.dato[:11] == "hist_delta:":
+                delta = int(entrada.dato[11:])
+                self._cargarHistoria(self.historiaAccion + delta)
+            elif entrada.dato == "hist_inicio":
+                self._cargarHistoria(1)
+            elif entrada.dato == "hist_actual":
+                self._cargarHistoria(self.modelo.jugador.acciones + 1)
+            elif entrada.dato == "resolubilidad":
+                self.escena = "resolubilidad"
             elif entrada.dato == "abrir_ayuda":
                 self.mostrarAyuda = True
             elif entrada.dato == "cerrar_ayuda":
@@ -1066,7 +1094,7 @@ class VistaGrafica:
             self.transicion = 0.35
             self.escena = "titulo"
             return
-        if self.escena == "bitacora":
+        if self.escena in ("bitacora", "mapa", "historia", "resolubilidad"):
             self.escena = "escenario"
             return
         if self.escena == "sistema":
@@ -1103,7 +1131,7 @@ class VistaGrafica:
             self.transicion = 0.4
             self.escena = "portada"
             return
-        if self.escena in ("bolsa", "sistema", "bitacora"):
+        if self.escena in ("bolsa", "sistema", "bitacora", "mapa", "historia", "resolubilidad"):
             self.escena = "escenario"
             return
         if self.submenu is not None:
@@ -1144,10 +1172,14 @@ class VistaGrafica:
 
     def _entradasSistema(self):
         return [
+            Entrada("Mapa conocido [M]", UI_SERVICIO, "abrir_mapa"),
+            Entrada("Línea de tiempo [T]", UI_SERVICIO, "historia"),
+            Entrada("Reporte resolubilidad", UI_SERVICIO, "resolubilidad",
+                    len(self.resolubilidadTexto) > 0, "sin reporte disponible"),
             Entrada("Guardar partida", UI_SERVICIO, "guardar"),
             Entrada("Cargar partida", UI_SERVICIO, "cargar"),
             Entrada("Bitacora (20 mensajes)", UI_SERVICIO, "bitacora"),
-            Entrada("Comandos de consola", UI_SERVICIO, "ayuda"),
+            Entrada("Ayuda y controles [H]", UI_SERVICIO, "abrir_ayuda"),
             Entrada("Volver al juego", UI_IR, "volver"),
             Entrada("Cerrar sesion", UI_IR, "titulo"),
         ]
@@ -1203,7 +1235,7 @@ class VistaGrafica:
             self.transicion = 0.35
             self.escena = "portada"
             return
-        if tecla in (pygame.K_ESCAPE,) and self.escena in ("escenario", "bolsa", "sistema", "bitacora"):
+        if tecla in (pygame.K_ESCAPE,) and self.escena in ("escenario", "bolsa", "sistema", "bitacora", "mapa", "historia", "resolubilidad"):
             self._pulsarB()
             return
         if tecla in (pygame.K_RETURN, pygame.K_z, pygame.K_SPACE):
@@ -1217,6 +1249,16 @@ class VistaGrafica:
             if self.escena == "bolsa":
                 self.cursorBolsa = max(0, self.captura.inventario.cursorVista)
             return
+        if tecla == pygame.K_m and self.escena in ("escenario", "mapa", "bitacora", "historia", "resolubilidad"):
+            self.escena = "escenario" if self.escena == "mapa" else "mapa"
+            return
+        if tecla == pygame.K_t and self.escena in ("escenario", "mapa", "bitacora", "historia", "resolubilidad"):
+            if self.escena == "historia":
+                self.escena = "escenario"
+            else:
+                self._cargarHistoria(max(1, self.modelo.jugador.acciones + 1))
+                self.escena = "historia"
+            return
         if tecla == pygame.K_TAB:
             self.escena = "bitacora" if self.escena != "bitacora" else "escenario"
             return
@@ -1229,7 +1271,17 @@ class VistaGrafica:
         if self.escena == "sistema":
             self._teclaLista(tecla, self._entradasSistema(), "cursorSistema")
             return
-        if self.escena == "bitacora":
+        if self.escena == "historia":
+            if tecla in (pygame.K_LEFT, pygame.K_a):
+                self._cargarHistoria(self.historiaAccion - 1)
+            elif tecla in (pygame.K_RIGHT, pygame.K_d):
+                self._cargarHistoria(self.historiaAccion + 1)
+            elif tecla in (pygame.K_DOWN, pygame.K_s):
+                self._cargarHistoria(self.historiaAccion - 5)
+            elif tecla in (pygame.K_UP, pygame.K_w):
+                self._cargarHistoria(self.historiaAccion + 5)
+            return
+        if self.escena in ("bitacora", "mapa", "resolubilidad"):
             return
         if self.escena != "escenario" or self._bloqueado():
             return
@@ -1571,11 +1623,17 @@ class VistaGrafica:
             self.texto(px + 82, py + 2, descClave, 14, ACERO)
 
         # Pie
-        local = len(self.criptas) > 0 and "ancho" in self.criptas[0][1]
-        self.texto(ANCHO // 2, ALTO - 20,
-                   "modo demostración local: motor determinista y estructuras propias" if local
-                   else "modo conectado / offline: motor determinista y estructuras propias",
-                   14, (75, 85, 115), centrado=True)
+        if self.errorTitulo:
+            aviso = pygame.Rect(28, 622, ANCHO - 56, 28)
+            self.caja(aviso, relleno=_mezclar(PANEL, ROJO, 0.25), borde=ROJO, grosor=2, radio=6)
+            self.texto(aviso.centerx, aviso.centery, _recortar(self.fuente(15), self.errorTitulo, aviso.width - 20),
+                       15, CREMA, centrado=True)
+        else:
+            local = len(self.criptas) > 0 and "ancho" in self.criptas[0][1]
+            self.texto(ANCHO // 2, ALTO - 20,
+                       "modo demostración local: motor determinista y estructuras propias" if local
+                       else "modo conectado / offline: motor determinista y estructuras propias",
+                       14, (75, 85, 115), centrado=True)
 
     def _dibujarJuego(self):
         self._lienzo()
@@ -1599,6 +1657,12 @@ class VistaGrafica:
             self._dibujarSistema()
         elif self.escena == "bitacora":
             self._dibujarBitacora()
+        elif self.escena == "mapa":
+            self._dibujarMapaModal()
+        elif self.escena == "historia":
+            self._dibujarHistoriaModal()
+        elif self.escena == "resolubilidad":
+            self._dibujarResolubilidadModal()
         elif self.escena == "final":
             self._dibujarFinal()
         # La viñeta sólo oscurece el escenario: las cajas de la interfaz mantienen su contraste.
@@ -1679,7 +1743,10 @@ class VistaGrafica:
             self.registrar(enemigo.etiqueta, rect)
             etiqueta = pygame.Rect(rect.x - 6, rect.y - 26, 132, 22)
             esCazador = getattr(enemigo, "comportamiento", "") == "cazador"
-            tagCaz = " [CAZ]" if esCazador else ""
+            rangoCaz = getattr(enemigo, "rango", 0)
+            tagCaz = (" [CAZ R:%d]" % rangoCaz) if (esCazador and rangoCaz > 0) else (" [CAZ]" if esCazador else "")
+            if esCazador:
+                pygame.draw.rect(self.pantalla, ROJO, rect.inflate(6, 6), 2, border_radius=6)
             etiquetaTexto = "%d) %s%s" % (i + 1, "" if salaLlena else enemigo.nombre.upper(), tagCaz)
             self.texto(etiqueta.x + 2, etiqueta.y,
                        _recortar(self.fuente(17), etiquetaTexto, etiqueta.width - 4), 17,
@@ -1718,7 +1785,7 @@ class VistaGrafica:
                       (rect.centerx, base.bottom - 14) if salida.direccion == "S" else
                       (base.left + 22, rect.centery) if salida.direccion == "O" else
                       (base.right - 22, rect.centery))
-            costoTexto = " (%d)" % salida.costo if salida.costo != 100 else ""
+            costoTexto = " (%d)" % salida.costo
             autoTexto = " [AUTO %d]" % salida.cierreAutomatico if getattr(salida, "cierreAutomatico", None) is not None else ""
             chipRect = self._chip(pasado, "%s %s%s%s" % (salida.direccion, texto, costoTexto, autoTexto), tono,
                                   base.inflate(-4, -4))
@@ -1777,7 +1844,12 @@ class VistaGrafica:
             self.registrar(enemigo.etiqueta, rect)
             etiqueta = pygame.Rect(x - 30, max(base.y + 6, y - 30), 96 if compacto else 150, 26)
             esCazador = getattr(enemigo, "comportamiento", "") == "cazador"
-            tagCaz = " [CAZ]" if compacto else (" [CAZADOR]" if esCazador else "")
+            rangoCaz = getattr(enemigo, "rango", 0)
+            if esCazador:
+                pygame.draw.rect(self.pantalla, ROJO, rect.inflate(8, 8), 2, border_radius=8)
+                tagCaz = " [CAZ R:%d]" % rangoCaz if compacto else " [CAZADOR R:%d]" % rangoCaz
+            else:
+                tagCaz = ""
             nombreTexto = ("%d)" % (i + 1) if compacto else "%d) %s" % (i + 1, enemigo.nombre.upper()))
             if esCazador:
                 nombreTexto += tagCaz
@@ -1868,13 +1940,16 @@ class VistaGrafica:
 
     def _dibujarMinimapa(self):
         self.caja(CAJA_MINI)
-        self._encabezado(CAJA_MINI, "MAPA", derecha="SALA %02d" % self.captura.sala.id)
+        self._encabezado(CAJA_MINI, "MAPA", derecha="SALA %02d  [M]" % self.captura.sala.id)
         celdas = self.captura.celdas
         if len(celdas) == 0:
             return
+        visibles = [c for c in celdas if c.visitada or c.avistada]
+        if len(visibles) == 0:
+            visibles = celdas
         minX = minY = 10 ** 6
         maxX = maxY = -10 ** 6
-        for celda in celdas:
+        for celda in visibles:
             minX = min(minX, celda.x)
             maxX = max(maxX, celda.x)
             minY = min(minY, celda.y)
@@ -1883,31 +1958,50 @@ class VistaGrafica:
                            CAJA_MINI.height - 62)
         pygame.draw.rect(self.pantalla, _oscurece(PANEL, 0.50), area, border_radius=8)
         pygame.draw.rect(self.pantalla, AGUA_CLARA, area, 1, border_radius=8)
-        anchoCelda = max(6, min(22, area.width // max(1, maxX - minX + 1)))
-        altoCelda = max(6, min(22, area.height // max(1, maxY - minY + 1)))
+        anchoCelda = max(8, min(24, area.width // max(1, maxX - minX + 1)))
+        altoCelda = max(8, min(24, area.height // max(1, maxY - minY + 1)))
         lado = min(anchoCelda, altoCelda)
         offsetX = area.centerx - (maxX - minX + 1) * lado / 2.0
         offsetY = area.centery - (maxY - minY + 1) * lado / 2.0
-        for celda in celdas:
+        hoverCelda = None
+        for celda in visibles:
             rect = pygame.Rect(offsetX + (celda.x - minX) * lado,
                                offsetY + (celda.y - minY) * lado, lado - 2, lado - 2)
+            esHover = rect.collidepoint(self.posRaton)
             if not celda.visitada:
-                tono = (30, 34, 56)
-            elif celda.actual:
+                # Sala avistada pero sin explorar (§3.3 Niebla de guerra)
+                pygame.draw.rect(self.pantalla, (38, 44, 68), rect, border_radius=3)
+                pygame.draw.rect(self.pantalla, ACERO, rect, 1, border_radius=3)
+                if lado >= 14:
+                    self.texto(rect.centerx, rect.centery, "?", 11, ACERO, centrado=True)
+                continue
+            if celda.actual:
                 pulso = int(120 + 100 * math.sin(pygame.time.get_ticks() / 220.0))
                 tono = (int(pulso * 0.4), pulso, 220)
             elif celda.esSalida:
                 tono = (176, 138, 44)
             else:
-                tono = (74, 88, 128)
+                tono = (92, 112, 160) if esHover else (74, 88, 128)
             pygame.draw.rect(self.pantalla, tono, rect, border_radius=3)
+            if celda.cerrada:
+                pygame.draw.rect(self.pantalla, ROJO, rect, 1, border_radius=3)
+            elif esHover:
+                pygame.draw.rect(self.pantalla, CIAN, rect, 1, border_radius=3)
             if celda.esSalida:
                 self.texto(rect.centerx, rect.centery, "S", 13, DORADO, centrado=True)
             if celda.actual:
                 self.texto(rect.centerx, rect.centery, "@", 14, BLANCO, centrado=True)
+            if esHover:
+                hoverCelda = celda
+            self.zona(rect, UI_SERVICIO, "ir_a:%d" % celda.idSala)
         jugador = self.captura.jugador
-        self.texto(CAJA_MINI.x + 14, CAJA_MINI.bottom - 22,
-                   "acciones %d   bajas %d" % (jugador.acciones, jugador.derrotados), 15, ACERO)
+        if hoverCelda is not None:
+            pie = "CLIC: IR A SALA %d (%s)" % (hoverCelda.idSala, hoverCelda.nombre)
+            self.texto(CAJA_MINI.x + 14, CAJA_MINI.bottom - 22,
+                       _recortar(self.fuente(14), pie, CAJA_MINI.width - 28), 14, CIAN)
+        else:
+            self.texto(CAJA_MINI.x + 14, CAJA_MINI.bottom - 22,
+                       "acc %d  bajas %d  [T] historia" % (jugador.acciones, jugador.derrotados), 14, ACERO)
 
     def _dibujarEstado(self):
         self.caja(CAJA_ESTADO, relleno=PANEL_CLARO)
@@ -2139,6 +2233,143 @@ class VistaGrafica:
             self.texto(panel.x + 24, y, mensaje, 17, PERLA)
             y += 24
         self.texto(panel.x + 24, panel.bottom - 26, "X / TAB vuelve", 16, ACERO)
+
+    def _cargarHistoria(self, k):
+        maxAcc = max(1, self.modelo.jugador.acciones + 1) if self.modelo is not None else 1
+        kClamped = max(1, min(maxAcc, int(k)))
+        self.historiaAccion = kClamped
+        try:
+            self.historiaTexto = self.modelo.consultarHistoriaAccion(kClamped)
+        except Exception as error:
+            self.historiaTexto = "No se pudo consultar la acción #%d: %s" % (kClamped, error)
+
+    def _dibujarHistoriaModal(self):
+        panel = pygame.Rect(100, 74, 780, 512)
+        self.caja(panel, relleno=PANEL_CLARO, borde=CIAN)
+        maxAcc = max(1, self.modelo.jugador.acciones + 1)
+        arriba = self._encabezado(panel, "LÍNEA DE TIEMPO (HISTORIA)",
+                                  derecha="ACCIÓN #%d / %d" % (self.historiaAccion, maxAcc))
+        y = arriba + 6
+        lineas = self.historiaTexto.splitlines() if self.historiaTexto else ["Sin datos históricos."]
+        for linea in lineas[:15]:
+            for sub in _envolver(linea, 76):
+                if y > panel.bottom - 94:
+                    break
+                tono = DORADO if sub.startswith("===") else (CIAN if sub.startswith("Jugador:") or sub.startswith("Sala") else PERLA)
+                self.texto(panel.x + 24, y, sub, 16, tono)
+                y += 21
+
+        # Botones de navegación temporal
+        botones = (
+            ("<< INICIO", "hist_inicio", self.historiaAccion > 1),
+            ("-5", "hist_delta:-5", self.historiaAccion > 1),
+            ("-1 <", "hist_delta:-1", self.historiaAccion > 1),
+            ("> +1", "hist_delta:1", self.historiaAccion < maxAcc),
+            ("+5", "hist_delta:5", self.historiaAccion < maxAcc),
+            ("ACTUAL >>", "hist_actual", self.historiaAccion < maxAcc),
+            ("CERRAR [T/X]", "volver_escenario", True),
+        )
+        bx = panel.x + 20
+        by = panel.bottom - 52
+        for etiqueta, dato, habilitada in botones:
+            ancho = 104 if len(etiqueta) > 4 else 62
+            rect = pygame.Rect(bx, by, ancho, 32)
+            hover = habilitada and rect.collidepoint(self.posRaton)
+            borde = BLANCO if hover else (CIAN if habilitada else AGUA_CLARA)
+            relleno = _aclara(PANEL, 0.25) if hover else PANEL
+            self.caja(rect, relleno=relleno, borde=borde, grosor=2, radio=6)
+            self.texto(rect.centerx, rect.centery, etiqueta, 14,
+                       BLANCO if habilitada else APAGADO, centrado=True)
+            if dato == "volver_escenario":
+                self.zona(rect, UI_IR, "volver")
+            else:
+                self.zona(rect, UI_SERVICIO, dato, habilitada)
+            bx += ancho + 8
+
+    def _dibujarMapaModal(self):
+        panel = pygame.Rect(70, 58, 840, 544)
+        self.caja(panel, relleno=PANEL_CLARO, borde=DORADO_OSCURO)
+        mapa = self.modelo.mapaConocido
+        from model.ordenamiento.Selector import ordenar
+        exploradas = ordenar(mapa.listaExploradas())
+        avistadas = ordenar(mapa.listaAvistadas(self.modelo.salas))
+        arriba = self._encabezado(panel, "MAPA CONOCIDO (CLIC EN SALA PARA IR A)",
+                                  derecha="%d exploradas  %d avistadas" % (len(exploradas), len(avistadas)))
+        y = arriba + 4
+        limiteY = panel.bottom - 72
+        for sId in exploradas:
+            if y > limiteY:
+                self.texto(panel.x + 24, y, "... (%d salas exploradas en total)" % len(exploradas), 14, ACERO)
+                break
+            sala = self.modelo.salas.buscar(sId)
+            if sala is None:
+                continue
+            esActual = (sId == self.modelo.jugador.sala.id)
+            fila = pygame.Rect(panel.x + 20, y - 2, panel.width - 40, 26)
+            hover = fila.collidepoint(self.posRaton)
+            if hover and not esActual:
+                pygame.draw.rect(self.pantalla, SELECCION, fila, border_radius=5)
+            elif esActual:
+                pygame.draw.rect(self.pantalla, _oscurece(CIAN, 0.72), fila, border_radius=5)
+            salidasTxt = []
+            for s in sala.salidas:
+                est = mapa.estadoPuertaRecordada(sala.id, s.destinoId)
+                estLbl = "?" if est == "sin_observar" else ("C" if est == "cerrada" else "A")
+                salidasTxt.append("%s->%s(%d,%s)" % (s.direccion, s.destinoId, s.costo, estLbl))
+            marca = "@ " if esActual else ""
+            resumen = "%sSala %s (%s): %s" % (marca, sala.id, sala.nombre, " | ".join(salidasTxt))
+            self.texto(fila.x + 8, y + 2, _recortar(self.fuente(15), resumen, fila.width - 16), 15,
+                       DORADO if esActual else (BLANCO if hover else PERLA))
+            if not esActual:
+                self.zona(fila, UI_SERVICIO, "ir_a:%d" % sId)
+            y += 28
+
+        if y <= limiteY:
+            avTxt = ", ".join(str(x) for x in avistadas) if avistadas else "ninguna"
+            self.texto(panel.x + 24, y + 4, _recortar(self.fuente(15), "Avistadas (?): " + avTxt, panel.width - 48),
+                       15, ACERO)
+        self.texto(panel.x + 24, panel.bottom - 28,
+                   "Leyenda: A=abierta  C=cerrada  ?=sin observar | Clic en sala: ir a | M/X: cerrar", 14, ACERO)
+
+    def _dibujarResolubilidadModal(self):
+        panel = pygame.Rect(110, 88, 760, 484)
+        self.caja(panel, relleno=PANEL_CLARO, borde=VERDE)
+        arriba = self._encabezado(panel, "REPORTE DE RESOLUBILIDAD (§3.5)")
+        y = arriba + 8
+        for linea in (self.resolubilidadTexto or "Sin reporte.").splitlines():
+            for sub in _envolver(linea, 74):
+                if y > panel.bottom - 44:
+                    break
+                self.texto(panel.x + 24, y, sub, 16, PERLA)
+                y += 22
+        self.texto(panel.x + 24, panel.bottom - 28, "X / ESC / Z para volver", 15, ACERO)
+
+    def _dibujarAyudaModal(self):
+        capa = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
+        capa.fill((8, 10, 18, 180))
+        self.pantalla.blit(capa, (0, 0))
+        panel = pygame.Rect(130, 80, 720, 500)
+        self.caja(panel, relleno=PANEL_CLARO, borde=DORADO)
+        arriba = self._encabezado(panel, "AYUDA Y CONTROLES — CRIPTA PARTE II")
+        lineas = (
+            ("WASD / Flechas", "Mover cursor o elegir acción en menú"),
+            ("Z / Enter", "Confirmar acción / atacar / interactuar"),
+            ("X / Esc", "Cancelar submenú / abrir menú sistema"),
+            ("I", "Abrir o cerrar Bolsa (ordenar por peso/valor/nombre)"),
+            ("M", "Mapa conocido (exploradas, avistadas, clic para ir a)"),
+            ("T", "Línea de tiempo (consultar historia #k sin gastar tiempo)"),
+            ("Tab", "Bitácora de los últimos 20 eventos"),
+            ("H / F1", "Mostrar u ocultar esta ayuda"),
+            ("Clic minimapa", "Viaje automático «ir a» a cualquier sala explorada"),
+            ("Cazadores", "Borde rojo + [CAZ R:x]: persiguen por ruta de menor costo"),
+        )
+        y = arriba + 10
+        for tecla, desc in lineas:
+            self._chip((panel.x + 96, y + 10), tecla, DORADO)
+            self.texto(panel.x + 190, y + 2, desc, 16, PERLA)
+            y += 38
+        self.texto(panel.centerx, panel.bottom - 28, "Pulsa cualquier tecla o haz clic para cerrar", 15, ACERO,
+                   centrado=True)
 
     def _dibujarFinal(self):
         resultado = presentacion.resultadoVisual(self.modelo)

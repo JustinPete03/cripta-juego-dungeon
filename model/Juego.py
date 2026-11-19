@@ -25,6 +25,7 @@ from model.Rastro import elegirDestinoRastreador
 from model.RutasCazador import RutasCazador
 from model.Cazador import elegirPasoCazador
 from model.MapaConocido import MapaConocido
+from model.Acciones import Accion
 from model import estado
 
 
@@ -73,6 +74,8 @@ class Modelo:
         # _construirSalas la reemplaza por una del tamaño de la cripta.
         self.rutasCazador = RutasCazador()
         self.mapaConocido = MapaConocido(self._registrar)
+        self._jugadorRecibioDanio = False
+        self.mensajeRechazoViaje = ""
         from model.LineaTiempo import LineaTiempo
         self.lineaTiempo = LineaTiempo(k=getattr(self, "kCheckpoint", 20))
 
@@ -474,6 +477,75 @@ class Modelo:
             return self.lineaTiempo.consultarTiempo(self, t)
         raise RuntimeError("Línea de tiempo no configurada.")
 
+    # ===================== Viaje automático «ir a» (N-03: lógica en el modelo) =====================
+
+    VIAJE_LLEGO = "llego"
+    VIAJE_ENEMIGOS = "enemigos"
+    VIAJE_DANIO = "danio"
+    VIAJE_SIN_RUTA = "sin_ruta"
+    VIAJE_NO_EXISTE = "no_existe"
+    VIAJE_NO_EXPLORADA = "no_explorada"
+    VIAJE_YA_EN_DESTINO = "ya_en_destino"
+    VIAJE_RECHAZADO = "rechazado"
+    VIAJE_FIN_PARTIDA = "fin_partida"
+
+    def validarViaje(self, destId):
+        """Valida si se puede iniciar un viaje hacia destId (§3.4, N-03).
+        Devuelve (ok, motivo). No consume tiempo."""
+        if self.estado != EN_CURSO:
+            return (False, self.VIAJE_FIN_PARTIDA)
+        if self.salas.buscar(destId) is None:
+            return (False, self.VIAJE_NO_EXISTE)
+        if not self.mapaConocido.estaExplorada(destId):
+            return (False, self.VIAJE_NO_EXPLORADA)
+        if self.jugador.sala.id == destId:
+            return (False, self.VIAJE_YA_EN_DESTINO)
+        return (True, None)
+
+    def pasoViaje(self, destId):
+        """Da un paso del viaje automático hacia destId (§3.4, N-03).
+
+        Devuelve (salida, motivo):
+          - salida es la Salida recorrida, o None si no se movió;
+          - motivo es None si el viaje puede continuar, o el VIAJE_* por el que se detiene.
+        """
+        from model.Dijkstra import elegirPasoViajeAutomatico
+
+        if self.estado != EN_CURSO:
+            return (None, self.VIAJE_FIN_PARTIDA)
+        salaDestino = self.salas.buscar(destId)
+        if salaDestino is None:
+            return (None, self.VIAJE_NO_EXISTE)
+
+        if len(self.jugador.sala.enemigos) > 0:
+            return (None, self.VIAJE_ENEMIGOS)
+
+        salida, costo = elegirPasoViajeAutomatico(
+            self.jugador.sala, salaDestino, self.salas, self.mapaConocido
+        )
+        if salida is None:
+            return (None, self.VIAJE_SIN_RUTA)
+
+        self._jugadorRecibioDanio = False
+        resultado = self.ejecutar(Accion(ACC_MOVER, salida.direccion))
+        recibioDanio = self._jugadorRecibioDanio
+        self._jugadorRecibioDanio = False
+        if not resultado.ok:
+            self.mensajeRechazoViaje = resultado.mensaje
+            return (None, self.VIAJE_RECHAZADO)
+
+        if self.estado == DERROTA:
+            return (salida, self.VIAJE_FIN_PARTIDA)
+        if self.jugador.sala.id == destId:
+            return (salida, self.VIAJE_LLEGO)
+        if recibioDanio:
+            return (salida, self.VIAJE_DANIO)
+        if len(self.jugador.sala.enemigos) > 0:
+            return (salida, self.VIAJE_ENEMIGOS)
+        if self.estado != EN_CURSO:
+            return (salida, self.VIAJE_FIN_PARTIDA)
+        return (salida, None)
+
     def _programarSiguienteJugador(self, costo):
         jugador = self.jugador
         tiempo = self.reloj + intervaloAccion(costo, jugador.velocidad)
@@ -537,7 +609,7 @@ class Modelo:
         self.mapaConocido.explorarSala(destino)
         if hasattr(self.efectos, "antorchaEncendida") and self.efectos.antorchaEncendida(self.jugador):
             for salida in destino.salidas:
-                self.mapaConocido.explorarSala(salida.destino)
+                self.mapaConocido.marcarExplorada(salida.destino)  # N-01: solo explorar, sin observar puertas lejanas
         self.mensaje("Entras a: %s." % destino.nombre)
         self._activarDormidos(destino)
         self._activarTrampas(destino)
@@ -580,6 +652,9 @@ class Modelo:
             return
         nueva = max(0, actor.vida - cantidad)
         self.asignar(actor, "vida", nueva)
+        # N-03: marcar que el jugador recibió daño (para detener «ir a» sin comparar vida)
+        if actor is self.jugador:
+            self._jugadorRecibioDanio = True
         if nueva == 0:
             self._morir(actor)
 

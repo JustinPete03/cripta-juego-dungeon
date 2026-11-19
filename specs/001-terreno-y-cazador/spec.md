@@ -12,15 +12,15 @@
 
 - **Q1: ¿El campo `costo` de una salida aplica en ambos sentidos?**
   - **Decisión**: Sí. §3.1 lo dice explícitamente: «El costo es el mismo en ambos sentidos.»
-  - **Impacto**: La `Salida` almacena el costo; la salida inversa comparte el mismo valor.
+  - **Impacto**: El costo de cada salida se conserva igual en ambos sentidos al construir el mapa.
 
 - **Q2: ¿Qué pasa si una salida no declara el campo `costo`?**
   - **Decisión**: Su costo es 100 (§3.1: «Si no lo declara, su costo es 100»).
-  - **Impacto**: `_construirSalas` usa `info.get("costo", 100)`.
+  - **Impacto**: Toda salida sin costo declarado toma el valor por defecto de 100 al cargar la cripta.
 
 - **Q3: ¿El costo de moverse afecta también a errantes y rastreadores?**
   - **Decisión**: Sí. §3.1: «La regla aplica a todos los actores.» Errantes y rastreadores conservan su comportamiento pero el intervalo de su movimiento depende del costo de la salida atravesada.
-  - **Impacto**: `_moverEnemigo` y `_programarEnemigo` deben usar el costo de la salida, no el costo fijo 100.
+  - **Impacto**: El movimiento de todos los enemigos calcula su intervalo usando el costo real de la salida atravesada en lugar del valor fijo 100.
 
 - **Q4: ¿El cazador abre puertas cerradas?**
   - **Decisión**: No. §3.2: «No abre puertas cerradas.» Solo considera salidas abiertas para su ruta.
