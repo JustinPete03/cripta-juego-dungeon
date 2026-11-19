@@ -114,6 +114,44 @@ HEROE_ESPALDAS = (
     "....jjn.njj.....",
 )
 
+HEROE_PASO1 = (
+    ".....YYYYY......",
+    "....RRRRRRR.....",
+    "...RRRRRRRRR....",
+    "..RrrrrrrrrrR...",
+    "..rZLLLLLLZrr...",
+    "...SSSSSSSSS....",
+    "...SKWSSSWKS....",
+    "...SHSSSSSHS....",
+    "..ZZGGGGGGGZZ...",
+    ".HLLtGGGGGTLL...",
+    ".HHHtGYfYGTNhh..",
+    "..r.tGGGGGTNhh..",
+    "...rGGGGGGGr....",
+    "..rrnnn..nnrr...",
+    "..jjnn....nnn...",
+    "..........nnjj..",
+)
+
+HEROE_PASO2 = (
+    ".....YYYYY......",
+    "....RRRRRRR.....",
+    "...RRRRRRRRR....",
+    "..RrrrrrrrrrR...",
+    "..rZLLLLLLZrr...",
+    "...SSSSSSSSS....",
+    "...SKWSSSWKS....",
+    "...SHSSSSSHS....",
+    "..ZZGGGGGGGZZ...",
+    "..LLtGGGGGTLLh..",
+    "..HHtGYfYGTNhhh.",
+    "..HHtGGGGGTr.r..",
+    "...rGGGGGGGr....",
+    "..rrnn..nnnrr...",
+    "..nnn....nnjj...",
+    ".jjnn...........",
+)
+
 RATA = (
     "................",
     "................",
@@ -399,11 +437,11 @@ SALIDA = (
     "...gggggggggg...",
 )
 
-NOMBRES = ("heroe", "heroe_espaldas", "rata", "esqueleto", "cazador", "murcielago", "daga", "pocion",
+NOMBRES = ("heroe", "heroe_espaldas", "heroe_paso1", "heroe_paso2", "rata", "esqueleto", "cazador", "murcielago", "daga", "pocion",
            "antidoto", "llave", "antorcha", "pergamino", "armadura", "trampa",
            "puerta_cerrada", "pasaje", "salida")
 
-CUERPOS = (HEROE, HEROE_ESPALDAS, RATA, ESQUELETO, CAZADOR, MURCIELAGO, DAGA, POCION, ANTIDOTO,
+CUERPOS = (HEROE, HEROE_ESPALDAS, HEROE_PASO1, HEROE_PASO2, RATA, ESQUELETO, CAZADOR, MURCIELAGO, DAGA, POCION, ANTIDOTO,
            LLAVE, ANTORCHA, PERGAMINO, ARMADURA, TRAMPA, PUERTA_CERRADA, PASAJE, SALIDA)
 
 AVISOS = []

@@ -219,6 +219,10 @@ class VistaGrafica:
         self.destello = None
         self.sonidoFin = False
         self.mapaSalaSel = None
+        self.hx = None
+        self.hy = None
+        self._salaCaminar = None
+        self.moviendo = False
         self.posiciones = []
         self.sacudida = 0.0
         self.salto = None
@@ -237,6 +241,13 @@ class VistaGrafica:
         self.destello = None
         self.sonidoFin = False
         self.mapaSalaSel = None
+        self.modoCaminar = True
+        self.hx = None
+        self.hy = None
+        self.mira = 1
+        self.moviendo = False
+        self.fasePaso = 0.0
+        self._salaCaminar = None
         # Superficies recicladas: las cajas, el escenario y las luces se dibujan una sola vez.
         self.cajas = {}
         self.escenarios = {}
@@ -897,6 +908,81 @@ class VistaGrafica:
             self.salto[1] = max(0.0, self.salto[1] - dt)
             if self.salto[1] <= 0:
                 self.salto = None
+        self._caminar(dt)
+
+    def _activoCaminar(self):
+        return self.modoCaminar and self.captura is not None and not self.combate
+
+    def _suelo(self):
+        return ESCENARIO.inflate(-2 * MURO, -2 * MURO)
+
+    def _caminar(self, dt):
+        self.moviendo = False
+        if not self._activoCaminar() or self.escena != "escenario" or self.mostrarAyuda:
+            return
+        suelo = self._suelo()
+        lado = sprites.MEDIDA * 3
+        minX = float(suelo.left)
+        maxX = float(max(suelo.left, suelo.right - lado))
+        minY = float(suelo.top)
+        maxY = float(max(suelo.top, suelo.bottom - lado))
+        salaId = self.captura.sala.id
+        if self.hx is None or salaId != self._salaCaminar:
+            self._salaCaminar = salaId
+            self.hx = max(minX, min(maxX, float(suelo.centerx - lado // 2)))
+            self.hy = max(minY, min(maxY, float(suelo.bottom - 92)))
+        if self._bloqueado() or self.submenu is not None:
+            return
+        teclas = pygame.key.get_pressed()
+        dx = (1 if (teclas[pygame.K_RIGHT] or teclas[pygame.K_d]) else 0) - \
+             (1 if (teclas[pygame.K_LEFT] or teclas[pygame.K_a]) else 0)
+        dy = (1 if (teclas[pygame.K_DOWN] or teclas[pygame.K_s]) else 0) - \
+             (1 if (teclas[pygame.K_UP] or teclas[pygame.K_w]) else 0)
+        if dx == 0 and dy == 0:
+            return
+        if dx != 0 and dy != 0:
+            dx *= 0.7071
+            dy *= 0.7071
+        vel = 215.0
+        self.hx = max(minX, min(maxX, self.hx + dx * vel * dt))
+        self.hy = max(minY, min(maxY, self.hy + dy * vel * dt))
+        if dx != 0:
+            self.mira = 1 if dx > 0 else -1
+        self.moviendo = True
+        self.fasePaso += dt
+
+        # Cruzar automáticamente al caminar hasta el umbral de una puerta abierta
+        objetivo = self._objetivoCercano()
+        if objetivo is not None and objetivo[0] == ACC_MOVER:
+            dirPuerta = objetivo[1]
+            if ((dirPuerta == "N" and dy < 0 and self.hy <= minY + 4) or
+                    (dirPuerta == "S" and dy > 0 and self.hy >= maxY - 4) or
+                    (dirPuerta == "O" and dx < 0 and self.hx <= minX + 4) or
+                    (dirPuerta == "E" and dx > 0 and self.hx >= maxX - 4)):
+                self._activar(Entrada("", ACC_MOVER, dirPuerta))
+
+    def _objetivoCercano(self):
+        if self.hx is None or self.captura is None:
+            return None
+        sala = self.captura.sala
+        suelo = self._suelo()
+        lado = sprites.MEDIDA * 3
+        heroe = pygame.Rect(int(self.hx), int(self.hy), lado, lado).inflate(18, 18)
+        base = ESCENARIO
+        puertas = {"N": (base.centerx - 24, base.top - 4),
+                   "S": (base.centerx - 24, base.bottom - 44),
+                   "E": (base.right - 44, base.centery - 24),
+                   "O": (base.left - 4, base.centery - 24)}
+        for salida in sala.salidas:
+            if salida.direccion in puertas:
+                x, y = puertas[salida.direccion]
+                if heroe.colliderect(pygame.Rect(x, y, 48, 48)):
+                    return (ACC_ABRIR if salida.cerrada else ACC_MOVER, salida.direccion)
+        for i in range(len(sala.suelo)):
+            x, y = self._posicionSuelo(i, suelo)
+            if heroe.colliderect(pygame.Rect(x, y, 32, 32)):
+                return (ACC_RECOGER, i)
+        return None
 
     def _alpha(self, clave):
         for entrada in self.parpadeos:
@@ -934,6 +1020,10 @@ class VistaGrafica:
         self.destello = None
         self.sonidoFin = False
         self.mapaSalaSel = None
+        self.hx = None
+        self.hy = None
+        self._salaCaminar = None
+        self.moviendo = False
         self.posiciones = []
         self.cola = []
         self.linea = None
@@ -1226,6 +1316,11 @@ class VistaGrafica:
             if len(entradas) > 0:
                 self._activar(entradas[min(self.cursorSub, len(entradas) - 1)])
             return
+        if self._activoCaminar() and self.escena == "escenario" and not self.esperando:
+            objetivo = self._objetivoCercano()
+            if objetivo is not None:
+                self._activar(Entrada("", objetivo[0], objetivo[1]))
+                return
         entradas = self._entradasMenu()
         if len(entradas) > 0:
             self._activar(entradas[min(self.cursorMenu, len(entradas) - 1)])
@@ -1423,8 +1518,15 @@ class VistaGrafica:
             return
         if self.escena != "escenario" or self._bloqueado():
             return
+        if tecla == pygame.K_c and self.captura is not None and not self.combate:
+            self.modoCaminar = not self.modoCaminar
+            self.sfx.reproducir("menu")
+            return
         if self.submenu is not None:
             self._teclaLista(tecla, self._entradasSubmenu(), "cursorSub")
+            return
+        if self._activoCaminar() and tecla in (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT,
+                                               pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d):
             return
         total = len(self._entradasMenu())
         if tecla in (pygame.K_UP, pygame.K_w):
@@ -1907,7 +2009,20 @@ class VistaGrafica:
                        (255, 110, 110), centrado=True, sombra=TINTA)
         self._dibujarSalidas(base, sala)
         bobHeroe = int(2.0 * math.sin(ticks / 280.0))
-        hx, hy = suelo.centerx - 24, suelo.bottom - 92 + bobHeroe
+        spriteHeroe = "heroe"
+        if self._activoCaminar() and self.hx is not None:
+            if self.moviendo:
+                ciclo = int(self.fasePaso * 10.0) % 4
+                if ciclo == 0:
+                    spriteHeroe = "heroe_paso1"
+                elif ciclo == 2:
+                    spriteHeroe = "heroe_paso2"
+                rebote = int(3 * abs(math.sin(self.fasePaso * 10.0 * math.pi / 2.0)))
+            else:
+                rebote = 0
+            hx, hy = int(self.hx), int(self.hy) - rebote
+        else:
+            hx, hy = suelo.centerx - 24, suelo.bottom - 92 + bobHeroe
         # Si el jugador lleva antorcha encendida, proyectar halo cálido pulsante en la sala.
         jugadorCap = self.captura.jugador
         if jugadorCap is not None and any("antorcha" in str(ef).lower() for ef in jugadorCap.efectos):
@@ -1916,7 +2031,7 @@ class VistaGrafica:
             haloAnt.set_alpha(pulsoAnt)
             self.pantalla.blit(haloAnt, (hx + 24 - 100, hy + 24 - 100))
         # El héroe va debajo de los objetos: comparten fila y sus etiquetas deben quedar visibles.
-        rect = self._dibujarActor("heroe", hx, hy, 3,
+        rect = self._dibujarActor(spriteHeroe, hx, hy, 3,
                                   self._alpha("jugador"), "jugador")
         self.registrar("jugador", rect)
         for i in range(len(sala.suelo)):
@@ -1963,6 +2078,25 @@ class VistaGrafica:
             self.barraVida(pygame.Rect(rect.x, rect.bottom + 4, rect.width, 20),
                            self._valorMostrado(enemigo.etiqueta, enemigo.vida),
                            enemigo.vidaMax, "", True)
+        if self.escena == "escenario" and not self.combate:
+            if self.modoCaminar:
+                self._chip((base.x + 118, base.y + 16), "CAMINANDO (WASD) · [C] MENÚ", AMARILLO,
+                           base.inflate(-4, -4))
+                if self.hx is not None and not self._bloqueado() and self.submenu is None:
+                    objetivo = self._objetivoCercano()
+                    if objetivo is not None:
+                        accion, dato = objetivo
+                        if accion == ACC_RECOGER:
+                            txtObj, tonoObj = "Z: TOMAR", VERDE
+                        elif accion == ACC_ABRIR:
+                            txtObj, tonoObj = "Z: ABRIR", DORADO
+                        else:
+                            txtObj, tonoObj = "Z: IR %s" % dato, CIAN
+                        self._chip((int(self.hx) + 24, int(self.hy) - 10), txtObj, tonoObj,
+                                   base.inflate(-4, -4))
+            else:
+                self._chip((base.x + 76, base.y + 16), "[C] CAMINAR (WASD)", ACERO,
+                           base.inflate(-4, -4))
 
     def _dibujarSalidas(self, base, sala):
         centro = base.center
